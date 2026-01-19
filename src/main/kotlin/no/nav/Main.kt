@@ -26,8 +26,8 @@ fun Application.module() {
         }
         get("/bigquery") {
             logger.info("BigQuery request received")
-            bigQueryClient.datasetPresent(datasetId = datasetId)
-            call.respond(HttpStatusCode.OK, "BigQuery")
+            val present = bigQueryClient.datasetPresent(datasetId = datasetId)
+            call.respond(HttpStatusCode.OK, "BigQuery ${datasetId.dataset}: $present")
         }
     }
 }
