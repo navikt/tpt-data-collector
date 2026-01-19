@@ -1,5 +1,6 @@
 package no.nav
 
+import com.google.cloud.bigquery.BigQuery
 import com.google.cloud.bigquery.DatasetId
 import com.google.cloud.bigquery.TableId
 import io.ktor.http.*
@@ -35,7 +36,18 @@ fun Application.module() {
             val tableId = TableId.of(datasetId.project, datasetId.dataset, tableName)
             logger.info("BigQueryTable request received")
             val present = bigQueryClient.tablePresent(tableId)
-            call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: $present\n")
+            if (!present) {
+                call.respond(HttpStatusCode.NotFound, "Table ${tableId.dataset} not found")
+            }
+            var rowcount = 0
+            val table = bigQueryClient.getTable(tableId)
+            val page = table.list(BigQuery.TableDataListOption.pageSize(100))
+            page.pageNoSchema.streamAll().forEach { page ->
+                page.forEach {
+                    rowcount++
+                }
+            }
+            call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: $rowcount\n")
         }
     }
 }

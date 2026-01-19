@@ -16,7 +16,7 @@ class BigQueryClient (projectId: String) {
         private val log = LoggerFactory.getLogger(BigQueryClient::class.java)
     }
 
-    private fun getTable(tableId: TableId): Table =
+    fun getTable(tableId: TableId): Table =
         requireNotNull(bigQuery.getTable(tableId)) {
             "Mangler tabell: '${tableId.table}' i BigQuery"
         }
