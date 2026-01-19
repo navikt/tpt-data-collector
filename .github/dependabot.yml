@@ -5,7 +5,7 @@ version: 2
 #registries:
 #  mvn-repo:
 #    type: maven-repository
-#    url: https://maven.pkg.github.com/navikt/backend-golden-path
+#    url: https://maven.pkg.github.com/navikt/tpt-data-collector
 #    username: username
 #    password: ${{secrets.READER_TOKEN}}
 

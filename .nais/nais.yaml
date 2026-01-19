@@ -1,11 +1,9 @@
 apiVersion: nais.io/v1alpha1
 kind: Application
 metadata:
-  name: backend-golden-path # TODO: Change this name to your application name
-  namespace: appsec # TODO: Change this to your team's namespace
+  name: tpt-data-collector
+  namespace: appsec
 spec:
-  ingresses:
-    - https://backend-golden-path.intern.dev.nav.no # TODO: Change this to your desired ingress
   image: {{image}}
   port: 8080
   replicas:
@@ -19,3 +17,7 @@ spec:
     logging:
       destinations:
         - id: loki
+  gcp:
+    bigQueryDatasets:
+      - name: appsec
+        permission: READ

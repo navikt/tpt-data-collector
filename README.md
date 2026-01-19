@@ -1,6 +1,6 @@
-# backend-golden-path
+# tpt-data-collector
 
-![workflow](https://github.com/navikt/backend-golden-path/actions/workflows/main.yaml/badge.svg)
+![workflow](https://github.com/navikt/tpt-data-collector/actions/workflows/main.yaml/badge.svg)
 
 ## Overview
 

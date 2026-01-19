@@ -1,4 +1,4 @@
-rootProject.name = "backend-golden-path" // TODO: Change this name to your application name
+rootProject.name = "tpt-data-collector"
 pluginManagement {
     repositories {
         mavenCentral()
