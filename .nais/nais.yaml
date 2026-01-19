@@ -12,7 +12,7 @@ spec:
   resources:
     requests:
       cpu: 50m
-      memory: 32Mi
+      memory: 128Mi
   observability:
     logging:
       destinations:
@@ -21,3 +21,6 @@ spec:
     bigQueryDatasets:
       - name: appsec
         permission: READ
+  env:
+    - name: BIGQUERY_DATASET_ID
+      value: appsec

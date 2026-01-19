@@ -10,6 +10,9 @@ dependencies {
     implementation(libs.bundles.ktor)
     implementation(libs.bundles.logging)
 
+    // BigQuery
+    implementation("com.google.cloud:google-cloud-bigquery:2.57.1")
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
