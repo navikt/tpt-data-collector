@@ -1,7 +1,7 @@
 package no.nav
 
-import com.google.cloud.bigquery.BigQuery
 import com.google.cloud.bigquery.DatasetId
+import com.google.cloud.bigquery.StandardTableDefinition
 import com.google.cloud.bigquery.TableId
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -37,16 +37,9 @@ fun Application.module() {
             logger.info("BigQueryTable request received")
             val present = bigQueryClient.tablePresent(tableId)
             if (!present) {
-                call.respond(HttpStatusCode.NotFound, "Table ${tableId.dataset} not found")
+                call.respond(HttpStatusCode.NotFound, "Table ${tableId.dataset} not found\n")
             }
-            var rowcount = 0
-            val table = bigQueryClient.getTable(tableId)
-            val page = table.list(BigQuery.TableDataListOption.pageSize(100))
-            page.pageNoSchema.streamAll().forEach { page ->
-                page.forEach {
-                    rowcount++
-                }
-            }
+            val rowcount = bigQueryClient.getTable(tableId).getDefinition<StandardTableDefinition>().numRows
             call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: $rowcount\n")
         }
     }
