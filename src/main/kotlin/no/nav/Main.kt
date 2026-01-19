@@ -1,6 +1,7 @@
 package no.nav
 
 import com.google.cloud.bigquery.DatasetId
+import com.google.cloud.bigquery.TableId
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.netty.*
@@ -27,7 +28,14 @@ fun Application.module() {
         get("/bigquery") {
             logger.info("BigQuery request received")
             val present = bigQueryClient.datasetPresent(datasetId = datasetId)
-            call.respond(HttpStatusCode.OK, "BigQuery ${datasetId.dataset}: $present")
+            call.respond(HttpStatusCode.OK, "BigQuery ${datasetId.dataset}: $present\n")
+        }
+        get("/bigquery/table/{tableName}") {
+            val tableName = call.parameters["tableName"]
+            val tableId = TableId.of(datasetId.project, datasetId.dataset, tableName)
+            logger.info("BigQueryTable request received")
+            val present = bigQueryClient.tablePresent(tableId)
+            call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: $present\n")
         }
     }
 }
