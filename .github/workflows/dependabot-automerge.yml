@@ -15,4 +15,4 @@ jobs:
         uses: navikt/automerge-dependabot@v1.3
         with:
           token: ${{ github.token }}
-          blackout-periods: '2025-07-01/2025-07-31,2025-12-20/2026-01-02' # TODO: Update periods suitable for your team, or omit this field entirely
+          blackout-periods: '2025-07-01/2025-07-31,2025-12-20/2026-01-02'
