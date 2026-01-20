@@ -42,7 +42,14 @@ fun Application.module() {
             val result = bigQueryClient.queryTable("SELECT * FROM `appsec.$tableName`")
 
             val fieldNames = result.schema?.fields?.map{it.name}.orEmpty()
-            call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: ${fieldNames.joinToString { ", " }}\n")
+            val types = result.schema?.fields?.map{it.type.name()}.orEmpty()
+            val description = result.schema?.fields?.map{it.description}.orEmpty()
+            val subFields = result.schema?.fields?.map{it.subFields.map { sub -> sub.name }.joinToString { "|" }}.orEmpty()
+            call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: \n" +
+                    "fieldNames: ${fieldNames.joinToString { ", " }}\n" +
+                    "description: ${description.joinToString { ", " }}\n" +
+                    "subFields: ${subFields.joinToString { ", " }}\n" +
+                    "types: ${types.joinToString { ", " }}\n")
         }
     }
 }
