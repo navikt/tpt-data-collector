@@ -45,7 +45,7 @@ fun Application.module() {
             val types = result.schema?.fields?.map{it.type.name()}.orEmpty()
 
             val resultString = result.iterateAll().map { row ->
-                val rowString = row.mapIndexed { idx, field -> "${fieldNames[idx]}: $field.$field.value.toString()}" }.joinToString(", ")
+                val rowString = row.mapIndexed { idx, field -> "${fieldNames[idx]}: ${field.value}" }.joinToString(", ")
                 "row: $rowString \n"
             }.joinToString("\n")
             call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: \n" +
