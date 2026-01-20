@@ -39,19 +39,18 @@ fun Application.module() {
                 call.respond(HttpStatusCode.NotFound, "Table ${tableId.dataset} not found\n")
             }
 
-            val result = bigQueryClient.queryTable("SELECT * FROM `appsec.$tableName`")
+            val result = bigQueryClient.queryTable("SELECT * FROM `appsec.$tableName` LIMIT 10")
 
             val fieldNames = result.schema?.fields?.map{it.name}.orEmpty()
             val types = result.schema?.fields?.map{it.type.name()}.orEmpty()
-            val description = result.schema?.fields?.map{it.description}.orEmpty()
 
-//            val resultString = result.iterateAll().map { row ->
-//                row.forEach { field -> field.value.toString() }
-//            }.joinToString(",")
+            val resultString = result.iterateAll().map { row ->
+                row.forEach { field -> field.value.toString() }
+            }.joinToString(",")
             call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: \n" +
                     "fieldNames: ${fieldNames.joinToString ( ", " )}\n" +
-                    "description: ${description.joinToString ( ", " )}\n" +
-                    "types: ${types.joinToString ( ", " )}\n")
+                    "types: ${types.joinToString ( ", " )}\n" +
+                    "result: $resultString\n")
         }
     }
 }
