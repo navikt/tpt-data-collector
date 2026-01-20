@@ -39,8 +39,8 @@ fun Application.module() {
             if (!present) {
                 call.respond(HttpStatusCode.NotFound, "Table ${tableId.dataset} not found\n")
             }
-            val rowcount = bigQueryClient.getTable(tableId).getDefinition<StandardTableDefinition>().numRows
-            call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: $rowcount\n")
+            val fieldNames = bigQueryClient.getTable(tableId).getDefinition<StandardTableDefinition>().schema?.fields?.map{it.name}.orEmpty()
+            call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: ${fieldNames.joinToString { ", " }}\n")
         }
     }
 }
