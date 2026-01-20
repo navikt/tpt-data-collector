@@ -1,7 +1,6 @@
 package no.nav
 
 import com.google.cloud.bigquery.DatasetId
-import com.google.cloud.bigquery.StandardTableDefinition
 import com.google.cloud.bigquery.TableId
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -39,7 +38,10 @@ fun Application.module() {
             if (!present) {
                 call.respond(HttpStatusCode.NotFound, "Table ${tableId.dataset} not found\n")
             }
-            val fieldNames = bigQueryClient.getTable(tableId).getDefinition<StandardTableDefinition>().schema?.fields?.map{it.name}.orEmpty()
+
+            val result = bigQueryClient.queryTable("SELECT * FROM `appsec.$tableName`")
+
+            val fieldNames = result.schema?.fields?.map{it.name}.orEmpty()
             call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: ${fieldNames.joinToString { ", " }}\n")
         }
     }

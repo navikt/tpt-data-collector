@@ -37,7 +37,7 @@ class BigQueryClient (val projectId: String) {
             "Mangler tabell: '${tableId.table}' i BigQuery"
         }
 
-    fun queryTable(query: String): TableResult? {
+    fun queryTable(query: String): TableResult {
         val queryConfig = QueryJobConfiguration.newBuilder(query).setUseLegacySql(false).build()
         val jobId = JobId.newBuilder().setProject(projectId).build()
 
