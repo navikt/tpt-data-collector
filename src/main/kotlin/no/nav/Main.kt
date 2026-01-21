@@ -9,6 +9,7 @@ import io.ktor.server.routing.*
 import no.nav.bigquery.BigQueryClient
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.bigquery.DummyBigQuery
+import no.nav.data.DockerfileFeatures
 import no.nav.util.getEnvVar
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -32,10 +33,13 @@ fun Application.module(testing: Boolean = false) {
         }
         get("/bigquery/dockerfile_features") {
             logger.info("Starting handling of request for dockerfile_features")
-            val result = bigQueryClient.readTable("dockerfile_features")
+            val dockerfileFeaturesList = bigQueryClient.readTable("dockerfile_features")
+            val reposList = bigQueryClient.readTable("repos")
+
+            val dockerfileFeatures = DockerfileFeatures(dockerfileFeaturesList, reposList)
             call.respond(
                 HttpStatusCode.OK, "BigQuery: \n" +
-                        "result: $result\n"
+                        "result: $dockerfileFeatures\n"
             )
         }
     }

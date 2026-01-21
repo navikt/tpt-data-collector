@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "2.3.0"
+    kotlin("plugin.serialization") version "2.3.0"
 }
 
 kotlin {
@@ -9,9 +10,10 @@ kotlin {
 dependencies {
     implementation(libs.bundles.ktor)
     implementation(libs.bundles.logging)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
     // BigQuery
-    implementation("com.google.cloud:google-cloud-bigquery:2.57.1")
+    implementation("com.google.cloud:google-cloud-bigquery:2.57.2")
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)

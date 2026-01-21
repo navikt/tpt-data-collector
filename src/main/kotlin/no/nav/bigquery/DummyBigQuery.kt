@@ -1,8 +1,7 @@
 package no.nav.bigquery
 
-class DummyBigQuery: BigQueryClientInterface {
-    override fun readTable(tableName: String): String {
-        return "{\"$tableName\":[]}"
+class DummyBigQuery : BigQueryClientInterface {
+    override fun readTable(tableName: String): List<Map<String, String>> {
+        return emptyList()
     }
-
 }

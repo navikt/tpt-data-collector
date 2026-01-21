@@ -9,11 +9,10 @@ import com.google.cloud.bigquery.Table
 import com.google.cloud.bigquery.TableDefinition
 import com.google.cloud.bigquery.TableId
 import com.google.cloud.bigquery.TableResult
-import no.nav.json.Jsonifier
 import no.nav.logger
 import kotlin.collections.orEmpty
 
-class BigQueryClient(val projectId: String, val datasetId: DatasetId): BigQueryClientInterface {
+class BigQueryClient(val projectId: String, val datasetId: DatasetId) : BigQueryClientInterface {
     private val bigQuery = BigQueryOptions.newBuilder()
         .setProjectId(projectId)
         .build()
@@ -60,12 +59,14 @@ class BigQueryClient(val projectId: String, val datasetId: DatasetId): BigQueryC
         return result
     }
 
-    override fun readTable(tableName: String): String {
+    override fun readTable(tableName: String): List<Map<String, String>> {
         val tableId = TableId.of(datasetId.project, datasetId.dataset, tableName)
         logger.info("BigQueryTable request received")
         tablePresent(tableId)
         val timestampColumn =
             if (tableName == "dockerfile_features")
+                "when_collected"
+            else if (tableName == "repos")
                 "when_collected"
             else
                 throw IllegalStateException("Table $tableName is not configured in code. Please fix here!!!")
@@ -79,15 +80,15 @@ class BigQueryClient(val projectId: String, val datasetId: DatasetId): BigQueryC
                     "GROUP BY t.repo_id;"
         )
 
-        val jsonifier = Jsonifier(tableName)
+        val dataList = mutableListOf<Map<String, String>>()
         result.iterateAll().forEach { row ->
-            jsonifier.startRow()
+            val rowMap = mutableMapOf<String, String>()
             row.forEachIndexed { idx, field ->
-                jsonifier.addField(fieldNames[idx], field.value.toString())
+                rowMap[fieldNames[idx]] = field.value.toString()
             }
-            jsonifier.endRow()
+            dataList.add(rowMap)
         }
-        return jsonifier.finish()
+        return dataList
     }
 
 }
