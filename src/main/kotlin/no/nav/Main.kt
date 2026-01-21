@@ -1,6 +1,7 @@
 package no.nav
 
 import com.google.cloud.bigquery.DatasetId
+import com.google.cloud.bigquery.TableDefinition
 import com.google.cloud.bigquery.TableId
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -8,6 +9,7 @@ import io.ktor.server.netty.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.nav.bigquery.BigQueryClient
+import no.nav.json.Jsonifier
 import no.nav.util.getEnvVar
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -39,19 +41,28 @@ fun Application.module() {
                 call.respond(HttpStatusCode.NotFound, "Table ${tableId.dataset} not found\n")
             }
 
+
+            val fieldNames = bigQueryClient.getTable(tableId).getDefinition<TableDefinition>().schema?.fields?.map{it.name}.orEmpty()
+
             val result = bigQueryClient.queryTable("SELECT * FROM `appsec.$tableName` LIMIT 10")
 
-            val fieldNames = result.schema?.fields?.map{it.name}.orEmpty()
-            val types = result.schema?.fields?.map{it.type.name()}.orEmpty()
+            //select array_agg(t order by insert_date desc limit 1)[ordinal(1)].*
+            //from `appsec-prod-624d.appsec.cloc-repo` t
+            //WHERE insert_date > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+            //group by t.repository_name, t.language;
 
-            val resultString = result.iterateAll().map { row ->
-                val rowString = row.mapIndexed { idx, field -> "${fieldNames[idx]}: ${field.value}" }.joinToString(", ")
-                "row: $rowString \n"
-            }.joinToString("\n")
+            val jsonifier = Jsonifier()
+            result.iterateAll().forEach { row ->
+                jsonifier.startRow()
+                row.forEachIndexed { idx, field ->
+                    jsonifier.addField(fieldNames[idx], field.value.toString())
+                }
+                jsonifier.endRow()
+            }
+
             call.respond(HttpStatusCode.OK, "BigQuery ${tableId.table}: \n" +
                     "fieldNames: ${fieldNames.joinToString ( ", " )}\n" +
-                    "types: ${types.joinToString ( ", " )}\n" +
-                    "result: $resultString\n")
+                    "result: ${jsonifier.finish()}\n")
         }
     }
 }
