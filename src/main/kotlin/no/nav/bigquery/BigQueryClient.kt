@@ -13,7 +13,7 @@ import no.nav.json.Jsonifier
 import no.nav.logger
 import kotlin.collections.orEmpty
 
-class BigQueryClient(val projectId: String, val datasetId: DatasetId) {
+class BigQueryClient(val projectId: String, val datasetId: DatasetId): BigQueryClientInterface {
     private val bigQuery = BigQueryOptions.newBuilder()
         .setProjectId(projectId)
         .build()
@@ -60,7 +60,7 @@ class BigQueryClient(val projectId: String, val datasetId: DatasetId) {
         return result
     }
 
-    fun readTable(tableName: String): String {
+    override fun readTable(tableName: String): String {
         val tableId = TableId.of(datasetId.project, datasetId.dataset, tableName)
         logger.info("BigQueryTable request received")
         tablePresent(tableId)

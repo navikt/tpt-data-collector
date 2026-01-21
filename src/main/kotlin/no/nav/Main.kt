@@ -7,6 +7,8 @@ import io.ktor.server.netty.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.nav.bigquery.BigQueryClient
+import no.nav.bigquery.BigQueryClientInterface
+import no.nav.bigquery.DummyBigQuery
 import no.nav.util.getEnvVar
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -15,10 +17,14 @@ fun main(args: Array<String>): Unit = EngineMain.main(args)
 
 val logger: Logger = LoggerFactory.getLogger("Main")
 
-fun Application.module() {
+fun Application.module(testing: Boolean = false) {
     val projectId = getEnvVar("GCP_TEAM_PROJECT_ID", "appsec")
     val datasetId = DatasetId.of(projectId, getEnvVar("BIGQUERY_DATASET_ID", "appsec"))
-    val bigQueryClient = BigQueryClient(projectId, datasetId)
+    val bigQueryClient: BigQueryClientInterface = if (testing)
+        DummyBigQuery()
+    else
+        BigQueryClient(projectId, datasetId)
+
     routing {
         get("/") {
             logger.info("Request received")

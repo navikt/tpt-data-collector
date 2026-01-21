@@ -11,7 +11,7 @@ class MainTest {
     @Test
     fun `server starts and responds with 200 OK`() = testApplication {
         application {
-            module()
+            module(testing = true)
         }
         val response = client.get("/")
         assertEquals(HttpStatusCode.OK, response.status)
