@@ -8,7 +8,7 @@ class JsonifierTest {
     @Test
     fun testJsonify() {
         //when
-        val jsonifier = Jsonifier()
+        val jsonifier = Jsonifier("result")
         jsonifier.startRow()
         jsonifier.addField("test", "valuee")
         jsonifier.endRow()
@@ -19,11 +19,11 @@ class JsonifierTest {
     @Test
     fun testJsonifyEncoding() {
         //when
-        val jsonifier = Jsonifier()
+        val jsonifier = Jsonifier("encoding")
         jsonifier.startRow()
         jsonifier.addField("test", "value\"!:;´`'")
         jsonifier.endRow()
 
-        assertEquals("""{"result":[{"test":"value\"!:;´`'"}]}""", jsonifier.finish())
+        assertEquals("""{"encoding":[{"test":"value\"!:;´`'"}]}""", jsonifier.finish())
     }
 }

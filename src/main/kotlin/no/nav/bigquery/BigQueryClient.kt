@@ -6,38 +6,41 @@ import com.google.cloud.bigquery.JobId
 import com.google.cloud.bigquery.JobInfo
 import com.google.cloud.bigquery.QueryJobConfiguration
 import com.google.cloud.bigquery.Table
+import com.google.cloud.bigquery.TableDefinition
 import com.google.cloud.bigquery.TableId
 import com.google.cloud.bigquery.TableResult
-import org.slf4j.LoggerFactory
+import no.nav.json.Jsonifier
+import no.nav.logger
+import kotlin.collections.orEmpty
 
-class BigQueryClient (val projectId: String) {
+class BigQueryClient(val projectId: String, val datasetId: DatasetId) {
     private val bigQuery = BigQueryOptions.newBuilder()
         .setProjectId(projectId)
         .build()
         .service
 
-    companion object {
-        private val log = LoggerFactory.getLogger(BigQueryClient::class.java)
+    init {
+        datasetPresent(datasetId)
     }
 
-    fun datasetPresent(datasetId: DatasetId): Boolean {
-        val present = bigQuery.getDataset(datasetId) != null
-        log.info("dataset: $datasetId, present: $present")
-        return present
+    private fun datasetPresent(datasetId: DatasetId) {
+        requireNotNull(bigQuery.getDataset(datasetId)) {
+            "Missing dataset: '${datasetId.dataset}'  in project: '${datasetId.project}' in BigQuery"
+        }
     }
 
-    fun tablePresent(tableId: TableId): Boolean {
-        val present = bigQuery.getTable(tableId) != null
-        log.info("table: $tableId, present: $present")
-        return present
-    }
-
-    fun getTable(tableId: TableId): Table =
+    private fun tablePresent(tableId: TableId) {
         requireNotNull(bigQuery.getTable(tableId)) {
-            "Mangler tabell: '${tableId.table}' i BigQuery"
+            "Missing table: '${tableId.table}' in BigQuery"
+        }
+    }
+
+    private fun getTable(tableId: TableId): Table =
+        requireNotNull(bigQuery.getTable(tableId)) {
+            "Missing table: '${tableId.table}' in BigQuery"
         }
 
-    fun queryTable(query: String): TableResult {
+    private fun queryTable(query: String): TableResult {
         val queryConfig = QueryJobConfiguration.newBuilder(query).setUseLegacySql(false).build()
         val jobId = JobId.newBuilder().setProject(projectId).build()
 
@@ -48,12 +51,43 @@ class BigQueryClient (val projectId: String) {
             throw IllegalStateException("Job no longer exists for $projectId")
         } else if (job.status.executionErrors != null && job.status.executionErrors.isNotEmpty()) {
             throw IllegalStateException(
-                "Job failed with unhandled error: \"${job.status.executionErrors[0].message}\" for $projectId")
+                "Job failed with unhandled error: \"${job.status.executionErrors[0].message}\" for $projectId"
+            )
         }
 
         val result = job.getQueryResults()
 
         return result
+    }
+
+    fun readTable(tableName: String): String {
+        val tableId = TableId.of(datasetId.project, datasetId.dataset, tableName)
+        logger.info("BigQueryTable request received")
+        tablePresent(tableId)
+        val timestampColumn =
+            if (tableName == "dockerfile_features")
+                "when_collected"
+            else
+                throw IllegalStateException("Table $tableName is not configured in code. Please fix here!!!")
+
+        val fieldNames = getTable(tableId).getDefinition<TableDefinition>().schema?.fields?.map { it.name }.orEmpty()
+
+        val result = queryTable(
+            "SELECT array_agg(t ORDER BY when_collected DESC LIMIT 1)[ordinal(1)].* " +
+                    "FROM `appsec.$tableName` t " +
+                    "WHERE $timestampColumn > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY) " +
+                    "GROUP BY t.repo_id;"
+        )
+
+        val jsonifier = Jsonifier(tableName)
+        result.iterateAll().forEach { row ->
+            jsonifier.startRow()
+            row.forEachIndexed { idx, field ->
+                jsonifier.addField(fieldNames[idx], field.value.toString())
+            }
+            jsonifier.endRow()
+        }
+        return jsonifier.finish()
     }
 
 }

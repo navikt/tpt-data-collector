@@ -4,13 +4,13 @@ import com.fasterxml.jackson.core.JsonEncoding
 import com.fasterxml.jackson.core.JsonFactory
 import java.io.ByteArrayOutputStream
 
-class Jsonifier {
+class Jsonifier(datasetName: String) {
     val stingStream = ByteArrayOutputStream()
     val jsonGenerator = JsonFactory().createGenerator(stingStream, JsonEncoding.UTF8)
 
     init {
         jsonGenerator.writeStartObject()
-        jsonGenerator.writeFieldName("result")
+        jsonGenerator.writeFieldName(datasetName)
         jsonGenerator.writeStartArray()
     }
 
