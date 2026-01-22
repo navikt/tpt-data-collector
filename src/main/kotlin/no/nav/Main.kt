@@ -35,9 +35,11 @@ val config = ApplikasjonsConfig()
         KafkaSender()
 
     routing {
-        get("/") {
-            logger.info("Request received")
-            call.respond(HttpStatusCode.OK, "Hello, World!")
+        get("/internal/isAlive") {
+            if(bigQueryClient.isAlive())
+                call.respond(HttpStatusCode.OK, "OK")
+            else
+                call.respond(HttpStatusCode.ServiceUnavailable, "BigQuery error")
         }
         get("/bigquery/dockerfile_features") {
             val tableName = "dockerfile_features"

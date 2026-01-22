@@ -6,6 +6,10 @@ metadata:
 spec:
   image: {{image}}
   port: 8080
+  liveness:
+    path: /internal/isAlive
+  readiness:
+    path: /internal/isAlive
   replicas:
     max: 1
     min: 1

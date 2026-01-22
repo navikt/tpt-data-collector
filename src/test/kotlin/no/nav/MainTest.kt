@@ -13,8 +13,8 @@ class MainTest {
         application {
             module(testing = true)
         }
-        val response = client.get("/")
+        val response = client.get("/internal/isAlive")
         assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("Hello, World!", response.bodyAsText())
+        assertEquals("OK", response.bodyAsText())
     }
 }

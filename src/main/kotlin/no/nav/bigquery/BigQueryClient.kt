@@ -19,10 +19,10 @@ class BigQueryClient(val projectId: String, val datasetId: DatasetId) : BigQuery
         .service
 
     init {
-        datasetPresent(datasetId)
+        datasetPresent()
     }
 
-    private fun datasetPresent(datasetId: DatasetId) {
+    private fun datasetPresent() {
         requireNotNull(bigQuery.getDataset(datasetId)) {
             "Missing dataset: '${datasetId.dataset}'  in project: '${datasetId.project}' in BigQuery"
         }
@@ -38,6 +38,15 @@ class BigQueryClient(val projectId: String, val datasetId: DatasetId) : BigQuery
         requireNotNull(bigQuery.getTable(tableId)) {
             "Missing table: '${tableId.table}' in BigQuery"
         }
+
+    override fun isAlive(): Boolean {
+        try {
+            datasetPresent()
+            return true
+        } catch (_: IllegalArgumentException) {
+            return false
+        }
+    }
 
     private fun queryTable(query: String): TableResult {
         val queryConfig = QueryJobConfiguration.newBuilder(query).setUseLegacySql(false).build()
