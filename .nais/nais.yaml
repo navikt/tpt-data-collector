@@ -9,6 +9,8 @@ spec:
   replicas:
     max: 1
     min: 1
+  kafka:
+    pool: nav-prod
   resources:
     requests:
       cpu: 50m
@@ -24,3 +26,7 @@ spec:
   env:
     - name: BIGQUERY_DATASET_ID
       value: appsec
+    - name: TPT_TOPIC
+      value: appsec.tpt
+    - name: KAFKA_CLIENT_ID
+      value: tpt-data-collector

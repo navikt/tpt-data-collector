@@ -15,6 +15,13 @@ dependencies {
     // BigQuery
     implementation("com.google.cloud:google-cloud-bigquery:2.57.2")
 
+    // Kafka
+    implementation("at.yawk.lz4:lz4-java:1.10.2")
+    implementation("org.apache.kafka:kafka-clients:4.1.1") {
+        // "Fikser CVE-2025-12183 - lz4-java >1.8.1 har sårbar versjon (transitive dependency fra kafka-clients:4.1.0)"
+        exclude("org.lz4", "lz4-java")
+    }
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
