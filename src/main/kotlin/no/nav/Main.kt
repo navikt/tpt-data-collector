@@ -57,8 +57,7 @@ val config = ApplikasjonsConfig()
 
             logger.debug("$tableName Done")
             call.respond(
-                HttpStatusCode.OK, "BigQuery: \n" +
-                        "Number of lines sent: ${mainTableList.size}\n"
+                HttpStatusCode.OK, "BigQuery: Number of lines sent: ${mainTableList.size}\n"
             )
         }
     }

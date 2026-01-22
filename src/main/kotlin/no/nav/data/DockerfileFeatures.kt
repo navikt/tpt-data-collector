@@ -10,16 +10,48 @@ class DockerfileFeatures(
         val repoId = row["repo_id"] ?: throw RuntimeException("repo_id not found in dockerfile_features")
         val repoRow = reposList.findLast { it["repo_id"] == repoId }
         val repoName = if (repoRow != null) repoRow["full_name"] ?: "" else ""
-        val dockerfileContent = row["content"] ?: ""
-        val usesChainguard = dockerfileContent.contains("chainguard")
-        val usesDistoless = usesChainguard || dockerfileContent.contains("distroless")
+        val baseImageLine = (row["content"] ?: "").split("\n")
+            .filter { !it.startsWith("#") }
+            .filter { it.startsWith("FROM") }
+            .lastOrNull()
+
+        var baseImage = ""
+        var pinsBaseImage = false
+        var usesChainguard = false
+        var usesDistoless = false
+        if (baseImageLine != null) {
+            baseImage = baseImageLine
+                .replace("^FROM".toRegex(), "")
+                .replace("@sha256:.*".toRegex(), "")
+                .trim().split(" ").firstOrNull() ?: ""
+            pinsBaseImage = baseImageLine.contains("@sha256:")
+            val containsPullThough = baseImage.startsWith("europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/")
+            val containsDirectChainguard = baseImage.startsWith("cgr.dev/chainguard/")
+            usesChainguard = containsPullThough || containsDirectChainguard
+            if (usesChainguard) {
+                if (baseImage.endsWith("-dev"))
+                    usesDistoless = false
+                else {
+                    val isNode = baseImage.contains("/node:")
+                    val isNodeSlim = baseImage.contains("node:.*-slim$".toRegex())
+                    if (isNode && !isNodeSlim)
+                        usesDistoless = false
+                    else
+                        usesDistoless = true
+                }
+            } else {
+                usesDistoless = baseImage.contains("/distroless/")
+            }
+        }
         DockerfileFeature(
             repoId = repoId,
             repoName = repoName,
             fileType = row["file_type"] ?: "",
+            baseImage = baseImage,
+            pinsBaseImage = pinsBaseImage,
             usesMultistage = row["uses_multistage"] == "true",
             usesChainguard = usesChainguard,
-            usesDistroless = usesDistoless,
+            usesDistoless = usesDistoless,
         )
     }
 
