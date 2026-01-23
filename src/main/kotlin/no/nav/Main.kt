@@ -51,7 +51,9 @@ fun Application.module(testing: Boolean = false) {
     routing {
         get("/internal/isAlive") {
             if (!bigQueryClient.isAlive())
-                call.respond(HttpStatusCode.ServiceUnavailable, "BigQuery error")
+                call.respond(HttpStatusCode.ServiceUnavailable, "BigQuery is not alive")
+            if (!dataCollectorService.isAlive())
+                call.respond(HttpStatusCode.ServiceUnavailable, "DataCollector service is not alive")
             call.respond(HttpStatusCode.OK, "OK")
         }
 
@@ -64,6 +66,7 @@ fun Application.module(testing: Boolean = false) {
     }
 }
 
+@Suppress("SameParameterValue")
 private fun calculateInitialDelayUntilClock(hour: Int, minute: Int = 0): Long {
     val timeZone = TimeZone.getTimeZone("UTC")
     val currentTime = Calendar.getInstance(timeZone)

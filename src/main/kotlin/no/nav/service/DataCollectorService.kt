@@ -4,11 +4,15 @@ import no.nav.bigquery.BigQueryClientInterface
 import no.nav.data.DockerfileFeatures
 import no.nav.kafka.KafkaSenderInterface
 import no.nav.logger
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 
 class DataCollectorService(
     val bigQueryClient: BigQueryClientInterface,
     val kafkaSender: KafkaSenderInterface
 ) {
+    var lastOkRun = Clock.System.now()
+
     fun processDockerfileFeaturesAndSendToKafka(): Int {
         val tableName = "dockerfile_features"
         logger.debug("Starting to handle $tableName request")
@@ -25,6 +29,11 @@ class DataCollectorService(
         logger.debug("$tableName Sending to kafka...")
         kafkaSender.sendToKafka(tableName, dockerfileFeatures.toString())
         logger.debug("$tableName Done")
+        lastOkRun = Clock.System.now()
         return mainTableList.size
+    }
+
+    fun isAlive(): Boolean {
+        return lastOkRun > Clock.System.now().minus(26.hours)
     }
 }
