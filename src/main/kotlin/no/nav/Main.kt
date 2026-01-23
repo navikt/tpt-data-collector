@@ -16,7 +16,9 @@ import no.nav.service.DataCollectorService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.Calendar
+import java.util.TimeZone
 import java.util.Timer
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
 
 fun main(args: Array<String>): Unit = EngineMain.main(args)
@@ -44,7 +46,7 @@ fun Application.module(testing: Boolean = false) {
         logger.info("Scheduled update job started")
         dataCollectorService.processDockerfileFeaturesAndSendToKafka()
         logger.info("Scheduled update job finished")
-    }, calculateInitialDelay(), 86400000L /*24h*/)
+    }, calculateInitialDelayUntilClock(4, 0), TimeUnit.DAYS.toMillis(1))
 
     routing {
         get("/internal/isAlive") {
@@ -62,12 +64,13 @@ fun Application.module(testing: Boolean = false) {
     }
 }
 
-private fun calculateInitialDelay(): Long {
-    val currentTime = Calendar.getInstance()
+private fun calculateInitialDelayUntilClock(hour: Int, minute: Int = 0): Long {
+    val timeZone = TimeZone.getTimeZone("UTC")
+    val currentTime = Calendar.getInstance(timeZone)
 
-    val schedulerTime = Calendar.getInstance()
-    schedulerTime[Calendar.HOUR_OF_DAY] = 11
-    schedulerTime[Calendar.MINUTE] = 0
+    val schedulerTime = Calendar.getInstance(timeZone)
+    schedulerTime[Calendar.HOUR_OF_DAY] = hour
+    schedulerTime[Calendar.MINUTE] = minute
     schedulerTime[Calendar.SECOND] = 0
 
     var initialDelay = schedulerTime.timeInMillis - currentTime.timeInMillis
