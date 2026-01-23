@@ -9,19 +9,22 @@ import io.ktor.server.routing.*
 import no.nav.bigquery.BigQueryClient
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.bigquery.DummyBigQuery
-import no.nav.data.DockerfileFeatures
 import no.nav.kafka.DummyKafkaSender
 import no.nav.kafka.KafkaSender
 import no.nav.config.ApplikasjonsConfig
+import no.nav.service.DataCollectorService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.util.Calendar
+import java.util.Timer
+import kotlin.concurrent.timerTask
 
 fun main(args: Array<String>): Unit = EngineMain.main(args)
 
 val logger: Logger = LoggerFactory.getLogger("Main")
 
 fun Application.module(testing: Boolean = false) {
-val config = ApplikasjonsConfig()
+    val config = ApplikasjonsConfig()
     val datasetId = DatasetId.of(config.projectId, config.datasetName)
 
     val bigQueryClient: BigQueryClientInterface = if (testing)
@@ -34,33 +37,46 @@ val config = ApplikasjonsConfig()
     else
         KafkaSender()
 
+    val dataCollectorService = DataCollectorService(bigQueryClient, kafkaSender)
+
+    //Start timer to update date every 24h
+    Timer().scheduleAtFixedRate(timerTask {
+        logger.info("Scheduled update job started")
+        dataCollectorService.processDockerfileFeaturesAndSendToKafka()
+        logger.info("Scheduled update job finished")
+    }, calculateInitialDelay(), 86400000L /*24h*/)
+
     routing {
         get("/internal/isAlive") {
-            if(bigQueryClient.isAlive())
-                call.respond(HttpStatusCode.OK, "OK")
-            else
+            if (!bigQueryClient.isAlive())
                 call.respond(HttpStatusCode.ServiceUnavailable, "BigQuery error")
+            call.respond(HttpStatusCode.OK, "OK")
         }
+
         get("/bigquery/dockerfile_features") {
-            val tableName = "dockerfile_features"
-            logger.debug("Starting to handle $tableName request")
-            val mainTableList = bigQueryClient.readTable(tableName)
-            logger.debug("$tableName query done")
-            val reposList = bigQueryClient.readTable("repos")
-            logger.debug("Got ${mainTableList.size} $tableName and ${reposList.size} repos")
-
-            val dockerfileFeatures = DockerfileFeatures(mainTableList, reposList)
-            val missingNames = dockerfileFeatures.dockerfileFeatures.filter { it.repoName.isEmpty() }.size
-            if (missingNames > 0)
-                logger.warn("$tableName: $missingNames number of repos (from \"repos\" table) are missing the name")
-
-            logger.debug("$tableName Sending to kafka...")
-            kafkaSender.sendToKafka(tableName, dockerfileFeatures.toString())
-
-            logger.debug("$tableName Done")
+            val rows = dataCollectorService.processDockerfileFeaturesAndSendToKafka()
             call.respond(
-                HttpStatusCode.OK, "BigQuery: Number of lines sent: ${mainTableList.size}\n"
+                HttpStatusCode.OK, "BigQuery: Number of lines sent: ${rows}\n"
             )
         }
     }
+}
+
+private fun calculateInitialDelay(): Long {
+    val currentTime = Calendar.getInstance()
+
+    val schedulerTime = Calendar.getInstance()
+    schedulerTime[Calendar.HOUR_OF_DAY] = 11
+    schedulerTime[Calendar.MINUTE] = 0
+    schedulerTime[Calendar.SECOND] = 0
+
+    var initialDelay = schedulerTime.timeInMillis - currentTime.timeInMillis
+
+    if (initialDelay < 0) {
+        schedulerTime[Calendar.HOUR_OF_DAY] =
+            schedulerTime[Calendar.HOUR_OF_DAY] + 24
+        initialDelay =
+            schedulerTime.timeInMillis - currentTime.timeInMillis
+    }
+    return initialDelay
 }
