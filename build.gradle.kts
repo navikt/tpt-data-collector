@@ -10,10 +10,10 @@ kotlin {
 dependencies {
     implementation(libs.bundles.ktor)
     implementation(libs.bundles.logging)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation(libs.kotlinx.serialization)
 
     // BigQuery
-    implementation("com.google.cloud:google-cloud-bigquery:2.57.2")
+    implementation(libs.bigquery)
 
     // Kafka
     implementation("at.yawk.lz4:lz4-java:1.10.2")
@@ -22,6 +22,13 @@ dependencies {
         exclude("org.lz4", "lz4-java")
     }
 
+    // Metrics
+    // ktor-metrics
+    implementation(libs.metrics.ktor)
+    implementation(libs.metrics.prometheus)
+
+
+    //Test
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

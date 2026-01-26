@@ -12,6 +12,7 @@ import no.nav.bigquery.DummyBigQuery
 import no.nav.kafka.DummyKafkaSender
 import no.nav.kafka.KafkaSender
 import no.nav.config.ApplikasjonsConfig
+import no.nav.metrics.metricsRoute
 import no.nav.service.DataCollectorService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -62,6 +63,9 @@ fun Application.module(testing: Boolean = false) {
             call.respond(
                 HttpStatusCode.OK, "BigQuery: Number of lines sent: ${rows}\n"
             )
+        }
+        if (!testing) {
+            metricsRoute()
         }
     }
 }

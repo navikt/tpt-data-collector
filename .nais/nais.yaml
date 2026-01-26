@@ -23,6 +23,9 @@ spec:
     logging:
       destinations:
         - id: loki
+  prometheus:
+    enabled: true
+    path: /metrics
   gcp:
     bigQueryDatasets:
       - name: appsec
