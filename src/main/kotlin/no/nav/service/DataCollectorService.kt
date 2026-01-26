@@ -15,7 +15,7 @@ class DataCollectorService(
 
     fun processDockerfileFeaturesAndSendToKafka(): Int {
         val tableName = "dockerfile_features"
-        logger.debug("Starting to handle $tableName request")
+        logger.info("Starting to process $tableName")
         val mainTableList = bigQueryClient.readTable(tableName)
         logger.debug("$tableName query done")
         val reposList = bigQueryClient.readTable("repos")
@@ -28,7 +28,7 @@ class DataCollectorService(
 
         logger.debug("$tableName Sending to kafka...")
         kafkaSender.sendToKafka(tableName, dockerfileFeatures.toString())
-        logger.debug("$tableName Done")
+        logger.info("$tableName request Done")
         lastOkRun = Clock.System.now()
         return mainTableList.size
     }

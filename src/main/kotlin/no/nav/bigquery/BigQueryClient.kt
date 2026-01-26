@@ -70,7 +70,7 @@ class BigQueryClient(val projectId: String, val datasetId: DatasetId) : BigQuery
 
     override fun readTable(tableName: String): List<Map<String, String>> {
         val tableId = TableId.of(datasetId.project, datasetId.dataset, tableName)
-        logger.info("BigQueryTable request received")
+        logger.debug("BigQueryTable request received for table: '$tableName'")
         tablePresent(tableId)
         val timestampColumn =
             if (tableName == "dockerfile_features")
