@@ -1,6 +1,6 @@
 [versions]
 ktor = "3.4.0"
-kotlinx-serialization = "1.9.0"
+kotlinx-serialization = "1.10.0"
 bigquery = "2.57.2"
 prometheus = "1.16.2"
 logback = "1.5.25"
