@@ -1,5 +1,7 @@
 package no.nav.data
 
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
@@ -71,14 +73,16 @@ class DockerfileFeaturesTest {
             USER nonroot
             CMD [ \"app.jar\" ]
         """.trimIndent()
+        val nowMills = System.currentTimeMillis()
         val dockerfileFeatures = DockerfileFeatures(
-            dockerfileFeaturesList = Json.decodeFromString<List<Map<String, String>>>("""[{ "repo_id":"567189411","content": "$dockerfile"}]"""),
+            dockerfileFeaturesList = Json.decodeFromString<List<Map<String, String>>>("""[{"repo_id":"567189411","when_collected":"${nowMills/1000.0}","content": "$dockerfile"}]"""),
             reposList = Json.decodeFromString<List<Map<String, String>>>(reposJsonString),
         )
         assertFalse(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesDistoless)
         assertEquals("gcr.io/distroless/java21-debian12", dockerfileFeatures.dockerfileFeatures.first().baseImage)
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().pinsBaseImage)
+        assertEquals(nowMills, dockerfileFeatures.dockerfileFeatures.first().whenCollected?.toInstant(TimeZone.UTC)?.toEpochMilliseconds())
     }
 
     @Test

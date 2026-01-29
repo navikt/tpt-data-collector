@@ -1,11 +1,13 @@
 package no.nav.data
 
+import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class DockerfileFeature(
     val repoId: String,
     val repoName: String,
+    val whenCollected: LocalDateTime?,
     val fileType: String,
     val baseImage: String,
     val pinsBaseImage: Boolean,

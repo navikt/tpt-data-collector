@@ -11,6 +11,7 @@ dependencies {
     implementation(libs.bundles.ktor)
     implementation(libs.bundles.logging)
     implementation(libs.kotlinx.serialization)
+    implementation(libs.kotlinx.datetime)
 
     // BigQuery
     implementation(libs.bigquery)
@@ -29,6 +30,7 @@ dependencies {
 
 
     //Test
+    testImplementation(libs.kotlin.test.junit)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
