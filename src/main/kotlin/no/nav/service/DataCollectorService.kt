@@ -19,16 +19,16 @@ class DataCollectorService(
         val mainTableList = bigQueryClient.readTable(tableName)
         logger.debug("$tableName query done")
         val reposList = bigQueryClient.readTable("repos")
-        logger.debug("Got ${mainTableList.size} $tableName and ${reposList.size} repos")
+        logger.info("Got ${mainTableList.size} $tableName and ${reposList.size} repos from queries")
 
         val dockerfileFeatures = DockerfileFeatures(mainTableList, reposList)
         val missingNames = dockerfileFeatures.dockerfileFeatures.filter { it.repoName.isEmpty() }.size
         if (missingNames > 0)
             logger.warn("$tableName: $missingNames number of repos (from \"repos\" table) are missing the name")
 
-        logger.debug("$tableName Sending to kafka...")
+        logger.info("$tableName Sending to ${dockerfileFeatures.dockerfileFeatures.size} lines to kafka...")
         dockerfileFeatures.dockerfileFeatures.forEach{ kafkaSender.sendToKafka(tableName, it.toJson()) }
-        logger.info("$tableName request Done")
+        logger.info("$tableName request processed and sent to kafka -> Done")
         lastOkRun = Clock.System.now()
         return mainTableList.size
     }
