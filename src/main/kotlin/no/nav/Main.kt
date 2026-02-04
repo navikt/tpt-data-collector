@@ -14,6 +14,7 @@ import no.nav.kafka.KafkaSender
 import no.nav.config.ApplikasjonsConfig
 import no.nav.metrics.metricsRoute
 import no.nav.service.DataCollectorService
+import no.nav.zizmor.ZizmorService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.Calendar
@@ -41,6 +42,7 @@ fun Application.module(testing: Boolean = false) {
         KafkaSender()
 
     val dataCollectorService = DataCollectorService(bigQueryClient, kafkaSender)
+    val zizmorService = ZizmorService(config.githubToken)
 
     //Start timer to update date every 24h
     Timer().scheduleAtFixedRate(timerTask {
@@ -62,6 +64,14 @@ fun Application.module(testing: Boolean = false) {
             val rows = dataCollectorService.processDockerfileFeaturesAndSendToKafka()
             call.respond(
                 HttpStatusCode.OK, "BigQuery: Number of lines sent: ${rows}\n"
+            )
+        }
+        get("/zizmor/{repo}") {
+            val repo = call.parameters["repo"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val resultString = zizmorService.runZizmorOnRepo(repo)
+            val result = zizmorService.analyseZizmorResult(resultString)
+            call.respond(
+                HttpStatusCode.OK, "BigQuery: Number of lines sent: ${result}\n"
             )
         }
         if (!testing) {

@@ -30,6 +30,8 @@ spec:
     bigQueryDatasets:
       - name: appsec
         permission: READ
+  envFrom:
+    - secret: tpt-data-collector
   env:
     - name: BIGQUERY_DATASET_ID
       value: appsec
