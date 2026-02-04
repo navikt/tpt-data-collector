@@ -79,7 +79,7 @@ class DockerfileFeaturesTest {
             reposList = Json.decodeFromString<List<Map<String, String>>>(reposJsonString),
         )
         assertFalse(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
-        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesDistoless)
+        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesDistroless)
         assertEquals("gcr.io/distroless/java21-debian12", dockerfileFeatures.dockerfileFeatures.first().baseImage)
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().pinsBaseImage)
         assertEquals(nowMills, dockerfileFeatures.dockerfileFeatures.first().whenCollected?.toInstant(TimeZone.UTC)?.toEpochMilliseconds())
@@ -107,7 +107,7 @@ class DockerfileFeaturesTest {
             reposList = Json.decodeFromString<List<Map<String, String>>>(reposJsonString),
         )
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
-        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesDistoless)
+        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesDistroless)
         assertEquals(
             "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/jre:openjdk-21",
             dockerfileFeatures.dockerfileFeatures.first().baseImage
@@ -137,7 +137,7 @@ class DockerfileFeaturesTest {
             reposList = Json.decodeFromString<List<Map<String, String>>>(reposJsonString),
         )
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
-        assertFalse(dockerfileFeatures.dockerfileFeatures.first().usesDistoless)
+        assertFalse(dockerfileFeatures.dockerfileFeatures.first().usesDistroless)
         assertEquals(
             "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/jre:openjdk-21-dev",
             dockerfileFeatures.dockerfileFeatures.first().baseImage
@@ -164,7 +164,7 @@ class DockerfileFeaturesTest {
             reposList = Json.decodeFromString<List<Map<String, String>>>(reposJsonString),
         )
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
-        assertFalse(dockerfileFeatures.dockerfileFeatures.first().usesDistoless)
+        assertFalse(dockerfileFeatures.dockerfileFeatures.first().usesDistroless)
         assertEquals(
             "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node:24",
             dockerfileFeatures.dockerfileFeatures.first().baseImage
@@ -191,7 +191,7 @@ class DockerfileFeaturesTest {
             reposList = Json.decodeFromString<List<Map<String, String>>>(reposJsonString),
         )
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
-        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesDistoless)
+        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesDistroless)
         assertEquals(
             "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node:24-slim",
             dockerfileFeatures.dockerfileFeatures.first().baseImage

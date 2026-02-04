@@ -13,5 +13,5 @@ data class DockerfileFeature(
     val pinsBaseImage: Boolean,
     val usesMultistage: Boolean,
     val usesChainguard: Boolean,
-    val usesDistoless: Boolean,
+    val usesDistroless: Boolean,
 )

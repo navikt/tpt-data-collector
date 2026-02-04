@@ -57,7 +57,7 @@ class DockerfileFeatures(
             pinsBaseImage = pinsBaseImage,
             usesMultistage = row["uses_multistage"] == "true",
             usesChainguard = usesChainguard,
-            usesDistoless = usesDistoless,
+            usesDistroless = usesDistoless,
         )
     }
 
