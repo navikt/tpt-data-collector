@@ -6,11 +6,10 @@ import org.apache.kafka.clients.producer.ProducerRecord
 
 class KafkaSender: KafkaSenderInterface {
     private val kafkaConfig = KafkaConfig()
+    private val kafkaProducer = KafkaProducer<String, String>(kafkaConfig.producerProperties())
 
     override fun sendToKafka(dataType: String, jsonBlob: String) {
-        KafkaProducer<String, String>(
-            kafkaConfig.producerProperties(),
-        ).use {
+        kafkaProducer.use {
             it.send(
                 ProducerRecord(
                     kafkaConfig.tptTopic,
