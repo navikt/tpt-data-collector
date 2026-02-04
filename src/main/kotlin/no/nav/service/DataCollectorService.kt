@@ -27,7 +27,7 @@ class DataCollectorService(
             logger.warn("$tableName: $missingNames number of repos (from \"repos\" table) are missing the name")
 
         logger.debug("$tableName Sending to kafka...")
-        kafkaSender.sendToKafka(tableName, dockerfileFeatures.toString())
+        dockerfileFeatures.dockerfileFeatures.forEach{ kafkaSender.sendToKafka(tableName, it.toJson()) }
         logger.info("$tableName request Done")
         lastOkRun = Clock.System.now()
         return mainTableList.size

@@ -56,9 +56,9 @@ class DockerfileFeaturesTest {
             dockerfileFeaturesList = Json.decodeFromString<List<Map<String, String>>>(dockerfileFeaturesJsonString),
             reposList = Json.decodeFromString<List<Map<String, String>>>(reposJsonString)
         )
-        assertContains(dockerfileFeatures.toString(), "{\"repoId\":\"567189411\",\"repoName\":\"org/cool_name\"")
-        assertContains(dockerfileFeatures.toString(), "{\"repoId\":\"584471087\",\"repoName\":\"org/cooler_name\"")
-        assertContains(dockerfileFeatures.toString(), "{\"repoId\":\"608614179\",\"repoName\":\"org/coolest_name\"")
+        assertContains(dockerfileFeatures.dockerfileFeatures[0].toJson(), "{\"repoId\":\"567189411\",\"repoName\":\"org/cool_name\"")
+        assertContains(dockerfileFeatures.dockerfileFeatures[1].toJson(), "{\"repoId\":\"584471087\",\"repoName\":\"org/cooler_name\"")
+        assertContains(dockerfileFeatures.dockerfileFeatures[2].toJson(), "{\"repoId\":\"608614179\",\"repoName\":\"org/coolest_name\"")
     }
 
     @Test

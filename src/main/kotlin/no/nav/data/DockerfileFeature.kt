@@ -2,6 +2,7 @@ package no.nav.data
 
 import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 @Serializable
 data class DockerfileFeature(
@@ -14,4 +15,8 @@ data class DockerfileFeature(
     val usesMultistage: Boolean,
     val usesChainguard: Boolean,
     val usesDistroless: Boolean,
-)
+) {
+    fun toJson(): String {
+        return Json.encodeToString(this)
+    }
+}

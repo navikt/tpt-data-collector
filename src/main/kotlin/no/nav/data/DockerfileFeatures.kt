@@ -3,7 +3,6 @@ package no.nav.data
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 
 class DockerfileFeatures(
@@ -64,9 +63,5 @@ class DockerfileFeatures(
     private fun convertToDateTime(timeStampString: String?): LocalDateTime? {
         val timeStamp = timeStampString?.toDoubleOrNull() ?: return null
         return Instant.fromEpochMilliseconds((timeStamp*1000).toLong()).toLocalDateTime(TimeZone.UTC)
-    }
-
-    override fun toString(): String {
-        return Json.encodeToString(dockerfileFeatures)
     }
 }
