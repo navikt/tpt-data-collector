@@ -20,7 +20,7 @@ class ZizmorService(val githubToken: String) {
     fun runZizmorOnRepo(org: String, repo: String): String {
         val saferRepo = repo.replace("/[^a-zA-ZÀ-Ÿ0-9-_.]/g".toRegex(), "")
         logger.info("Zizmor: running zizmor on repo: \"$org/$saferRepo\"")
-        return "/app/zizmor --quiet --format=json --gh-token=$githubToken $org/$saferRepo".runCommand(File("."))
+        return "/app/zizmor --quiet --format=json --gh-token=$githubToken $org/$saferRepo 2>&1".runCommand(File("."))
     }
     fun analyseZizmorResult(resultString: String): String {
         logger.info("Zizmor: analysing result: \"$resultString\"")
