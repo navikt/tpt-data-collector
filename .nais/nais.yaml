@@ -37,8 +37,6 @@ spec:
     bigQueryDatasets:
       - name: appsec
         permission: READ
-  envFrom:
-    - secret: tpt-data-collector
   env:
     - name: BIGQUERY_DATASET_ID
       value: appsec
@@ -46,3 +44,5 @@ spec:
       value: appsec.tpt
     - name: KAFKA_CLIENT_ID
       value: tpt-data-collector
+  envFrom:
+    - secret: tpt-data-collector
