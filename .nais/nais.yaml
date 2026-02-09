@@ -13,6 +13,9 @@ spec:
     inbound:
       rules:
         - application: tpt-backend
+    outbound:
+      external:
+        - host: github.com
   liveness:
     path: /internal/isAlive
   readiness:
