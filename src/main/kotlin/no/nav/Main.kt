@@ -71,7 +71,7 @@ fun Application.module(testing: Boolean = false) {
             val resultString = zizmorService.runZizmorOnRepo("navikt", repo)
             val result = zizmorService.analyseZizmorResult(resultString)
             call.respond(
-                HttpStatusCode.OK, "BigQuery: Number of lines sent: ${result}\n"
+                HttpStatusCode.OK, "Zizmor result: ${result}\n"
             )
         }
         if (!testing) {
