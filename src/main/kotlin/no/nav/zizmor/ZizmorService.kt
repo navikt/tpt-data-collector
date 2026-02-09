@@ -15,8 +15,9 @@ fun String.runCommand(workingDir: File): String {
 }
 
 class ZizmorService(val githubToken: String) {
-    fun runZizmorOnRepo(repo: String): String {
-        return "./zizmor --quiet --format=json --gh-token=$githubToken $repo".runCommand(File("."))
+    fun runZizmorOnRepo(org: String, repo: String): String {
+        val saferRepo = repo.replace("/[^a-zA-ZÀ-Ÿ0-9-_.]/g".toRegex(), "")
+        return "/app/zizmor --quiet --format=json --gh-token=$githubToken $org/$saferRepo".runCommand(File("."))
     }
     fun analyseZizmorResult(resultString: String): String {
         return resultString

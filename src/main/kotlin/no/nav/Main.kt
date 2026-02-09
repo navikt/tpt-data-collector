@@ -66,9 +66,9 @@ fun Application.module(testing: Boolean = false) {
                 HttpStatusCode.OK, "BigQuery: Number of lines sent: ${rows}\n"
             )
         }
-        get("/zizmor/{repo}") {
+        get("/zizmor/navikt/{repo}") {
             val repo = call.parameters["repo"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val resultString = zizmorService.runZizmorOnRepo(repo)
+            val resultString = zizmorService.runZizmorOnRepo("navikt", repo)
             val result = zizmorService.analyseZizmorResult(resultString)
             call.respond(
                 HttpStatusCode.OK, "BigQuery: Number of lines sent: ${result}\n"
