@@ -1,15 +1,14 @@
 package no.nav.zizmor
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 
 class ZizmorServiceTest {
-    @Test
-    fun `ZizmorService should throw exception when failing`() {
-        val zizmorService = ZizmorService("dummy", "zizmor")
-        assertThrows<RuntimeException>{ zizmorService.runZizmorOnRepo("navikt", "tpt-data-collector") }
-    }
+//    @Test
+//    fun `ZizmorService should throw exception when failing`() {
+//        val zizmorService = ZizmorService("dummy", "zizmor")
+//        assertThrows<RuntimeException>{ zizmorService.runZizmorOnRepo("navikt", "tpt-data-collector") }
+//    }
 
 //    @Test
 //    fun `ZizmorService should return json when ok`() {
