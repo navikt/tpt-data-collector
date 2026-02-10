@@ -68,8 +68,9 @@ fun Application.module(testing: Boolean = false) {
         }
         get("/zizmor/navikt/{repo}") {
             val repo = call.parameters["repo"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val resultString = zizmorService.runZizmorOnRepo("navikt", repo)
-            val result = zizmorService.analyseZizmorResult(resultString)
+            val saferRepo = repo.replace("/[^a-zA-ZÀ-Ÿ0-9-_.]/g".toRegex(), "")
+            val resultString = zizmorService.runZizmorOnRepo("navikt", saferRepo)
+            val result = zizmorService.analyseZizmorResult("navikt/$saferRepo", resultString)
             call.respond(
                 HttpStatusCode.OK, "Zizmor result: ${result}\n"
             )

@@ -22,7 +22,7 @@ class ZizmorServiceTest {
     fun `ZizmorService should process result`() {
         val zizmorService = ZizmorService("dummy", "zizmor")
         val jsonString = this::class.java.getResource("/zizmor_big_result.json")?.readText() ?: "wops"
-        val processed = zizmorService.analyseZizmorResult(jsonString)
+        val processed = zizmorService.analyseZizmorResult("test", jsonString)
         assertEquals(29, processed.results.size)
         assertEquals(13, processed.results.filter { it.ident == "unpinned-uses" }.size)
         assertEquals(5, processed.results.filter { it.ident == "artipacked" }.size)

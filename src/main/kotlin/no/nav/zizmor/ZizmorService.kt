@@ -25,12 +25,11 @@ fun String.runCommand(workingDir: File): String {
 class ZizmorService(val githubToken: String, val zizmorCommand: String = "/app/zizmor") {
     val logger = LoggerFactory.getLogger(this::class.java)
     fun runZizmorOnRepo(org: String, repo: String): String {
-        val saferRepo = repo.replace("/[^a-zA-ZÀ-Ÿ0-9-_.]/g".toRegex(), "")
-        logger.info("Zizmor: running zizmor on repo: \"$org/$saferRepo\"")
-        val resultString = "$zizmorCommand --quiet --cache-dir /tmp --format=json --gh-token=$githubToken $org/$saferRepo".runCommand(File("."))
+        logger.info("Zizmor: running zizmor on repo: \"$org/$repo\"")
+        val resultString = "$zizmorCommand --quiet --cache-dir /tmp --format=json --gh-token=$githubToken $org/$repo".runCommand(File("."))
         return resultString.replace("^. zizmor v.*\n".toRegex(), "")
     }
-    fun analyseZizmorResult(resultString: String): ZizmorResult {
-        return stringToZizmorResult(resultString)
+    fun analyseZizmorResult(repo: String, resultString: String): ZizmorResult {
+        return stringToZizmorResult(repo, resultString)
     }
 }

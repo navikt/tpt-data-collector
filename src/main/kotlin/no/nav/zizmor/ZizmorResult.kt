@@ -5,14 +5,16 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class ZizmorResult(
+    val repo: String,
     val results: List<ZizmorFinding>,
 )
 
 private val jsonDecoder = Json { ignoreUnknownKeys = true }
 
-fun stringToZizmorResult(resultString: String): ZizmorResult {
+fun stringToZizmorResult(repo: String, resultString: String): ZizmorResult {
     return ZizmorResult(
-        jsonDecoder.decodeFromString<List<ZizmorFindingInput>>(resultString)
+        repo = repo,
+        results = jsonDecoder.decodeFromString<List<ZizmorFindingInput>>(resultString)
             .map { finding ->
                 ZizmorFinding(
                     finding.ident,
@@ -38,7 +40,11 @@ data class ZizmorFinding(
     val confidence: String,
     val severity: String,
     val locations: List<ZizmorLocation>
-)
+) {
+    override fun toString(): String {
+        return jsonDecoder.encodeToString(this)
+    }
+}
 
 @Suppress("unused")
 @Serializable()
@@ -46,7 +52,11 @@ class ZizmorLocation(
     val path: String,
     val lineStart: Int,
     val lineEnd: Int,
-)
+) {
+    override fun toString(): String {
+        return jsonDecoder.encodeToString(this)
+    }
+}
 
 
 // *****************************
