@@ -14,7 +14,7 @@ RUN ARCH=`uname -m` && \
     sha256sum /usr/bin/zizmor && \
     echo "$CHECKSUM  /usr/bin/zizmor" | sha256sum -c
 
-FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/jre:openjdk-25
+FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/jre:openjdk-25-dev
 
 COPY build/libs/*.jar /app/
 COPY --from=zizmor-installer /usr/bin/zizmor /app/
