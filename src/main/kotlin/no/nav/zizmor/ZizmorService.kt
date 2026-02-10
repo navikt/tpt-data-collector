@@ -8,22 +8,29 @@ fun String.runCommand(workingDir: File): String {
     val proc = ProcessBuilder(*split(" ").toTypedArray())
         .directory(workingDir)
         .redirectOutput(ProcessBuilder.Redirect.PIPE)
-        .redirectError(ProcessBuilder.Redirect.PIPE)
+        .redirectErrorStream(true)
         .start()
 
-    proc.waitFor(60, TimeUnit.MINUTES)
+    proc.waitFor(10, TimeUnit.MINUTES)
+    if (proc.exitValue() in 1..<5) {
+        throw RuntimeException(
+            "Exit status: ${proc.exitValue()} while running zizmor command: ${
+                proc.inputStream.bufferedReader().readText()
+            }"
+        )
+    }
     return proc.inputStream.bufferedReader().readText()
 }
 
-class ZizmorService(val githubToken: String) {
+class ZizmorService(val githubToken: String, val zizmorCommand: String = "/app/zizmor") {
     val logger = LoggerFactory.getLogger(this::class.java)
     fun runZizmorOnRepo(org: String, repo: String): String {
         val saferRepo = repo.replace("/[^a-zA-ZÀ-Ÿ0-9-_.]/g".toRegex(), "")
         logger.info("Zizmor: running zizmor on repo: \"$org/$saferRepo\"")
-        return "/app/zizmor --format=json --gh-token=$githubToken $org/$saferRepo 2>&1".runCommand(File("."))
+        val resultString = "$zizmorCommand --quiet --cache-dir /tmp --format=json --gh-token=$githubToken $org/$saferRepo".runCommand(File("."))
+        return resultString.replace("^. zizmor v.*\n".toRegex(), "")
     }
-    fun analyseZizmorResult(resultString: String): String {
-        logger.info("Zizmor: analysing result: \"$resultString\"")
-        return resultString
+    fun analyseZizmorResult(resultString: String): ZizmorResult {
+        return stringToZizmorResult(resultString)
     }
 }

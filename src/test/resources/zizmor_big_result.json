@@ -1,0 +1,2809 @@
+[
+  {
+    "ident": "artipacked",
+    "desc": "credential persistence through GitHub Actions artifacts",
+    "url": "https://docs.zizmor.sh/audits/#artipacked",
+    "determinations": {
+      "confidence": "Low",
+      "severity": "Medium",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "does not set persist-credentials: false",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "build"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 39,
+              "column": 8
+            },
+            "end_point": {
+              "row": 40,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 1038,
+              "end": 1128
+            }
+          },
+          "feature": "name: Check-out repository to allow access from workflow\n        uses: actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "artipacked",
+    "desc": "credential persistence through GitHub Actions artifacts",
+    "url": "https://docs.zizmor.sh/audits/#artipacked",
+    "determinations": {
+      "confidence": "Low",
+      "severity": "Medium",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "does not set persist-credentials: false",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "deploy-to-Q2"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 96,
+              "column": 8
+            },
+            "end_point": {
+              "row": 97,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 2842,
+              "end": 2932
+            }
+          },
+          "feature": "name: Check-out repository to allow access from workflow\n        uses: actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "excessive-permissions",
+    "desc": "overly broad permissions",
+    "url": "https://docs.zizmor.sh/audits/#excessive-permissions",
+    "determinations": {
+      "confidence": "Medium",
+      "severity": "Medium",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "default permissions used due to no permissions: block",
+          "route": {
+            "route": []
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 0,
+              "column": 0
+            },
+            "end_point": {
+              "row": 106,
+              "column": 0
+            },
+            "offset_span": {
+              "start": 0,
+              "end": 3170
+            }
+          },
+          "feature": "name: build (and deploy to q2)\n\n# Jobs triggered by push to any branch\non:\n  push:\n    branches:\n      - main\n\nenv:\n  APPLICATION_NAME: reponame\n  GITHUB_REF: ${github.ref}\n  SHA10: ${GITHUB_SHA::10}\n\njobs:\n  build:\n    permissions:\n      packages: write\n      contents: read\n      id-token: write\n      actions: read\n      security-events: write\n    name: Build and push docker container\n    outputs:\n      pretty_time: ${{ steps.create_version_tag.outputs.pretty_time }}\n      version: ${{ steps.create_version_tag.outputs.version }}\n      image: ${{ steps.docker-build-push.outputs.image }}\n\n    runs-on: ubuntu-latest\n    steps:\n\n      - name: Create version tag\n        id: create_version_tag\n        run: |\n          export TIME=\"$(TZ='Europe/Oslo' date +%Y.%m.%d-%H.%M)\"\n          export PRETTY_TIME=\"$(TZ='Europe/Oslo' date +%Y-%m-%d\\ %H:%M:%S)\"\n          export VERSION_TAG=\"1.${TIME}-${{ env.SHA10 }}\"\n          echo \"pretty_time=${PRETTY_TIME}\" >> $GITHUB_OUTPUT\n          echo \"version=${VERSION_TAG}\" >> $GITHUB_OUTPUT\n\n      - name: Check-out repository to allow access from workflow\n        uses: actions/checkout@v4\n\n      - name: Set up JDK 11\n        uses: actions/setup-java@v4\n        with:\n          java-version: 11\n          distribution: 'zulu'\n\n      - name: Cache dependencies\n        uses: actions/cache@v4\n        with:\n          path: ~/.m2/repository\n          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}\n          restore-keys: ${{ runner.os }}-maven-\n\n      - name: Maven build\n        env:\n          GITHUB_NAV_TOKEN: ${{ secrets.READER_TOKEN }}\n          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN}}\n        run: mvn clean install -D repositories.internal.enabled=false --settings maven-settings.xml\n\n      - uses: nais/docker-build-push@v0\n        id: docker-build-push\n        with:\n            team: isa\n\n  metadata:\n    name: Metadata\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n        - name: Get current date\n          id: date\n          run: |\n            export PRETTY_TIME=\"$(TZ='Europe/Oslo' date +%d.%m.%Y\\ %H:%M:%S)\"\n            echo \"pretty_time=${PRETTY_TIME}\" >> $GITHUB_OUTPUT\n        - name: Metadata\n          run: |\n            printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n            printf \"Triggered by:\\n\\tpush to : [${GITHUB_REF##*/}]\\n\"\n            printf \"Pushed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n            printf \"Timestamp :\\n\\t%s\\n\" \"${{ steps.date.outputs.pretty_time }}\"\n            printf \"Image :\\n\\t%s\\n\" \"${{ needs.build.outputs.image }}\"\n            printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n            printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"\n\n\n  deploy-to-Q2:\n    name: Deploy to NAIS Q2\n    needs: build\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      id-token: write\n\n    steps:\n      - name: Check-out repository to allow access from workflow\n        uses: actions/checkout@v4\n\n      - name: deploy to q2\n        uses: nais/deploy/actions/deploy@v2\n        env:\n          CLUSTER: dev-fss\n          RESOURCE: nais/reponame-q2.yaml\n          VAR: image=${{ needs.build.outputs.image }}\n          VARS: nais/roles.json\n",
+          "comments": [
+            "# Jobs triggered by push to any branch"
+          ]
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "excessive-permissions",
+    "desc": "overly broad permissions",
+    "url": "https://docs.zizmor.sh/audits/#excessive-permissions",
+    "determinations": {
+      "confidence": "Medium",
+      "severity": "Medium",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "this job",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 66,
+              "column": 2
+            },
+            "end_point": {
+              "row": 84,
+              "column": 67
+            },
+            "offset_span": {
+              "start": 1852,
+              "end": 2671
+            }
+          },
+          "feature": "  metadata:\n    name: Metadata\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n        - name: Get current date\n          id: date\n          run: |\n            export PRETTY_TIME=\"$(TZ='Europe/Oslo' date +%d.%m.%Y\\ %H:%M:%S)\"\n            echo \"pretty_time=${PRETTY_TIME}\" >> $GITHUB_OUTPUT\n        - name: Metadata\n          run: |\n            printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n            printf \"Triggered by:\\n\\tpush to : [${GITHUB_REF##*/}]\\n\"\n            printf \"Pushed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n            printf \"Timestamp :\\n\\t%s\\n\" \"${{ steps.date.outputs.pretty_time }}\"\n            printf \"Image :\\n\\t%s\\n\" \"${{ needs.build.outputs.image }}\"\n            printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n            printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "default permissions used due to no permissions: block",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 66,
+              "column": 2
+            },
+            "end_point": {
+              "row": 84,
+              "column": 67
+            },
+            "offset_span": {
+              "start": 1852,
+              "end": 2671
+            }
+          },
+          "feature": "  metadata:\n    name: Metadata\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n        - name: Get current date\n          id: date\n          run: |\n            export PRETTY_TIME=\"$(TZ='Europe/Oslo' date +%d.%m.%Y\\ %H:%M:%S)\"\n            echo \"pretty_time=${PRETTY_TIME}\" >> $GITHUB_OUTPUT\n        - name: Metadata\n          run: |\n            printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n            printf \"Triggered by:\\n\\tpush to : [${GITHUB_REF##*/}]\\n\"\n            printf \"Pushed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n            printf \"Timestamp :\\n\\t%s\\n\" \"${{ steps.date.outputs.pretty_time }}\"\n            printf \"Image :\\n\\t%s\\n\" \"${{ needs.build.outputs.image }}\"\n            printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n            printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "template-injection",
+    "desc": "code injection via template expansion",
+    "url": "https://docs.zizmor.sh/audits/#template-injection",
+    "determinations": {
+      "confidence": "Low",
+      "severity": "Informational",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Hidden"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 76,
+              "column": 10
+            },
+            "end_point": {
+              "row": 84,
+              "column": 67
+            },
+            "offset_span": {
+              "start": 2157,
+              "end": 2671
+            }
+          },
+          "feature": "name: Metadata\n          run: |\n            printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n            printf \"Triggered by:\\n\\tpush to : [${GITHUB_REF##*/}]\\n\"\n            printf \"Pushed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n            printf \"Timestamp :\\n\\t%s\\n\" \"${{ steps.date.outputs.pretty_time }}\"\n            printf \"Image :\\n\\t%s\\n\" \"${{ needs.build.outputs.image }}\"\n            printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n            printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "may expand into attacker-controllable code",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 189,
+              "fragment": {
+                "Raw": "steps.date.outputs.pretty_time"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 81,
+              "column": 46
+            },
+            "end_point": {
+              "row": 81,
+              "column": 76
+            },
+            "offset_span": {
+              "start": 2429,
+              "end": 2459
+            }
+          },
+          "feature": "|\n            printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n            printf \"Triggered by:\\n\\tpush to : [${GITHUB_REF##*/}]\\n\"\n            printf \"Pushed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n            printf \"Timestamp :\\n\\t%s\\n\" \"${{ steps.date.outputs.pretty_time }}\"\n            printf \"Image :\\n\\t%s\\n\" \"${{ needs.build.outputs.image }}\"\n            printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n            printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "this run block",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": "KeyOnly",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 77,
+              "column": 10
+            },
+            "end_point": {
+              "row": 77,
+              "column": 13
+            },
+            "offset_span": {
+              "start": 2182,
+              "end": 2185
+            }
+          },
+          "feature": "run",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "template-injection",
+    "desc": "code injection via template expansion",
+    "url": "https://docs.zizmor.sh/audits/#template-injection",
+    "determinations": {
+      "confidence": "Low",
+      "severity": "Informational",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Hidden"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 76,
+              "column": 10
+            },
+            "end_point": {
+              "row": 84,
+              "column": 67
+            },
+            "offset_span": {
+              "start": 2157,
+              "end": 2671
+            }
+          },
+          "feature": "name: Metadata\n          run: |\n            printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n            printf \"Triggered by:\\n\\tpush to : [${GITHUB_REF##*/}]\\n\"\n            printf \"Pushed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n            printf \"Timestamp :\\n\\t%s\\n\" \"${{ steps.date.outputs.pretty_time }}\"\n            printf \"Image :\\n\\t%s\\n\" \"${{ needs.build.outputs.image }}\"\n            printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n            printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "may expand into attacker-controllable code",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 254,
+              "fragment": {
+                "Raw": "needs.build.outputs.image"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 82,
+              "column": 42
+            },
+            "end_point": {
+              "row": 82,
+              "column": 67
+            },
+            "offset_span": {
+              "start": 2506,
+              "end": 2531
+            }
+          },
+          "feature": "|\n            printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n            printf \"Triggered by:\\n\\tpush to : [${GITHUB_REF##*/}]\\n\"\n            printf \"Pushed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n            printf \"Timestamp :\\n\\t%s\\n\" \"${{ steps.date.outputs.pretty_time }}\"\n            printf \"Image :\\n\\t%s\\n\" \"${{ needs.build.outputs.image }}\"\n            printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n            printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "this run block",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": "KeyOnly",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 77,
+              "column": 10
+            },
+            "end_point": {
+              "row": 77,
+              "column": 13
+            },
+            "offset_span": {
+              "start": 2182,
+              "end": 2185
+            }
+          },
+          "feature": "run",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "build"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "actions/checkout@v4"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 40,
+              "column": 14
+            },
+            "end_point": {
+              "row": 40,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 1109,
+              "end": 1128
+            }
+          },
+          "feature": "actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "build"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 2
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "actions/setup-java@v4"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 43,
+              "column": 14
+            },
+            "end_point": {
+              "row": 43,
+              "column": 35
+            },
+            "offset_span": {
+              "start": 1172,
+              "end": 1193
+            }
+          },
+          "feature": "actions/setup-java@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "build"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 3
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "actions/cache@v4"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 49,
+              "column": 14
+            },
+            "end_point": {
+              "row": 49,
+              "column": 30
+            },
+            "offset_span": {
+              "start": 1314,
+              "end": 1330
+            }
+          },
+          "feature": "actions/cache@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "build"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 5
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "nais/docker-build-push@v0"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 61,
+              "column": 14
+            },
+            "end_point": {
+              "row": 61,
+              "column": 39
+            },
+            "offset_span": {
+              "start": 1757,
+              "end": 1782
+            }
+          },
+          "feature": "nais/docker-build-push@v0",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "deploy-to-Q2"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "actions/checkout@v4"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 97,
+              "column": 14
+            },
+            "end_point": {
+              "row": 97,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 2913,
+              "end": 2932
+            }
+          },
+          "feature": "actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/build-and-deploy.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "deploy-to-Q2"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "nais/deploy/actions/deploy@v2"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 100,
+              "column": 14
+            },
+            "end_point": {
+              "row": 100,
+              "column": 43
+            },
+            "offset_span": {
+              "start": 2975,
+              "end": 3004
+            }
+          },
+          "feature": "nais/deploy/actions/deploy@v2",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "artipacked",
+    "desc": "credential persistence through GitHub Actions artifacts",
+    "url": "https://docs.zizmor.sh/audits/#artipacked",
+    "determinations": {
+      "confidence": "Low",
+      "severity": "Medium",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "does not set persist-credentials: false",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "deploy-to-environment"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 54,
+              "column": 8
+            },
+            "end_point": {
+              "row": 55,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 1341,
+              "end": 1431
+            }
+          },
+          "feature": "name: Check-out repository to allow access from workflow\n        uses: actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "excessive-permissions",
+    "desc": "overly broad permissions",
+    "url": "https://docs.zizmor.sh/audits/#excessive-permissions",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "packages: write is overly broad at the workflow level",
+          "route": {
+            "route": [
+              {
+                "Key": "permissions"
+              },
+              {
+                "Key": "packages"
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 23,
+              "column": 2
+            },
+            "end_point": {
+              "row": 23,
+              "column": 17
+            },
+            "offset_span": {
+              "start": 429,
+              "end": 444
+            }
+          },
+          "feature": "  packages: write",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "template-injection",
+    "desc": "code injection via template expansion",
+    "url": "https://docs.zizmor.sh/audits/#template-injection",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Hidden"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 32,
+              "column": 8
+            },
+            "end_point": {
+              "row": 41,
+              "column": 65
+            },
+            "offset_span": {
+              "start": 561,
+              "end": 1130
+            }
+          },
+          "feature": "name : Metadata\n        run: |\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Trigger:\\n\\tmanual deployment\\n\"\n          printf \"Triggered by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Deployed to :\\n\\t[${{ env.ENVIRONMENT }}]\\n\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-environment.outputs.pretty_time }}\"\n          printf \"Image:\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"\n          printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n          printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "may expand into attacker-controllable code",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 171,
+              "fragment": {
+                "Raw": "env.ENVIRONMENT"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 37,
+              "column": 40
+            },
+            "end_point": {
+              "row": 37,
+              "column": 55
+            },
+            "offset_span": {
+              "start": 806,
+              "end": 821
+            }
+          },
+          "feature": "|\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Trigger:\\n\\tmanual deployment\\n\"\n          printf \"Triggered by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Deployed to :\\n\\t[${{ env.ENVIRONMENT }}]\\n\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-environment.outputs.pretty_time }}\"\n          printf \"Image:\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"\n          printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n          printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "this run block",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": "KeyOnly",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 33,
+              "column": 8
+            },
+            "end_point": {
+              "row": 33,
+              "column": 11
+            },
+            "offset_span": {
+              "start": 585,
+              "end": 588
+            }
+          },
+          "feature": "run",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "template-injection",
+    "desc": "code injection via template expansion",
+    "url": "https://docs.zizmor.sh/audits/#template-injection",
+    "determinations": {
+      "confidence": "Low",
+      "severity": "Informational",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Hidden"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 32,
+              "column": 8
+            },
+            "end_point": {
+              "row": 41,
+              "column": 65
+            },
+            "offset_span": {
+              "start": 561,
+              "end": 1130
+            }
+          },
+          "feature": "name : Metadata\n        run: |\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Trigger:\\n\\tmanual deployment\\n\"\n          printf \"Triggered by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Deployed to :\\n\\t[${{ env.ENVIRONMENT }}]\\n\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-environment.outputs.pretty_time }}\"\n          printf \"Image:\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"\n          printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n          printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "may expand into attacker-controllable code",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 232,
+              "fragment": {
+                "Raw": "needs.deploy-to-environment.outputs.pretty_time"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 38,
+              "column": 48
+            },
+            "end_point": {
+              "row": 38,
+              "column": 95
+            },
+            "offset_span": {
+              "start": 877,
+              "end": 924
+            }
+          },
+          "feature": "|\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Trigger:\\n\\tmanual deployment\\n\"\n          printf \"Triggered by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Deployed to :\\n\\t[${{ env.ENVIRONMENT }}]\\n\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-environment.outputs.pretty_time }}\"\n          printf \"Image:\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"\n          printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n          printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "this run block",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": "KeyOnly",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 33,
+              "column": 8
+            },
+            "end_point": {
+              "row": 33,
+              "column": 11
+            },
+            "offset_span": {
+              "start": 585,
+              "end": 588
+            }
+          },
+          "feature": "run",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "template-injection",
+    "desc": "code injection via template expansion",
+    "url": "https://docs.zizmor.sh/audits/#template-injection",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Hidden"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 32,
+              "column": 8
+            },
+            "end_point": {
+              "row": 41,
+              "column": 65
+            },
+            "offset_span": {
+              "start": 561,
+              "end": 1130
+            }
+          },
+          "feature": "name : Metadata\n        run: |\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Trigger:\\n\\tmanual deployment\\n\"\n          printf \"Triggered by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Deployed to :\\n\\t[${{ env.ENVIRONMENT }}]\\n\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-environment.outputs.pretty_time }}\"\n          printf \"Image:\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"\n          printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n          printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "may expand into attacker-controllable code",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 313,
+              "fragment": {
+                "Raw": "github.event.inputs.image"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 39,
+              "column": 39
+            },
+            "end_point": {
+              "row": 39,
+              "column": 64
+            },
+            "offset_span": {
+              "start": 968,
+              "end": 993
+            }
+          },
+          "feature": "|\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Trigger:\\n\\tmanual deployment\\n\"\n          printf \"Triggered by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Deployed to :\\n\\t[${{ env.ENVIRONMENT }}]\\n\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-environment.outputs.pretty_time }}\"\n          printf \"Image:\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"\n          printf \"Short commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA::7}\"\n          printf \"Complete commit hash :\\n\\t%s\\n\" \"${GITHUB_SHA}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "this run block",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": "KeyOnly",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 33,
+              "column": 8
+            },
+            "end_point": {
+              "row": 33,
+              "column": 11
+            },
+            "offset_span": {
+              "start": 585,
+              "end": 588
+            }
+          },
+          "feature": "run",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "deploy-to-environment"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "actions/checkout@v4"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 55,
+              "column": 14
+            },
+            "end_point": {
+              "row": 55,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 1412,
+              "end": 1431
+            }
+          },
+          "feature": "actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-dev.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "deploy-to-environment"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "nais/deploy/actions/deploy@v2"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 58,
+              "column": 14
+            },
+            "end_point": {
+              "row": 58,
+              "column": 43
+            },
+            "offset_span": {
+              "start": 1468,
+              "end": 1497
+            }
+          },
+          "feature": "nais/deploy/actions/deploy@v2",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "artipacked",
+    "desc": "credential persistence through GitHub Actions artifacts",
+    "url": "https://docs.zizmor.sh/audits/#artipacked",
+    "determinations": {
+      "confidence": "Low",
+      "severity": "Medium",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "does not set persist-credentials: false",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "deploy-to-prod"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 42,
+              "column": 8
+            },
+            "end_point": {
+              "row": 43,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 841,
+              "end": 931
+            }
+          },
+          "feature": "name: Check-out repository to allow access from workflow\n        uses: actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "excessive-permissions",
+    "desc": "overly broad permissions",
+    "url": "https://docs.zizmor.sh/audits/#excessive-permissions",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "packages: write is overly broad at the workflow level",
+          "route": {
+            "route": [
+              {
+                "Key": "permissions"
+              },
+              {
+                "Key": "packages"
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 13,
+              "column": 2
+            },
+            "end_point": {
+              "row": 13,
+              "column": 17
+            },
+            "offset_span": {
+              "start": 175,
+              "end": 190
+            }
+          },
+          "feature": "  packages: write",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "template-injection",
+    "desc": "code injection via template expansion",
+    "url": "https://docs.zizmor.sh/audits/#template-injection",
+    "determinations": {
+      "confidence": "Low",
+      "severity": "Informational",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Hidden"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 24,
+              "column": 8
+            },
+            "end_point": {
+              "row": 29,
+              "column": 70
+            },
+            "offset_span": {
+              "start": 320,
+              "end": 635
+            }
+          },
+          "feature": "name: Metadata\n        run: |\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Deployed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-prod.outputs.pretty_time }}\"\n          printf \"Image :\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "may expand into attacker-controllable code",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 137,
+              "fragment": {
+                "Raw": "needs.deploy-to-prod.outputs.pretty_time"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 28,
+              "column": 48
+            },
+            "end_point": {
+              "row": 28,
+              "column": 88
+            },
+            "offset_span": {
+              "start": 520,
+              "end": 560
+            }
+          },
+          "feature": "|\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Deployed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-prod.outputs.pretty_time }}\"\n          printf \"Image :\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "this run block",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": "KeyOnly",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 25,
+              "column": 8
+            },
+            "end_point": {
+              "row": 25,
+              "column": 11
+            },
+            "offset_span": {
+              "start": 343,
+              "end": 346
+            }
+          },
+          "feature": "run",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "template-injection",
+    "desc": "code injection via template expansion",
+    "url": "https://docs.zizmor.sh/audits/#template-injection",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Hidden"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 24,
+              "column": 8
+            },
+            "end_point": {
+              "row": 29,
+              "column": 70
+            },
+            "offset_span": {
+              "start": 320,
+              "end": 635
+            }
+          },
+          "feature": "name: Metadata\n        run: |\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Deployed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-prod.outputs.pretty_time }}\"\n          printf \"Image :\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "may expand into attacker-controllable code",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 212,
+              "fragment": {
+                "Raw": "github.event.inputs.image"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 29,
+              "column": 40
+            },
+            "end_point": {
+              "row": 29,
+              "column": 65
+            },
+            "offset_span": {
+              "start": 605,
+              "end": 630
+            }
+          },
+          "feature": "|\n          printf \"=== METADATA FROM GITHUB ACTIONS ===\\n\"\n          printf \"Deployed by user :\\n\\t%s\\n\" \"${GITHUB_ACTOR}\"\n          printf \"Time deployed :\\n\\t%s\\n\" \"${{ needs.deploy-to-prod.outputs.pretty_time }}\"\n          printf \"Image :\\n\\t%s\\n\" \"${{ github.event.inputs.image  }}\"",
+          "comments": []
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "this run block",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "metadata"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "run"
+              }
+            ]
+          },
+          "feature_kind": "KeyOnly",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 25,
+              "column": 8
+            },
+            "end_point": {
+              "row": 25,
+              "column": 11
+            },
+            "offset_span": {
+              "start": 343,
+              "end": 346
+            }
+          },
+          "feature": "run",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "deploy-to-prod"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "actions/checkout@v4"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 43,
+              "column": 14
+            },
+            "end_point": {
+              "row": 43,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 912,
+              "end": 931
+            }
+          },
+          "feature": "actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/deploy-prod.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "deploy-to-prod"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "nais/deploy/actions/deploy@v2"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 46,
+              "column": 14
+            },
+            "end_point": {
+              "row": 46,
+              "column": 43
+            },
+            "offset_span": {
+              "start": 968,
+              "end": 997
+            }
+          },
+          "feature": "nais/deploy/actions/deploy@v2",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "artipacked",
+    "desc": "credential persistence through GitHub Actions artifacts",
+    "url": "https://docs.zizmor.sh/audits/#artipacked",
+    "determinations": {
+      "confidence": "Low",
+      "severity": "Medium",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/pr-checks.yml"
+            }
+          },
+          "annotation": "does not set persist-credentials: false",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "Tests"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 15,
+              "column": 8
+            },
+            "end_point": {
+              "row": 16,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 260,
+              "end": 350
+            }
+          },
+          "feature": "name: Check-out repository to allow access from workflow\n        uses: actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/pr-checks.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "Tests"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 0
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "actions/checkout@v4"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 16,
+              "column": 14
+            },
+            "end_point": {
+              "row": 16,
+              "column": 33
+            },
+            "offset_span": {
+              "start": 331,
+              "end": 350
+            }
+          },
+          "feature": "actions/checkout@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/pr-checks.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "Tests"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "actions/setup-java@v4"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 18,
+              "column": 14
+            },
+            "end_point": {
+              "row": 18,
+              "column": 35
+            },
+            "offset_span": {
+              "start": 393,
+              "end": 414
+            }
+          },
+          "feature": "actions/setup-java@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  },
+  {
+    "ident": "unpinned-uses",
+    "desc": "unpinned action reference",
+    "url": "https://docs.zizmor.sh/audits/#unpinned-uses",
+    "determinations": {
+      "confidence": "High",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Remote": {
+              "slug": {
+                "owner": "navikt",
+                "repo": "reponame",
+                "git_ref": null
+              },
+              "path": ".github/workflows/pr-checks.yml"
+            }
+          },
+          "annotation": "action is not pinned to a hash (required by blanket policy)",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "Tests"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 2
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "actions/cache@v4"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 23,
+              "column": 14
+            },
+            "end_point": {
+              "row": 23,
+              "column": 30
+            },
+            "offset_span": {
+              "start": 534,
+              "end": 550
+            }
+          },
+          "feature": "actions/cache@v4",
+          "comments": []
+        }
+      }
+    ],
+    "ignored": false
+  }
+]
