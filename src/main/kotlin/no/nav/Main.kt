@@ -14,7 +14,6 @@ import no.nav.kafka.KafkaSender
 import no.nav.config.ApplikasjonsConfig
 import no.nav.metrics.metricsRoute
 import no.nav.service.DataCollectorService
-import no.nav.zizmor.ZizmorService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.Calendar
@@ -41,10 +40,9 @@ fun Application.module(testing: Boolean = false) {
     else
         KafkaSender()
 
-    val dataCollectorService = DataCollectorService(bigQueryClient, kafkaSender)
-    val zizmorService = ZizmorService(config.githubToken)
+    val dataCollectorService = DataCollectorService(bigQueryClient, kafkaSender, config.githubToken)
 
-    //Start timer to update date every 24h
+    //Start a timer to update every 24h
     Timer().scheduleAtFixedRate(timerTask {
         logger.info("Scheduled update job started")
         dataCollectorService.processDockerfileFeaturesAndSendToKafka()
@@ -68,9 +66,7 @@ fun Application.module(testing: Boolean = false) {
         }
         get("/zizmor/navikt/{repo}") {
             val repo = call.parameters["repo"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val saferRepo = repo.replace("/[^a-zA-ZÀ-Ÿ0-9-_.]/g".toRegex(), "")
-            val resultString = zizmorService.runZizmorOnRepo("navikt", saferRepo)
-            val result = zizmorService.analyseZizmorResult("navikt/$saferRepo", resultString)
+            val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(repo)
             call.respond(
                 HttpStatusCode.OK, "Zizmor result: ${result}\n"
             )

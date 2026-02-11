@@ -7,15 +7,19 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNames
 
+private val json = Json { ignoreUnknownKeys = true }
+
 @Serializable
 data class ZizmorResult(
     val repo: String,
     val severity: String,
     val warnings: Int,
     val results: List<ZizmorFinding>,
-)
-
-private val json = Json { ignoreUnknownKeys = true }
+) {
+    fun toJson(): String {
+        return json.encodeToString(this)
+    }
+}
 
 fun stringToZizmorResult(resultString: String): List<ZizmorFinding> {
     return json.decodeFromString<List<ZizmorFindingInput>>(resultString)
@@ -44,11 +48,7 @@ data class ZizmorFinding(
     val confidence: String,
     val severity: String,
     val locations: List<ZizmorLocation>
-) {
-    override fun toString(): String {
-        return json.encodeToString(this)
-    }
-}
+)
 
 @Suppress("unused")
 @Serializable
@@ -57,11 +57,7 @@ class ZizmorLocation(
     val lineStart: Int,
     val lineEnd: Int,
     val feature: String,
-) {
-    override fun toString(): String {
-        return json.encodeToString(this)
-    }
-}
+)
 
 
 // *****************************
