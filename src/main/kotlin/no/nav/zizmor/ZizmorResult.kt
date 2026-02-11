@@ -1,36 +1,40 @@
+@file:OptIn(ExperimentalSerializationApi::class) // for JsonNames
+
 package no.nav.zizmor
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNames
 
 @Serializable
 data class ZizmorResult(
     val repo: String,
+    val severity: String,
+    val warnings: Int,
     val results: List<ZizmorFinding>,
 )
 
-private val jsonDecoder = Json { ignoreUnknownKeys = true }
+private val json = Json { ignoreUnknownKeys = true }
 
-fun stringToZizmorResult(repo: String, resultString: String): ZizmorResult {
-    return ZizmorResult(
-        repo = repo,
-        results = jsonDecoder.decodeFromString<List<ZizmorFindingInput>>(resultString)
-            .map { finding ->
-                ZizmorFinding(
-                    finding.ident,
-                    finding.desc,
-                    finding.determinations.confidence,
-                    finding.determinations.severity,
-                    finding.locations.map { location ->
-                        ZizmorLocation(
-                            path = location.symbolic.key.Remote.path,
-                            lineStart = location.concrete.location.start_point.row,
-                            lineEnd = location.concrete.location.end_point.row,
-                        )
-                    }
-                )
-            }
-    )
+fun stringToZizmorResult(resultString: String): List<ZizmorFinding> {
+    return json.decodeFromString<List<ZizmorFindingInput>>(resultString)
+        .map { finding ->
+            ZizmorFinding(
+                finding.ident,
+                finding.desc,
+                finding.determinations.confidence,
+                finding.determinations.severity,
+                finding.locations.map { location ->
+                    ZizmorLocation(
+                        path = location.symbolic.key.remote.path,
+                        lineStart = location.concrete.location.startPoint.row,
+                        lineEnd = location.concrete.location.endPoint.row,
+                        feature = location.concrete.feature,
+                    )
+                }
+            )
+        }
 }
 
 @Serializable
@@ -42,19 +46,20 @@ data class ZizmorFinding(
     val locations: List<ZizmorLocation>
 ) {
     override fun toString(): String {
-        return jsonDecoder.encodeToString(this)
+        return json.encodeToString(this)
     }
 }
 
 @Suppress("unused")
-@Serializable()
+@Serializable
 class ZizmorLocation(
     val path: String,
     val lineStart: Int,
     val lineEnd: Int,
+    val feature: String,
 ) {
     override fun toString(): String {
-        return jsonDecoder.encodeToString(this)
+        return json.encodeToString(this)
     }
 }
 
@@ -89,7 +94,8 @@ class ZizmorSymbolic(
 
 @Serializable
 class ZizmorKey(
-    val Remote: ZizmorRemote,
+    @JsonNames("Remote")
+    val remote: ZizmorRemote,
 )
 
 @Serializable
@@ -100,12 +106,15 @@ class ZizmorRemote(
 @Serializable
 class ZizmorConcrete(
     val location: ZizmorLoc,
+    val feature: String,
 )
 
 @Serializable
 class ZizmorLoc(
-    val start_point: ZizmorPoint,
-    val end_point: ZizmorPoint,
+    @JsonNames("start_point")
+    val startPoint: ZizmorPoint,
+    @JsonNames("end_point")
+    val endPoint: ZizmorPoint,
 )
 
 @Serializable

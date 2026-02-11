@@ -3,6 +3,7 @@ package no.nav.service
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.data.DockerfileFeatures
 import no.nav.kafka.KafkaSenderInterface
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
@@ -12,7 +13,7 @@ class DataCollectorService(
     val kafkaSender: KafkaSenderInterface
 ) {
     var lastOkRun = Clock.System.now()
-    val logger = LoggerFactory.getLogger(this::class.java)
+    val logger: Logger = LoggerFactory.getLogger(this::class.java)
 
     fun processDockerfileFeaturesAndSendToKafka(): Int {
         val tableName = "dockerfile_features"
