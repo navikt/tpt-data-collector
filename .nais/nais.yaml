@@ -4,6 +4,8 @@ metadata:
   name: tpt-data-collector
   namespace: appsec
 spec:
+  ingresses:
+    - https://tpt-data-collector.nav.no
   image: {{image}}
   port: 8080
   azure:

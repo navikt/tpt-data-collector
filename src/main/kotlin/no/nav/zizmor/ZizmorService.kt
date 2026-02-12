@@ -23,27 +23,36 @@ fun String.runCommand(workingDir: File): String {
     return proc.inputStream.bufferedReader().readText()
 }
 
-class ZizmorService(val githubToken: String, val zizmorCommand: String = "/app/zizmor") {
+class ZizmorService(val githubToken: String, val zizmorCommand: String) {
     val logger: Logger = LoggerFactory.getLogger(this::class.java)
 
     fun runZizmorOnRepo(org: String, repo: String): String {
         logger.info("Zizmor: running zizmor on repo: \"$org/$repo\"")
-        val resultString = "$zizmorCommand --quiet --cache-dir /tmp --format=json --gh-token=$githubToken $org/$repo".runCommand(File("."))
+
+        if (zizmorCommand == "TESTING")
+            return this::class.java.getResource("/zizmor_big_result.json")?.readText()
+                ?: throw RuntimeException("Could not read zizmor_big_result.json")
+
+        val resultString = "$zizmorCommand --quiet --cache-dir /tmp --format=json --gh-token=$githubToken $org/$repo"
+            .runCommand(File("."))
+
         return resultString.replace("^. zizmor v.*\n".toRegex(), "")
     }
 
     fun analyseZizmorResult(repo: String, resultString: String): ZizmorResult {
         val zizmorResult = stringToZizmorResult(resultString)
         val filteredResult = zizmorResult
-            .filterNot { it.ident == "unpinned-uses" && // filter out nais actions
-                    it.locations.all { location -> location.feature.startsWith("nais/")} }
+            .filterNot {
+                it.ident == "unpinned-uses" && // filter out nais actions
+                        it.locations.all { location -> location.feature.startsWith("nais/") }
+            }
         var severity = "OK"
         filteredResult.forEach {
             if (severity != it.severity && severity.lowercase() != "high") {
-                if ( it.severity.lowercase() == "high" || it.severity.lowercase() == "medium") severity = it.severity
-                else if ( severity.lowercase() != "medium") {
-                    if ( it.severity.lowercase() == "low") severity = it.severity
-                    else if ( severity.lowercase() != "low") severity = it.severity
+                if (it.severity.lowercase() == "high" || it.severity.lowercase() == "medium") severity = it.severity
+                else if (severity.lowercase() != "medium") {
+                    if (it.severity.lowercase() == "low") severity = it.severity
+                    else if (severity.lowercase() != "low") severity = it.severity
                 }
             }
         }
