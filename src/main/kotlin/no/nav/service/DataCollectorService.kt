@@ -14,10 +14,11 @@ class DataCollectorService(
     val bigQueryClient: BigQueryClientInterface,
     val kafkaSender: KafkaSenderInterface,
     githubToken: String,
+    zizmorCommand: String,
 ) {
     var lastOkRun = Clock.System.now()
     val logger: Logger = LoggerFactory.getLogger(this::class.java)
-    val zizmorService = ZizmorService(githubToken)
+    val zizmorService = ZizmorService(githubToken, zizmorCommand)
 
     fun processDockerfileFeaturesAndSendToKafka(): Int {
         val tableName = "dockerfile_features"

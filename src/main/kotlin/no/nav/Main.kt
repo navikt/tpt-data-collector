@@ -4,16 +4,20 @@ import com.google.cloud.bigquery.DatasetId
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.netty.*
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.SerializationException
 import no.nav.bigquery.BigQueryClient
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.bigquery.DummyBigQuery
 import no.nav.kafka.DummyKafkaSender
 import no.nav.kafka.KafkaSender
 import no.nav.config.ApplikasjonsConfig
+import no.nav.github.GithubWebhookService
 import no.nav.metrics.metricsRoute
 import no.nav.service.DataCollectorService
+import org.apache.commons.codec.digest.HmacUtils
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.Calendar
@@ -40,7 +44,13 @@ fun Application.module(testing: Boolean = false) {
     else
         KafkaSender()
 
-    val dataCollectorService = DataCollectorService(bigQueryClient, kafkaSender, config.githubToken)
+    val dataCollectorService = DataCollectorService(
+        bigQueryClient = bigQueryClient,
+        kafkaSender = kafkaSender,
+        githubToken = config.githubToken,
+        zizmorCommand = if (testing) "TESTING" else "/app/zizmor",
+    )
+    val githubWebhookService = GithubWebhookService()
 
     //Start a timer to update every 24h
     Timer().scheduleAtFixedRate(timerTask {
@@ -58,23 +68,54 @@ fun Application.module(testing: Boolean = false) {
             call.respond(HttpStatusCode.OK, "OK")
         }
 
-        get("/bigquery/dockerfile_features") {
-            val rows = dataCollectorService.processDockerfileFeaturesAndSendToKafka()
-            call.respond(
-                HttpStatusCode.OK, "BigQuery: Number of lines sent: ${rows}\n"
+        post("/webhook/github") {
+            val signature = call.request.headers["X-Hub-Signature-256"] ?: call.respond(
+                HttpStatusCode.Unauthorized,
+                "Signature is missing"
             )
+            if (
+                signature.toString().length != 71 ||
+                !signature.toString().startsWith("sha256=")
+            ) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@post
+            }
+            val body = call.receiveText()
+            if (signature.toString() != generateHmac(body, config.githubWebhookSecret)) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@post
+            }
+
+            val webhookEvent = try {
+                githubWebhookService.jsonToEvent(body)
+            } catch (e: SerializationException) {
+                logger.warn("Failed to parse webhook event", e)
+                call.respond(HttpStatusCode.BadRequest, "Bad webhook payload")
+                return@post
+            }
+
+            if (githubWebhookService.shallCheckRepoWithZizmor(webhookEvent)) {
+                logger.info("Running zizmor on \"${webhookEvent.payload.repository.name}\" triggered by push to \"${webhookEvent.payload.ref}\"")
+                val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookEvent.payload.repository.name)
+                call.respond(
+                    HttpStatusCode.OK, "Zizmor was run sucsessfully on: ${result.repo} " +
+                            "with ${result.warnings} warnings and worst severity ${result.severity}\n"
+                )
+            } else {
+                call.respond(
+                    HttpStatusCode.OK, "Skipping zizmor on repo \"${webhookEvent.payload.repository.name}\""
+                )
+            }
         }
-        get("/zizmor/navikt/{repo}") {
-            val repo = call.parameters["repo"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(repo)
-            call.respond(
-                HttpStatusCode.OK, "Zizmor result: ${result}\n"
-            )
-        }
+
         if (!testing) {
             metricsRoute()
         }
     }
+}
+
+fun generateHmac(data: String, key: String): String {
+    return "sha256=${HmacUtils("HmacSHA256", key.toByteArray()).hmacHex(data)}"
 }
 
 @Suppress("SameParameterValue")
