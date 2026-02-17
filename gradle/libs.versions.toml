@@ -5,7 +5,7 @@ kotlinx-datetime = "0.7.1"
 kotlin-test = "2.3.10"
 bigquery = "2.59.0"
 prometheus = "1.16.3"
-logback = "1.5.29"
+logback = "1.5.30"
 logstash = "9.0"
 junit-jupiter = "6.0.2"
 
