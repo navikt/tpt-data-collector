@@ -28,17 +28,20 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
         val webhookPayload = try {
             jsonToPayload(jsonString)
         } catch (e: SerializationException) {
-            logger.warn("Failed to parse webhook event with SerializationException: ${e.message}", e)
-            logger.info("Event json: $jsonString")
+            logger.warn("Zizmor: Failed to parse webhook event with SerializationException: ${e.message}", e)
+            logger.debug("Event json: $jsonString")
             throw WebhookException(HttpStatusCode.BadRequest, "Bad webhook payload")
         }
 
         if (shallCheckRepoWithZizmor(webhookPayload)) {
-            logger.info("Running zizmor on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
+            logger.info("Zizmor: running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
             val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
-            return "Zizmor was run sucsessfully on: ${result.repo} with ${result.warnings} warnings " +
+            val info = "Zizmor: was run sucsessfully on: ${result.repo} with ${result.warnings} warnings " +
                     "and worst severity ${result.severity}\n"
+            logger.info(info)
+            return info
         } else {
+            logger.info("Zizmor: Skipping repo \"${webhookPayload.repository.name}\"")
             return "Skipping zizmor on repo \"${webhookPayload.repository.name}\""
         }
     }
@@ -49,12 +52,12 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
 
     fun shallCheckRepoWithZizmor(payload: WebhookPayload): Boolean {
         if (!payload.repository.fullName.startsWith("navikt")) {
-            logger.warn("Wrong org in event \"${payload.repository.fullName}\"")
+            logger.warn("Zizmor: Wrong org in event \"${payload.repository.fullName}\"")
             return false
         }
         val pushBranch = payload.ref.split("/").last()
         if (pushBranch != payload.repository.masterBranch) {
-            logger.debug("Push not on master branch \"${payload.ref}\"")
+            logger.info("Zizmor: Push not on master branch \"${payload.ref}\" skipping check")
             return false
         }
         return true
