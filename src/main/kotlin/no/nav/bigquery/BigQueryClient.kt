@@ -9,10 +9,12 @@ import com.google.cloud.bigquery.Table
 import com.google.cloud.bigquery.TableDefinition
 import com.google.cloud.bigquery.TableId
 import com.google.cloud.bigquery.TableResult
-import no.nav.logger
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import kotlin.collections.orEmpty
 
 class BigQueryClient(val projectId: String, val datasetId: DatasetId) : BigQueryClientInterface {
+    val logger: Logger = LoggerFactory.getLogger(this::class.java)
     private val bigQuery = BigQueryOptions.newBuilder()
         .setProjectId(projectId)
         .build()
