@@ -1,7 +1,6 @@
 package no.nav.zizmor
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import io.ktor.util.logging.KtorSimpleLogger
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -24,7 +23,7 @@ fun String.runCommand(workingDir: File): String {
 }
 
 class ZizmorService(val githubToken: String, val zizmorCommand: String) {
-    val logger: Logger = LoggerFactory.getLogger(this::class.java)
+    val logger = KtorSimpleLogger(this::class.java.name)
 
     fun runZizmorOnRepo(org: String, repo: String): String {
         logger.info("Zizmor: running zizmor on repo: \"$org/$repo\"")

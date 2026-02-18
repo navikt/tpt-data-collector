@@ -1,12 +1,11 @@
 package no.nav.service
 
+import io.ktor.util.logging.KtorSimpleLogger
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.data.DockerfileFeatures
 import no.nav.kafka.KafkaSenderInterface
 import no.nav.zizmor.ZizmorResult
 import no.nav.zizmor.ZizmorService
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 
@@ -17,10 +16,11 @@ class DataCollectorService(
     zizmorCommand: String,
 ) {
     var lastOkRun = Clock.System.now()
-    val logger: Logger = LoggerFactory.getLogger(this::class.java)
+    val logger = KtorSimpleLogger(this::class.java.name)
     val zizmorService = ZizmorService(githubToken, zizmorCommand)
 
     fun processDockerfileFeaturesAndSendToKafka(): Int {
+        logger.info("Scheduled update job started")
         val tableName = "dockerfile_features"
         logger.info("Starting to process $tableName")
         val mainTableList = bigQueryClient.readTable(tableName)
@@ -37,6 +37,7 @@ class DataCollectorService(
         dockerfileFeatures.dockerfileFeatures.forEach{ kafkaSender.sendToKafka(tableName, it.toJson()) }
         logger.info("$tableName request processed and sent to kafka -> Done")
         lastOkRun = Clock.System.now()
+        logger.info("Scheduled update job finished")
         return mainTableList.size
     }
 

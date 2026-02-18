@@ -1,28 +1,26 @@
 package no.nav
 
 import com.google.cloud.bigquery.DatasetId
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.netty.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.netty.EngineMain
 import io.ktor.server.request.receiveText
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
-import kotlinx.serialization.SerializationException
+import io.ktor.server.response.respond
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
 import no.nav.bigquery.BigQueryClient
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.bigquery.DummyBigQuery
-import no.nav.kafka.DummyKafkaSender
-import no.nav.kafka.KafkaSender
 import no.nav.config.ApplikasjonsConfig
 import no.nav.github.GithubWebhookService
+import no.nav.github.WebhookException
+import no.nav.kafka.DummyKafkaSender
+import no.nav.kafka.KafkaSender
 import no.nav.metrics.metricsRoute
 import no.nav.service.DataCollectorService
 import org.apache.commons.codec.digest.HmacUtils
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-import java.util.Calendar
-import java.util.TimeZone
-import java.util.Timer
+import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
 
@@ -30,7 +28,6 @@ fun main(args: Array<String>): Unit = EngineMain.main(args)
 
 
 fun Application.module(testing: Boolean = false) {
-    val logger: Logger = LoggerFactory.getLogger("Main")
     val config = ApplikasjonsConfig()
     val datasetId = DatasetId.of(config.projectId, config.datasetName)
 
@@ -50,13 +47,11 @@ fun Application.module(testing: Boolean = false) {
         githubToken = config.githubToken,
         zizmorCommand = if (testing) "TESTING" else "/app/zizmor",
     )
-    val githubWebhookService = GithubWebhookService()
+    val githubWebhookService = GithubWebhookService(config.githubWebhookSecret, dataCollectorService)
 
     //Start a timer to update every 24h
     Timer().scheduleAtFixedRate(timerTask {
-        logger.info("Scheduled update job started")
         dataCollectorService.processDockerfileFeaturesAndSendToKafka()
-        logger.info("Scheduled update job finished")
     }, calculateInitialDelayUntilClock(4, 0), TimeUnit.DAYS.toMillis(1))
 
     routing {
@@ -69,42 +64,12 @@ fun Application.module(testing: Boolean = false) {
         }
 
         post("/webhook/github") {
-            val signature = call.request.headers["X-Hub-Signature-256"] ?: call.respond(
-                HttpStatusCode.Unauthorized,
-                "Signature is missing"
-            )
-            if (
-                signature.toString().length != 71 ||
-                !signature.toString().startsWith("sha256=")
-            ) {
-                call.respond(HttpStatusCode.Unauthorized)
-                return@post
-            }
-            val body = call.receiveText()
-            if (signature.toString() != generateHmac(body, config.githubWebhookSecret)) {
-                call.respond(HttpStatusCode.Unauthorized)
-                return@post
-            }
-
-            val webhookEvent = try {
-                githubWebhookService.jsonToEvent(body)
-            } catch (e: SerializationException) {
-                logger.warn("Failed to parse webhook event", e)
-                call.respond(HttpStatusCode.BadRequest, "Bad webhook payload")
-                return@post
-            }
-
-            if (githubWebhookService.shallCheckRepoWithZizmor(webhookEvent)) {
-                logger.info("Running zizmor on \"${webhookEvent.payload.repository.name}\" triggered by push to \"${webhookEvent.payload.ref}\"")
-                val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookEvent.payload.repository.name)
-                call.respond(
-                    HttpStatusCode.OK, "Zizmor was run sucsessfully on: ${result.repo} " +
-                            "with ${result.warnings} warnings and worst severity ${result.severity}\n"
-                )
-            } else {
-                call.respond(
-                    HttpStatusCode.OK, "Skipping zizmor on repo \"${webhookEvent.payload.repository.name}\""
-                )
+            val signature = call.request.headers["X-Hub-Signature-256"]
+            try {
+                val returnMessage = githubWebhookService.handleWebhookEvent(jsonString = call.receiveText(), signature = signature)
+                call.respond(HttpStatusCode.OK, returnMessage)
+            } catch (e: WebhookException) {
+                call.respond(e.statusCode, e.message ?: "")
             }
         }
 
