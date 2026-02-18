@@ -25,40 +25,36 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
             throw WebhookException(HttpStatusCode.Unauthorized, "Signature is wrong")
         }
 
-        val webhookEvent = try {
-            jsonToEvent(jsonString)
+        val webhookPayload = try {
+            jsonToPayload(jsonString)
         } catch (e: SerializationException) {
             logger.warn("Failed to parse webhook event with SerializationException: ${e.message}", e)
             logger.info("Event json: $jsonString")
             throw WebhookException(HttpStatusCode.BadRequest, "Bad webhook payload")
         }
 
-        if (shallCheckRepoWithZizmor(webhookEvent)) {
-            logger.info("Running zizmor on \"${webhookEvent.payload.repository.name}\" triggered by push to \"${webhookEvent.payload.ref}\"")
-            val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookEvent.payload.repository.name)
+        if (shallCheckRepoWithZizmor(webhookPayload)) {
+            logger.info("Running zizmor on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
+            val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
             return "Zizmor was run sucsessfully on: ${result.repo} with ${result.warnings} warnings " +
                     "and worst severity ${result.severity}\n"
         } else {
-            return "Skipping zizmor on repo \"${webhookEvent.payload.repository.name}\""
+            return "Skipping zizmor on repo \"${webhookPayload.repository.name}\""
         }
     }
 
-    fun jsonToEvent(jsonString: String): WebhookEvent {
-        return json.decodeFromString<WebhookEvent>(jsonString)
+    fun jsonToPayload(jsonString: String): WebhookPayload {
+        return json.decodeFromString<WebhookPayload>(jsonString)
     }
 
-    fun shallCheckRepoWithZizmor(event: WebhookEvent): Boolean {
-        if (event.type != "push") {
-            logger.warn("Got unknown event type \"${event.type}\"")
+    fun shallCheckRepoWithZizmor(payload: WebhookPayload): Boolean {
+        if (!payload.repository.fullName.startsWith("navikt")) {
+            logger.warn("Wrong org in event \"${payload.repository.fullName}\"")
             return false
         }
-        if (!event.payload.repository.fullName.startsWith("navikt")) {
-            logger.warn("Wrong org in event \"${event.payload.repository.fullName}\"")
-            return false
-        }
-        val pushBranch = event.payload.ref.split("/").last()
-        if (pushBranch != event.payload.repository.masterBranch) {
-            logger.debug("Push not on master branch \"${event.payload.ref}\"")
+        val pushBranch = payload.ref.split("/").last()
+        if (pushBranch != payload.repository.masterBranch) {
+            logger.debug("Push not on master branch \"${payload.ref}\"")
             return false
         }
         return true

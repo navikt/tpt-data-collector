@@ -7,14 +7,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 
 @Serializable
-class WebhookEvent (
-    @JsonNames("event")
-    val type: String,
-    val payload: Payload,
-)
-
-@Serializable
-class Payload (
+class WebhookPayload (
     val ref: String,
     val pusher: Pusher,
     val repository: Repository,
