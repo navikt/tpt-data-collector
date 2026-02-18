@@ -28,9 +28,9 @@ import kotlin.concurrent.timerTask
 
 fun main(args: Array<String>): Unit = EngineMain.main(args)
 
-val logger: Logger = LoggerFactory.getLogger("Main")
 
 fun Application.module(testing: Boolean = false) {
+    val logger: Logger = LoggerFactory.getLogger("Main")
     val config = ApplikasjonsConfig()
     val datasetId = DatasetId.of(config.projectId, config.datasetName)
 
