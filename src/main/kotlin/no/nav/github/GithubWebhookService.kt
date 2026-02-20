@@ -29,7 +29,7 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
             jsonToPayload(jsonString)
         } catch (e: SerializationException) {
             logger.warn("Zizmor: Failed to parse webhook event with SerializationException: ${e.message}", e)
-            logger.debug("Event json: $jsonString")
+            logger.debug("Zizmor: Event json: $jsonString")
             throw WebhookException(HttpStatusCode.BadRequest, "Bad webhook payload")
         }
 
