@@ -35,7 +35,7 @@ jobs:
       - name: Generate and submit dependency graph
         uses: gradle/actions/dependency-submission@f29f5a9d7b09a7c6b29859002d29d24e1674c884
       - name: Scan docker image for secrets
-        uses: aquasecurity/trivy-action@c1824fd6edce30d7ab345a9989de00bbd46ef284
+        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518
         with:
           image-ref: '${{ steps.docker-push.outputs.image }}'
           format: 'sarif'
