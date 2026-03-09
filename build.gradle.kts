@@ -17,7 +17,7 @@ dependencies {
     implementation(libs.bigquery)
 
     // Kafka
-    implementation("at.yawk.lz4:lz4-java:1.10.3")
+    implementation("at.yawk.lz4:lz4-java:1.10.4")
     implementation("org.apache.kafka:kafka-clients:4.2.0") {
         // "Fikser CVE-2025-12183 - lz4-java >1.8.1 har sårbar versjon (transitive dependency fra kafka-clients:4.1.0)"
         exclude("org.lz4", "lz4-java")
