@@ -51,13 +51,15 @@ fun Application.module(testing: Boolean = false) {
 
     //Start a timer to update every 24h
     Timer().scheduleAtFixedRate(timerTask {
-        dataCollectorService.processDockerfileFeaturesAndSendToKafka()
+        try {
+            dataCollectorService.processDockerfileFeaturesAndSendToKafka()
+        } catch (e: Exception) {
+            dataCollectorService.logger.error("Scheduled job failed with unhandled exception", e)
+        }
     }, calculateInitialDelayUntilClock(4, 0), TimeUnit.DAYS.toMillis(1))
 
     routing {
         get("/internal/isAlive") {
-            if (!bigQueryClient.isAlive())
-                call.respond(HttpStatusCode.ServiceUnavailable, "BigQuery is not alive")
             if (!dataCollectorService.isAlive())
                 call.respond(HttpStatusCode.ServiceUnavailable, "DataCollector service is not alive")
             call.respond(HttpStatusCode.OK, "OK")
