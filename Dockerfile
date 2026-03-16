@@ -2,15 +2,18 @@ FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/jre:openjdk-25-dev
 
 USER root
 
+# e19a1651fef8429db9721573b5644b5cd696f893e2273c6338c88b1d34ace785 = 1.23.1-r0
 RUN ARCH=`uname -m` && \
     echo "ARCH: $ARCH" && \
-    CHECKSUM="5c7e74a37abd140317631c0be321f49272589b670fc9dfc77766ce97f6fe35f0" && \
-    if [ $ARCH = "aarch64" ] ; then CHECKSUM="2187019d69ffebf808f1195cdfa66ba769590e6eec9ad70b7250d68e5a3d2af3" ; fi && \
-    echo "CHECKSUM: $CHECKSUM" \
+    CHECKSUM="e19a1651fef8429db9721573b5644b5cd696f893e2273c6338c88b1d34ace785" && \
+    if [ $ARCH = "aarch64" ] ; then CHECKSUM="0e14525857aa60d44b3f4d266dc6b8511fac5e269e94e1bdd5bbf0edbe5fc4d2" ; fi && \
+    echo "Expected zizmor CHECKSUM: $CHECKSUM" && \
     set -eux && \
     apk update && \
     apk add zizmor && \
+    echo "Zizmor version" && \
     zizmor --version && \
+    echo "Zizmor checksum" && \
     sha256sum /usr/bin/zizmor && \
     echo "$CHECKSUM  /usr/bin/zizmor" | sha256sum -c
 
