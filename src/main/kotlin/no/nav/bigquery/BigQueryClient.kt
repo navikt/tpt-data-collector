@@ -93,7 +93,7 @@ class BigQueryClient(val projectId: String, val datasetId: DatasetId) : BigQuery
         result.iterateAll().forEach { row ->
             val rowMap = mutableMapOf<String, String>()
             row.forEachIndexed { idx, field ->
-                rowMap[fieldNames[idx]] = field.value.toString()
+                rowMap[fieldNames[idx]] = field.value?.toString() ?: ""
             }
             dataList.add(rowMap)
         }
