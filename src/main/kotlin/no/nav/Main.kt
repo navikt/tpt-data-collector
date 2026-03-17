@@ -19,6 +19,7 @@ import no.nav.kafka.DummyKafkaSender
 import no.nav.kafka.KafkaSender
 import no.nav.metrics.metricsRoute
 import no.nav.service.DataCollectorService
+import no.nav.zizmor.ZizmorException
 import org.apache.commons.codec.digest.HmacUtils
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -72,6 +73,8 @@ fun Application.module(testing: Boolean = false) {
                 call.respond(HttpStatusCode.OK, returnMessage)
             } catch (e: WebhookException) {
                 call.respond(e.statusCode, e.message ?: "")
+            } catch (e: ZizmorException) {
+                call.respond(HttpStatusCode.InternalServerError, e.message ?: "")
             }
         }
 
