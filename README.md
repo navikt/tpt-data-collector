@@ -4,19 +4,11 @@
 
 ## Overview
 
-This is a demo repository that offers a golden path for JVM projects.
-The workflows are defined using GitHub Actions and are located in the `.github/workflows` directory.
-
-## After using this template
-
-- Look over each `TODO` in this repository and make appropriate changes.
-- Remember to add the repository to your team in [Nais console](https://console.nav.cloud.nais.io/).
-- Change this README to suit your application. (You can always view the backend-golden-path README by clicking "generated from [navikt/backend-golden-path](https://github.com/navikt/backend-golden-path)" in your repository's header)
-- Make the rest of your application!
+An application that collects data (from BigQuery and a webhook) and sends aggregated results to tpt.
 
 ## Workflows
 
-### 1. Run test & build on PRs
+### 1. Run test and build on PRs
 
 This workflow is triggered on pull requests and performs the following steps:
 
@@ -34,7 +26,7 @@ This workflow triggers on push to main and when dependabot updates the dependenc
 - **Setup same as test workflow** (see above).
 - ...
 - **Build & push docker image + SBOM**: Uses the `nais/docker-build-push` action to build and push a Docker image and generate a Software Bill of Materials (SBOM) file.
-- **Generate and submit dependency graph**: Uses the `gradle/actions/dependency-submission` action to generate and submit the dependency graph to Github.
+- **Generate and submit dependency graph**: Uses the `gradle/actions/dependency-submission` action to generate and submit the dependency graph to GitHub.
 - **Scan docker image for secrets**: Uses the `aquasecurity/trivy-action` action to scan the Docker image for secrets and generates a SARIF file.
 - **Upload SARIF file**: Uses the `github/codeql-action/upload-sarif` action to upload the SARIF file.
 
