@@ -32,9 +32,11 @@ class ZizmorService(val githubToken: String, val zizmorCommand: String) {
     fun runZizmorOnRepo(org: String, repo: String): String {
         logger.info("Zizmor: running zizmor on repo: \"$org/$repo\"")
 
-        if (zizmorCommand == "TESTING")
+        if (zizmorCommand == "TESTING") {
+            logger.info("Zizmor: Reading zizrmor results from file. TESTING")
             return this::class.java.getResource("/zizmor_big_result.json")?.readText()
                 ?: throw ZizmorException("Could not read zizmor_big_result.json")
+        }
 
         val resultString = "$zizmorCommand --quiet --cache-dir /tmp --format=json --gh-token=$githubToken $org/$repo"
             .runCommand(File("."), logger)
