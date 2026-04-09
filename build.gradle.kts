@@ -9,7 +9,22 @@ kotlin {
 
 dependencies {
     implementation(libs.bundles.ktor)
+    constraints{
+        implementation("io.netty:netty-codec-http:4.2.12.Final") {
+            because("Netty HTTP/2 CONTINUATION Frame Flood DoS via Zero-Byte Frame Bypass")
+        }
+        implementation("io.netty:netty-codec-http2:4.2.12.Final") {
+            because("Netty HTTP/2 CONTINUATION Frame Flood DoS via Zero-Byte Frame Bypass")
+        }
+    }
+
     implementation(libs.bundles.logging)
+    constraints {
+        implementation("tools.jackson.core:jackson-core:3.1.1") {
+            because("Multiple dependabot vulnerabilities")
+        }
+    }
+
     implementation(libs.kotlinx.serialization)
     implementation(libs.kotlinx.datetime)
 
