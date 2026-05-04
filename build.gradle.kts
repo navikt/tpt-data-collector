@@ -20,7 +20,7 @@ dependencies {
 
     implementation(libs.bundles.logging)
     constraints {
-        implementation("tools.jackson.core:jackson-core:3.1.2") {
+        implementation("tools.jackson.core:jackson-core:3.1.3") {
             because("Multiple dependabot vulnerabilities")
         }
     }
