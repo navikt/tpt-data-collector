@@ -31,7 +31,7 @@ dependencies {
     // BigQuery
     implementation(libs.bigquery)
     constraints {
-        implementation("com.fasterxml.jackson.core:jackson-core:2.21.2") {
+        implementation("com.fasterxml.jackson.core:jackson-core:2.21.3") {
             because("jackson-core: Number Length Constraint Bypass in Async Parser Leads to Potential DoS Condition")
         }
     }
