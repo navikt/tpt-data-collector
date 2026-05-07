@@ -10,10 +10,10 @@ kotlin {
 dependencies {
     implementation(libs.bundles.ktor)
     constraints{
-        implementation("io.netty:netty-codec-http:4.2.12.Final") {
+        implementation("io.netty:netty-codec-http:4.2.13.Final") {
             because("Netty HTTP/2 CONTINUATION Frame Flood DoS via Zero-Byte Frame Bypass")
         }
-        implementation("io.netty:netty-codec-http2:4.2.12.Final") {
+        implementation("io.netty:netty-codec-http2:4.2.13.Final") {
             because("Netty HTTP/2 CONTINUATION Frame Flood DoS via Zero-Byte Frame Bypass")
         }
     }
