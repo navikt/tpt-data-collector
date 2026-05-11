@@ -1,7 +1,7 @@
 [versions]
 ktor = "3.4.3"
 kotlinx-serialization = "1.11.0"
-kotlinx-datetime = "0.7.1"
+kotlinx-datetime = "0.8.0"
 kotlin-test = "2.3.21"
 bigquery = "2.66.0"
 prometheus = "1.16.5"
