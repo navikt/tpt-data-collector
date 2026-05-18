@@ -1,5 +1,5 @@
 [versions]
-ktor = "3.4.3"
+ktor = "3.5.0"
 kotlinx-serialization = "1.11.0"
 kotlinx-datetime = "0.8.0"
 kotlin-test = "2.3.21"
