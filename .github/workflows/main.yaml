@@ -28,7 +28,7 @@ jobs:
       - name: Test & build
         run: ./gradlew test build
       - name: Build & push docker image + SBOM
-        uses: nais/docker-build-push@be85229e81c0293c265c646c084f05317fb6e0d2 # v0
+        uses: nais/docker-build-push@751a312f0803eb96a05a41fadf51be19b7be362c # v0
         id: docker-push
         with:
           team: appsec
@@ -42,7 +42,7 @@ jobs:
           format: 'sarif'
           scanners: 'secret'
           output: 'trivy.sarif'
-      - uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+      - uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
         with:
           sarif_file: 'trivy.sarif'
   deploy:
