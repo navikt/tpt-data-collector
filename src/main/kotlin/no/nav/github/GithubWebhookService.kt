@@ -35,10 +35,9 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
 
         if (shallCheckRepoWithZizmor(webhookPayload)) {
             logger.info("Zizmor: running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
-            //val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
-            //val info = "Zizmor: was run sucsessfully on: ${result.repo} with ${result.warnings} warnings " +
-            //        "and worst severity ${result.severity}\n"
-            //logger.info(info)
+            val changedFiles = webhookPayload.commits
+                .flatMap { it.added + it.modified }.toSet()
+            logger.info("Changed files: $changedFiles")
             return "Hello git!"
         } else {
             logger.info("Zizmor: Skipping repo \"${webhookPayload.repository.name}\"")

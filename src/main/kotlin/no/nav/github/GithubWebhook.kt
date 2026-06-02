@@ -2,6 +2,7 @@
 
 package no.nav.github
 
+import com.google.errorprone.annotations.Modifier
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
@@ -11,7 +12,9 @@ class WebhookPayload (
     val ref: String,
     val pusher: Pusher,
     val repository: Repository,
-)
+    val commits: List<Commit>
+) {
+}
 
 @Serializable
 class Pusher (
@@ -26,3 +29,8 @@ class Repository (
     @JsonNames("master_branch")
     val masterBranch: String,
 )
+
+@Serializable
+class Commit(val modified: List<String>, val added: List<String>, val removed: List<String>)
+
+
