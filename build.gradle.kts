@@ -20,7 +20,7 @@ dependencies {
 
     implementation(libs.bundles.logging)
     constraints {
-        implementation("tools.jackson.core:jackson-core:3.1.3") {
+        implementation("tools.jackson.core:jackson-core:3.1.4") {
             because("Multiple dependabot vulnerabilities")
         }
     }
@@ -31,7 +31,7 @@ dependencies {
     // BigQuery
     implementation(libs.bigquery)
     constraints {
-        implementation("com.fasterxml.jackson.core:jackson-core:2.21.3") {
+        implementation("com.fasterxml.jackson.core:jackson-core:2.21.4") {
             because("jackson-core: Number Length Constraint Bypass in Async Parser Leads to Potential DoS Condition")
         }
     }
