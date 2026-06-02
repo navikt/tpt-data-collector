@@ -12,6 +12,46 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
     val logger = KtorSimpleLogger(this::class.java.name)
 
     fun handleWebhookEvent(jsonString: String, signature: String?): String {
+        validateWebhookEvent(jsonString, signature)
+
+        val webhookPayload = try {
+            jsonToPayload(jsonString)
+        } catch (e: SerializationException) {
+            logger.warn("Failed to parse webhook event with SerializationException: ${e.message}", e)
+            logger.debug("Event json: $jsonString")
+            throw WebhookException(HttpStatusCode.BadRequest, "Bad webhook payload")
+        }
+
+        if (isRelevant(webhookPayload)) {
+            logger.info("running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
+            val changedFiles = webhookPayload.commits
+                .flatMap { it.added + it.modified }.toSet()
+            logger.info("Changed files: $changedFiles")
+            return "Hello git!"
+        } else {
+            logger.info("Skipping repo \"${webhookPayload.repository.name}\"")
+            return "Skipping  on repo \"${webhookPayload.repository.name}\""
+        }
+    }
+
+    private fun jsonToPayload(jsonString: String): WebhookPayload {
+        return json.decodeFromString<WebhookPayload>(jsonString)
+    }
+
+    private fun isRelevant(payload: WebhookPayload): Boolean {
+        if (!payload.repository.fullName.startsWith("navikt/")) {
+            logger.warn("Wrong org in event \"${payload.repository.fullName}\"")
+            return false
+        }
+        val pushBranch = payload.ref.split("/").last()
+        if (pushBranch != payload.repository.masterBranch) {
+            logger.info("Push is not on default branch \"${payload.ref}\" skipping check")
+            return false
+        }
+        return true
+    }
+
+    private fun validateWebhookEvent(jsonString: String, signature: String?){
         if (signature == null) {
             throw WebhookException(HttpStatusCode.Unauthorized, "Signature is missing")
         }
@@ -24,43 +64,8 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
         if (signature != generateHmac(jsonString, githubWebhookSecret)) {
             throw WebhookException(HttpStatusCode.Unauthorized, "Signature is wrong")
         }
-
-        val webhookPayload = try {
-            jsonToPayload(jsonString)
-        } catch (e: SerializationException) {
-            logger.warn("Zizmor: Failed to parse webhook event with SerializationException: ${e.message}", e)
-            logger.debug("Zizmor: Event json: $jsonString")
-            throw WebhookException(HttpStatusCode.BadRequest, "Bad webhook payload")
-        }
-
-        if (shallCheckRepoWithZizmor(webhookPayload)) {
-            logger.info("Zizmor: running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
-            val changedFiles = webhookPayload.commits
-                .flatMap { it.added + it.modified }.toSet()
-            logger.info("Changed files: $changedFiles")
-            return "Hello git!"
-        } else {
-            logger.info("Zizmor: Skipping repo \"${webhookPayload.repository.name}\"")
-            return "Skipping zizmor on repo \"${webhookPayload.repository.name}\""
-        }
     }
 
-    fun jsonToPayload(jsonString: String): WebhookPayload {
-        return json.decodeFromString<WebhookPayload>(jsonString)
-    }
-
-    fun shallCheckRepoWithZizmor(payload: WebhookPayload): Boolean {
-        if (!payload.repository.fullName.startsWith("navikt")) {
-            logger.warn("Zizmor: Wrong org in event \"${payload.repository.fullName}\"")
-            return false
-        }
-        val pushBranch = payload.ref.split("/").last()
-        if (pushBranch != payload.repository.masterBranch) {
-            logger.info("Zizmor: Push not on master branch \"${payload.ref}\" skipping check")
-            return false
-        }
-        return true
-    }
 }
 
 class WebhookException(val statusCode: HttpStatusCode, message: String): RuntimeException(message)
