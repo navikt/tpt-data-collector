@@ -35,11 +35,11 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
 
         if (shallCheckRepoWithZizmor(webhookPayload)) {
             logger.info("Zizmor: running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
-            val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
-            val info = "Zizmor: was run sucsessfully on: ${result.repo} with ${result.warnings} warnings " +
-                    "and worst severity ${result.severity}\n"
-            logger.info(info)
-            return info
+            //val result = dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
+            //val info = "Zizmor: was run sucsessfully on: ${result.repo} with ${result.warnings} warnings " +
+            //        "and worst severity ${result.severity}\n"
+            //logger.info(info)
+            return "Hello git!"
         } else {
             logger.info("Zizmor: Skipping repo \"${webhookPayload.repository.name}\"")
             return "Skipping zizmor on repo \"${webhookPayload.repository.name}\""
