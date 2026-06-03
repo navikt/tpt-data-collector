@@ -44,7 +44,7 @@ class DataCollectorService(
     fun checkRepoWithZizmorAndSendToKafka(repo: String): ZizmorResult {
         val saferRepo = repo.replace("/[^a-zA-ZÀ-Ÿ0-9-_.]/g".toRegex(), "")
         val resultString = zizmorService.runZizmorOnRepo("navikt", saferRepo)
-        val result = zizmorService.analyseZizmorResult("navikt/$saferRepo", resultString)
+        val result = zizmorService.analyzeZizmorResult("navikt/$saferRepo", resultString)
         kafkaSender.sendToKafka("zizmor", result.toJson())
         return result
     }

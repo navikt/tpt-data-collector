@@ -44,7 +44,7 @@ class ZizmorService(val githubToken: String, val zizmorCommand: String) {
         return resultString.replace("^. zizmor v.*\n".toRegex(), "")
     }
 
-    fun analyseZizmorResult(repo: String, resultString: String): ZizmorResult {
+    fun analyzeZizmorResult(repo: String, resultString: String): ZizmorResult {
         val zizmorResult = stringToZizmorResult(resultString)
         val filteredResult = zizmorResult
             .filterNot {

@@ -22,7 +22,7 @@ class ZizmorServiceTest {
     fun `ZizmorService should process result`() {
         val zizmorService = ZizmorService("dummy", "zizmor")
         val jsonString = this::class.java.getResource("/zizmor_big_result.json")?.readText() ?: "wops"
-        val processed = zizmorService.analyseZizmorResult("test", jsonString)
+        val processed = zizmorService.analyzeZizmorResult("test", jsonString)
         assertEquals("High", processed.severity)
         assertEquals(25, processed.warnings)
         assertEquals(9, processed.results.filter { it.ident == "unpinned-uses" }.size)
@@ -36,7 +36,7 @@ class ZizmorServiceTest {
         val zizmorService = ZizmorService("dummy", "zizmor")
         val jsonString = "[\n" +
                 "]\n"
-        val processed = zizmorService.analyseZizmorResult("test", jsonString)
+        val processed = zizmorService.analyzeZizmorResult("test", jsonString)
         assertEquals("OK", processed.severity)
     }
 
@@ -46,7 +46,7 @@ class ZizmorServiceTest {
         val jsonString = "[\n" +
                 makeResult("Informational") +
                 "]\n"
-        val processed = zizmorService.analyseZizmorResult("test", jsonString)
+        val processed = zizmorService.analyzeZizmorResult("test", jsonString)
         assertEquals("Informational", processed.severity)
     }
 
@@ -57,7 +57,7 @@ class ZizmorServiceTest {
                 makeResult("Informational") + ",\n"+
                 makeResult("Low") +
                 "]\n"
-        val processed = zizmorService.analyseZizmorResult("test", jsonString)
+        val processed = zizmorService.analyzeZizmorResult("test", jsonString)
         assertEquals("Low", processed.severity)
     }
 
@@ -69,7 +69,7 @@ class ZizmorServiceTest {
                 makeResult("Medium") + ",\n"+
                 makeResult("Low") +
                 "]\n"
-        val processed = zizmorService.analyseZizmorResult("test", jsonString)
+        val processed = zizmorService.analyzeZizmorResult("test", jsonString)
         assertEquals("Medium", processed.severity)
     }
 
@@ -82,7 +82,7 @@ class ZizmorServiceTest {
                 makeResult("Low") + ",\n"+
                 makeResult("Medium") +
                 "]\n"
-        val processed = zizmorService.analyseZizmorResult("test", jsonString)
+        val processed = zizmorService.analyzeZizmorResult("test", jsonString)
         assertEquals("High", processed.severity)
     }
 
@@ -94,7 +94,7 @@ class ZizmorServiceTest {
                 makeResult("Medium") + ",\n"+
                 makeResult("High") +
                 "]\n"
-        val processed = zizmorService.analyseZizmorResult("test", jsonString)
+        val processed = zizmorService.analyzeZizmorResult("test", jsonString)
         assertEquals("High", processed.severity)
     }
 
