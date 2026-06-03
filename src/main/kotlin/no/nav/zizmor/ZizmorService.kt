@@ -51,17 +51,19 @@ class ZizmorService(val githubToken: String, val zizmorCommand: String) {
                 it.ident == "unpinned-uses" && // filter out nais actions
                         it.locations.all { location -> location.feature.startsWith("nais/") }
             }
-        var severity = "OK"
-        filteredResult.forEach {
-            if (severity != it.severity && severity.lowercase() != "high") {
-                if (it.severity.lowercase() == "high" || it.severity.lowercase() == "medium") severity = it.severity
-                else if (severity.lowercase() != "medium") {
-                    if (it.severity.lowercase() == "low") severity = it.severity
-                    else if (severity.lowercase() != "low") severity = it.severity
-                }
-            }
-        }
-        return ZizmorResult(repo = repo, severity = severity, warnings = filteredResult.size, results = filteredResult)
+
+        val severityOrder = mapOf(
+            "OK" to 0,
+            "Low" to 1,
+            "Medium" to 2,
+            "High" to 3
+        )
+        val maxSeverity = filteredResult
+            .maxByOrNull { severityOrder[it.severity] ?: 0 }
+            ?.severity
+            ?: "OK"
+
+        return ZizmorResult(repo = repo, severity = maxSeverity, warnings = filteredResult.size, results = filteredResult)
     }
 }
 
