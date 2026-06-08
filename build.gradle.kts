@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "2.3.21"
-    kotlin("plugin.serialization") version "2.3.21"
+    kotlin("jvm") version "2.4.0"
+    kotlin("plugin.serialization") version "2.4.0"
 }
 
 kotlin {
@@ -10,17 +10,17 @@ kotlin {
 dependencies {
     implementation(libs.bundles.ktor)
     constraints{
-        implementation("io.netty:netty-codec-http:4.2.14.Final") {
+        implementation("io.netty:netty-codec-http:4.2.15.Final") {
             because("Netty HTTP/2 CONTINUATION Frame Flood DoS via Zero-Byte Frame Bypass")
         }
-        implementation("io.netty:netty-codec-http2:4.2.14.Final") {
+        implementation("io.netty:netty-codec-http2:4.2.15.Final") {
             because("Netty HTTP/2 CONTINUATION Frame Flood DoS via Zero-Byte Frame Bypass")
         }
     }
 
     implementation(libs.bundles.logging)
     constraints {
-        implementation("tools.jackson.core:jackson-core:3.1.3") {
+        implementation("tools.jackson.core:jackson-core:3.1.4") {
             because("Multiple dependabot vulnerabilities")
         }
     }
@@ -31,7 +31,7 @@ dependencies {
     // BigQuery
     implementation(libs.bigquery)
     constraints {
-        implementation("com.fasterxml.jackson.core:jackson-core:2.21.3") {
+        implementation("com.fasterxml.jackson.core:jackson-core:2.22.0") {
             because("jackson-core: Number Length Constraint Bypass in Async Parser Leads to Potential DoS Condition")
         }
     }
