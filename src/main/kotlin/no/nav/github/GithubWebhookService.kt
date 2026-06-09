@@ -29,18 +29,27 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
                 logger.info("MOCK: Changes in workflow-files - running Zizmor on repo ${webhookPayload.repository.name}")
                 //dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
             }
+            if (shouldUpdateDockerfiles(webhookPayload)) {
+                logger.info("MOCK: Changes in dockerfiles - running updateDockerfiles on repo ${webhookPayload.repository.name}")
+                //dataCollectorService.updateDockerfiles(webhookPayload.repository.name)
+            }
             return "Hello git!"
         } else {
             return "Skipping  on repo \"${webhookPayload.repository.name}\""
         }
     }
     
+    private fun shouldUpdateDockerfiles(payload: WebhookPayload): Boolean {
+        val changedFiles = payload.commits
+            .flatMap { it.added + it.modified }.toSet()
+        return changedFiles.any { it.contains("dockerfile", true) }
+    }
+
     private fun shouldRunZizmor(payload: WebhookPayload): Boolean {
         val changedFiles = payload.commits
             .flatMap { it.added + it.modified }.toSet()
         return changedFiles.any { it.startsWith(".github/workflows/") }
     }
-    
     private fun logChangedFiles(payload: WebhookPayload) {
         val changedFiles = payload.commits
             .flatMap { it.added + it.modified }.toSet()
