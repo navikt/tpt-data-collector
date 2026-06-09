@@ -6,6 +6,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import no.nav.generateHmac
 import no.nav.service.DataCollectorService
+import javax.swing.text.ChangedCharSetException
 
 class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorService: DataCollectorService) {
     val json = Json { ignoreUnknownKeys = true }
@@ -24,12 +25,14 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
 
         if (isRelevant(webhookPayload)) {
             logger.info("running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
-            logChangedFiles(webhookPayload)
-            if (shouldRunZizmor(webhookPayload)) {
+            val changedFiles: Set<String> = addedAndModifiedFiles(webhookPayload)
+            logger.info("Changed files: $changedFiles")
+
+            if (shouldRunZizmor(changedFiles)) {
                 logger.info("MOCK: Changes in workflow-files - running Zizmor on repo ${webhookPayload.repository.name}")
                 //dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
             }
-            if (shouldUpdateDockerfiles(webhookPayload)) {
+            if (shouldUpdateDockerfiles(changedFiles)) {
                 logger.info("MOCK: Changes in dockerfiles - running updateDockerfiles on repo ${webhookPayload.repository.name}")
                 //dataCollectorService.updateDockerfiles(webhookPayload.repository.name)
             }
@@ -39,21 +42,17 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
         }
     }
     
-    private fun shouldUpdateDockerfiles(payload: WebhookPayload): Boolean {
-        val changedFiles = payload.commits
-            .flatMap { it.added + it.modified }.toSet()
-        return changedFiles.any { it.contains("dockerfile", true) }
+    private fun shouldUpdateDockerfiles(changedFiles: Set<String>): Boolean {
+        return changedFiles.any { it.split("/").last().contains("dockerfile", true) }
     }
 
-    private fun shouldRunZizmor(payload: WebhookPayload): Boolean {
-        val changedFiles = payload.commits
-            .flatMap { it.added + it.modified }.toSet()
+    private fun shouldRunZizmor(changedFiles: Set<String>): Boolean {
         return changedFiles.any { it.startsWith(".github/workflows/") }
     }
-    private fun logChangedFiles(payload: WebhookPayload) {
-        val changedFiles = payload.commits
+    
+    private fun addedAndModifiedFiles(payload: WebhookPayload): Set<String> {
+        return payload.commits
             .flatMap { it.added + it.modified }.toSet()
-        logger.info("Changed files: $changedFiles")
     }
 
     private fun jsonToPayload(jsonString: String): WebhookPayload {
