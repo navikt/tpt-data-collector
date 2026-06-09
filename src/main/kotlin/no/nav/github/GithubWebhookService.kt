@@ -31,7 +31,6 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
             }
             return "Hello git!"
         } else {
-            logger.info("Skipping repo \"${webhookPayload.repository.name}\"")
             return "Skipping  on repo \"${webhookPayload.repository.name}\""
         }
     }
@@ -54,12 +53,12 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
         if (!payload.repository.fullName.startsWith("navikt/")) {
-            logger.warn("Wrong org in event \"${payload.repository.fullName}\"")
+            logger.warn("Wrong org in event \"${payload.repository.fullName}\" - skipping checks")
             return false
         }
         val pushBranch = payload.ref.split("/").last()
         if (pushBranch != payload.repository.masterBranch) {
-            logger.info("Push is not on default branch \"${payload.ref}\" skipping check")
+            logger.info("Push to repo \"${payload.repository.fullName}\" is not on default branch \"${payload.ref}\" - skipping checks")
             return false
         }
         return true
