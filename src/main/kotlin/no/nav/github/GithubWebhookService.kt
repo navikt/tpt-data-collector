@@ -24,14 +24,28 @@ class GithubWebhookService(val githubWebhookSecret: String, val dataCollectorSer
 
         if (isRelevant(webhookPayload)) {
             logger.info("running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
-            val changedFiles = webhookPayload.commits
-                .flatMap { it.added + it.modified }.toSet()
-            logger.info("Changed files: $changedFiles")
+            logChangedFiles(webhookPayload)
+            if (shouldRunZizmor(webhookPayload)) {
+                logger.info("MOCK: Changes in workflow-files - running Zizmor on repo ${webhookPayload.repository.name}")
+                //dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
+            }
             return "Hello git!"
         } else {
             logger.info("Skipping repo \"${webhookPayload.repository.name}\"")
             return "Skipping  on repo \"${webhookPayload.repository.name}\""
         }
+    }
+    
+    private fun shouldRunZizmor(payload: WebhookPayload): Boolean {
+        val changedFiles = payload.commits
+            .flatMap { it.added + it.modified }.toSet()
+        return changedFiles.any { it.startsWith(".github/workflows/") }
+    }
+    
+    private fun logChangedFiles(payload: WebhookPayload) {
+        val changedFiles = payload.commits
+            .flatMap { it.added + it.modified }.toSet()
+        logger.info("Changed files: $changedFiles")
     }
 
     private fun jsonToPayload(jsonString: String): WebhookPayload {
