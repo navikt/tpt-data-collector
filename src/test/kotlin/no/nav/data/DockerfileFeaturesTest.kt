@@ -56,9 +56,9 @@ class DockerfileFeaturesTest {
             dockerfileFeaturesList = Json.decodeFromString<List<Map<String, String>>>(dockerfileFeaturesJsonString),
             reposList = Json.decodeFromString<List<Map<String, String>>>(reposJsonString)
         )
-        assertContains(dockerfileFeatures.dockerfileFeatures[0].toJson(), "{\"repoId\":\"567189411\",\"repoName\":\"org/cool_name\"")
-        assertContains(dockerfileFeatures.dockerfileFeatures[1].toJson(), "{\"repoId\":\"584471087\",\"repoName\":\"org/cooler_name\"")
-        assertContains(dockerfileFeatures.dockerfileFeatures[2].toJson(), "{\"repoId\":\"608614179\",\"repoName\":\"org/coolest_name\"")
+        assertContains(dockerfileFeatures.dockerfileFeatures[0].toJson(), "{\"repoId\":\"567189411\",\"repoName\":\"org/cool_name\",\"path\":\"Dockerfile\"")
+        assertContains(dockerfileFeatures.dockerfileFeatures[1].toJson(), "{\"repoId\":\"584471087\",\"repoName\":\"org/cooler_name\",\"path\":\"Dockerfile\"")
+        assertContains(dockerfileFeatures.dockerfileFeatures[2].toJson(), "{\"repoId\":\"608614179\",\"repoName\":\"org/coolest_name\",\"path\":\"Dockerfile\"")
     }
 
     @Test
@@ -108,6 +108,7 @@ class DockerfileFeaturesTest {
         )
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesDistroless)
+        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesMultistage)
         assertEquals(
             "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/jre:openjdk-21",
             dockerfileFeatures.dockerfileFeatures.first().baseImage
@@ -138,6 +139,7 @@ class DockerfileFeaturesTest {
         )
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
         assertFalse(dockerfileFeatures.dockerfileFeatures.first().usesDistroless)
+        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesMultistage)
         assertEquals(
             "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/jre:openjdk-21-dev",
             dockerfileFeatures.dockerfileFeatures.first().baseImage
@@ -165,6 +167,7 @@ class DockerfileFeaturesTest {
         )
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
         assertFalse(dockerfileFeatures.dockerfileFeatures.first().usesDistroless)
+        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesMultistage)
         assertEquals(
             "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node:24",
             dockerfileFeatures.dockerfileFeatures.first().baseImage
@@ -192,10 +195,30 @@ class DockerfileFeaturesTest {
         )
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesChainguard)
         assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesDistroless)
+        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesMultistage)
         assertEquals(
             "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node:24-slim",
             dockerfileFeatures.dockerfileFeatures.first().baseImage
         )
         assertFalse(dockerfileFeatures.dockerfileFeatures.first().pinsBaseImage)
+    }
+
+    @Test
+    fun `Shall determine base image when FROM uses platform flag`() {
+        val dockerfile = """
+            FROM --platform=${'$'}BUILDPLATFORM golang:1.24 AS builder
+            WORKDIR /src
+            COPY . .
+            RUN go build ./...
+            FROM gcr.io/distroless/static-debian12
+            COPY --from=builder /src/app /app
+        """.trimIndent()
+        val dockerfileFeatures = DockerfileFeatures(
+            dockerfileFeaturesList = Json.decodeFromString<List<Map<String, String>>>("""[{ "repo_id":"567189411","content": "$dockerfile","path":"docker/Dockerfile.prod"}]"""),
+            reposList = Json.decodeFromString<List<Map<String, String>>>(reposJsonString),
+        )
+        assertEquals("docker/Dockerfile.prod", dockerfileFeatures.dockerfileFeatures.first().path)
+        assertEquals("gcr.io/distroless/static-debian12", dockerfileFeatures.dockerfileFeatures.first().baseImage)
+        assertTrue(dockerfileFeatures.dockerfileFeatures.first().usesMultistage)
     }
 }

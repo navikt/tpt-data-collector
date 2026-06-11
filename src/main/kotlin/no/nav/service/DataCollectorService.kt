@@ -1,8 +1,17 @@
 package no.nav.service
 
 import io.ktor.util.logging.KtorSimpleLogger
+import java.io.IOException
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import no.nav.bigquery.BigQueryClientInterface
+import no.nav.data.DockerfileFeatureExtractor
 import no.nav.data.DockerfileFeatures
+import no.nav.data.isDockerfileCandidate
+import no.nav.github.GithubGitTreeClientInterface
+import no.nav.github.GithubRepositoryContentsClientInterface
+import no.nav.github.GithubRequestException
+import no.nav.github.logGithubFetchFailure
 import no.nav.kafka.KafkaSenderInterface
 import no.nav.zizmor.ZizmorResult
 import no.nav.zizmor.ZizmorService
@@ -14,10 +23,13 @@ class DataCollectorService(
     val kafkaSender: KafkaSenderInterface,
     githubToken: String,
     zizmorCommand: String,
+    val githubContentsClient: GithubRepositoryContentsClientInterface,
+    val githubTreeClient: GithubGitTreeClientInterface,
 ) {
     var lastOkRun = Clock.System.now()
     val logger = KtorSimpleLogger(this::class.java.name)
     val zizmorService = ZizmorService(githubToken, zizmorCommand)
+    private val dockerfileFeatureExtractor = DockerfileFeatureExtractor()
 
     fun processDockerfileFeaturesAndSendToKafka(): Int {
         logger.info("Scheduled update job started")
@@ -47,6 +59,62 @@ class DataCollectorService(
         val result = zizmorService.analyzeZizmorResult("navikt/$saferRepo", resultString)
         kafkaSender.sendToKafka("zizmor", result.toJson())
         return result
+    }
+
+    fun processChangedDockerfilesAndSendToKafka(
+        repoId: String,
+        repoFullName: String,
+        ref: String,
+        candidatePaths: Set<String>,
+        removedPaths: Set<String> = emptySet(),
+    ): Int {
+        val owner = repoFullName.substringBefore("/")
+        val repo = repoFullName.substringAfter("/")
+        val pathsToProcess = if (removedPaths.isEmpty()) {
+            candidatePaths
+        } else {
+            logger.info("Detected removed Dockerfile candidates in \"$repoFullName\": $removedPaths. Refreshing current Dockerfile candidates from GitHub.")
+            githubTreeClient.listBlobPaths(owner, repo, ref).filter(::isDockerfileCandidate).toSet()
+        }
+
+        if (pathsToProcess.isEmpty()) {
+            logger.info("Webhook Dockerfile processing finished for \"$repoFullName\": no Dockerfile candidates remain at $ref")
+            return 0
+        }
+
+        val whenCollected = Clock.System.now().toLocalDateTime(TimeZone.UTC)
+        var processedCount = 0
+
+        pathsToProcess.sorted().forEach { path ->
+            try {
+                val content = githubContentsClient.readFile(owner, repo, path, ref)
+                val feature = dockerfileFeatureExtractor.extract(
+                    repoId = repoId,
+                    repoName = repoFullName,
+                    path = path,
+                    content = content,
+                    whenCollected = whenCollected,
+                )
+
+                if (feature == null) {
+                    logger.info("Skipping Dockerfile candidate \"$path\" in \"$repoFullName\": content did not validate as a Dockerfile")
+                    return@forEach
+                }
+
+                kafkaSender.sendToKafka("dockerfile_features", feature.toJson())
+                processedCount += 1
+            } catch (e: GithubRequestException) {
+                logger.logGithubFetchFailure(repoFullName, e)
+            } catch (e: IOException) {
+                logger.warn("Failed to fetch Dockerfile candidate \"$path\" from \"$repoFullName\": ${e.message}", e)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw RuntimeException("Webhook Dockerfile processing interrupted for \"$repoFullName\"", e)
+            }
+        }
+
+        logger.info("Webhook Dockerfile processing finished for \"$repoFullName\": published $processedCount message(s)")
+        return processedCount
     }
 
     fun isAlive(): Boolean {

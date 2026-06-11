@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 data class DockerfileFeature(
     val repoId: String,
     val repoName: String,
+    val path: String,
     val whenCollected: LocalDateTime?,
     val fileType: String,
     val baseImage: String,
