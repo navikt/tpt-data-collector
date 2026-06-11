@@ -23,7 +23,7 @@ Optional variables:
 - `TPT_LOCAL_REPO_ID`: repo id to include in the generated Kafka payloads, defaults to `0`
 - `TPT_DATA_COLLECTOR_GITHUB_USER_AGENT`: overrides the default local runner user agent
 
-The task uses the real `GithubFileClient`, but keeps BigQuery and Kafka in-memory. It prints the discovered candidate paths and any generated `dockerfile_features` payloads to stdout.
+The task uses the real GitHub API clients (`GithubRepositoryContentsClient` and `GithubGitTreeClient`), but keeps BigQuery and Kafka in-memory. It prints the discovered candidate paths and any generated `dockerfile_features` payloads to stdout.
 
 
 ## License
@@ -36,4 +36,3 @@ This project is maintained by [@appsec](https://github.com/orgs/navikt/teams/app
 Questions and/or feature requests? Please create an [issue](https://github.com/navikt/tpt-data-collector/issues).
 
 If you work in [@navikt](https://github.com/navikt) you can reach us at the Slack channel [#appsec](https://nav-it.slack.com/archives/C06P91VN27M).
-
