@@ -47,6 +47,7 @@ class ApplikasjonsConfig(
     val datasetName: String = getEnvVar("BIGQUERY_DATASET_ID", "appsec"),
     val githubToken: String = getEnvVar("TPT_DATA_COLLECTOR_GITHUB_TOKEN", "dummy"),
     val githubWebhookSecret: String = getEnvVar("GITHUB_WEBHOOK_SECRET", "dummy"),
+    val githubUserAgent: String = getEnvVar("TPT_DATA_COLLECTOR_GITHUB_USER_AGENT", "tpt-data-collector"),
 )
 
 fun getEnvVar(

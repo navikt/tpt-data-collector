@@ -1,3 +1,6 @@
+import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.SourceSetContainer
+
 plugins {
     kotlin("jvm") version "2.3.21"
     kotlin("plugin.serialization") version "2.3.21"
@@ -57,6 +60,8 @@ dependencies {
     testImplementation(libs.ktor.server.test.host)
 }
 
+val projectSourceSets = the<SourceSetContainer>()
+
 tasks {
     withType<Jar> {
         archiveBaseName.set("app")
@@ -86,5 +91,13 @@ tasks {
 
     withType<Wrapper> {
         gradleVersion = "8.14.2"
+    }
+
+    register<JavaExec>("runLocalDockerfileCheck") {
+        group = "verification"
+        description = "Runs the local Dockerfile fetch check with real GitHub and dummy BigQuery/Kafka"
+        dependsOn("testClasses")
+        classpath = projectSourceSets.named("test").get().runtimeClasspath
+        mainClass.set("no.nav.local.LocalDockerfileRunnerKt")
     }
 }

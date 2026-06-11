@@ -13,6 +13,10 @@ import no.nav.bigquery.BigQueryClient
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.bigquery.DummyBigQuery
 import no.nav.config.ApplikasjonsConfig
+import no.nav.github.DummyGithubRepositoryClient
+import no.nav.github.GithubApiClient
+import no.nav.github.GithubGitTreeClient
+import no.nav.github.GithubRepositoryContentsClient
 import no.nav.github.GithubWebhookService
 import no.nav.github.WebhookException
 import no.nav.kafka.DummyKafkaSender
@@ -42,11 +46,29 @@ fun Application.module(testing: Boolean = false) {
     else
         KafkaSender()
 
+    val githubRepositoryClient = if (testing) DummyGithubRepositoryClient() else null
+    val githubApiClient = if (testing) null else GithubApiClient(
+        githubToken = config.githubToken,
+        userAgent = config.githubUserAgent,
+    )
+    val githubContentsClient = if (testing) {
+        githubRepositoryClient!!
+    } else {
+        GithubRepositoryContentsClient(githubApiClient!!)
+    }
+    val githubTreeClient = if (testing) {
+        githubRepositoryClient!!
+    } else {
+        GithubGitTreeClient(githubApiClient!!)
+    }
+
     val dataCollectorService = DataCollectorService(
         bigQueryClient = bigQueryClient,
         kafkaSender = kafkaSender,
         githubToken = config.githubToken,
         zizmorCommand = if (testing) "TESTING" else "/app/zizmor",
+        githubContentsClient = githubContentsClient,
+        githubTreeClient = githubTreeClient,
     )
     val githubWebhookService = GithubWebhookService(config.githubWebhookSecret, dataCollectorService)
 
