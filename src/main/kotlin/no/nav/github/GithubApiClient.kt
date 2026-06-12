@@ -270,7 +270,7 @@ internal fun interface HttpStringSender {
     fun send(request: HttpRequest): HttpResponse<String>
 }
 
-private class JavaHttpStringSender : HttpStringSender {
+internal class JavaHttpStringSender : HttpStringSender {
     private val httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
         .build()
