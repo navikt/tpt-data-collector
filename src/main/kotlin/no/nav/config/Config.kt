@@ -46,11 +46,31 @@ class ApplikasjonsConfig(
     val projectId: String = getEnvVar("GCP_TEAM_PROJECT_ID", "appsec"),
     val datasetName: String = getEnvVar("BIGQUERY_DATASET_ID", "appsec"),
     val githubToken: String = getEnvVar("TPT_DATA_COLLECTOR_GITHUB_TOKEN", "dummy"),
+    val githubAppId: String? = getOptionalEnvVar("GITHUB_APP_ID"),
+    val githubAppInstallationId: String? = getOptionalEnvVar("GITHUB_APP_INSTALLATION_ID"),
+    val githubAppPrivateKey: String? = getOptionalEnvVar("GITHUB_APP_PRIVATE_KEY"),
     val githubWebhookSecret: String = getEnvVar("GITHUB_WEBHOOK_SECRET", "dummy"),
     val githubUserAgent: String = getEnvVar("TPT_DATA_COLLECTOR_GITHUB_USER_AGENT", "tpt-data-collector"),
-)
+) {
+    val hasGithubAppConfig: Boolean =
+        !githubAppId.isNullOrBlank() &&
+            !githubAppInstallationId.isNullOrBlank() &&
+            !githubAppPrivateKey.isNullOrBlank()
+
+    init {
+        val configuredGithubAppValues = listOf(githubAppId, githubAppInstallationId, githubAppPrivateKey)
+            .count { !it.isNullOrBlank() }
+        if (configuredGithubAppValues in 1..2) {
+            throw RuntimeException(
+                "GitHub App auth requires GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, and GITHUB_APP_PRIVATE_KEY to all be set together",
+            )
+        }
+    }
+}
 
 fun getEnvVar(
     varName: String,
     defaultValue: String? = null,
 ) = System.getenv(varName) ?: defaultValue ?: throw RuntimeException("Missing required variable $varName")
+
+fun getOptionalEnvVar(varName: String): String? = System.getenv(varName)
