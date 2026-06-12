@@ -19,12 +19,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class GithubRepositoryClientUnitTest {
+    private val tokenProvider = StaticGithubTokenProvider("token")
+
     @Test
     fun `readFile normalizes path and decodes base64 content`() {
         val requests = mutableListOf<HttpRequest>()
         val client = GithubRepositoryContentsClient(
             GithubApiClient(
-            githubToken = "token",
+            tokenProvider = tokenProvider,
             userAgent = "test-agent",
             httpSender = HttpStringSender { request ->
                 requests += request
@@ -55,7 +57,7 @@ class GithubRepositoryClientUnitTest {
         var callCount = 0
         val client = GithubRepositoryContentsClient(
             GithubApiClient(
-            githubToken = "token",
+            tokenProvider = tokenProvider,
             httpSender = HttpStringSender {
                 callCount += 1
                 TestHttpResponse(200, "{}", requestValue = it)
@@ -75,7 +77,7 @@ class GithubRepositoryClientUnitTest {
     fun `readFile classifies directory payload as permanent not-file failure`() {
         val client = GithubRepositoryContentsClient(
             GithubApiClient(
-            githubToken = "token",
+            tokenProvider = tokenProvider,
             httpSender = HttpStringSender { request ->
                 TestHttpResponse(
                     statusCodeValue = 200,
@@ -100,7 +102,7 @@ class GithubRepositoryClientUnitTest {
         var attempts = 0
         val client = GithubRepositoryContentsClient(
             GithubApiClient(
-            githubToken = "token",
+            tokenProvider = tokenProvider,
             httpSender = HttpStringSender { request ->
                 attempts += 1
                 if (attempts == 1) {
@@ -131,7 +133,7 @@ class GithubRepositoryClientUnitTest {
         var attempts = 0
         val client = GithubRepositoryContentsClient(
             GithubApiClient(
-            githubToken = "token",
+            tokenProvider = tokenProvider,
             clock = clock,
             httpSender = HttpStringSender { request ->
                 attempts += 1
@@ -168,7 +170,7 @@ class GithubRepositoryClientUnitTest {
     fun `listBlobPaths returns blob paths from repository tree`() {
         val client = GithubGitTreeClient(
             GithubApiClient(
-            githubToken = "token",
+            tokenProvider = tokenProvider,
             httpSender = HttpStringSender { request ->
                 TestHttpResponse(
                     200,
@@ -211,7 +213,7 @@ class GithubRepositoryClientUnitTest {
     fun `listBlobPaths fails on truncated tree`() {
         val client = GithubGitTreeClient(
             GithubApiClient(
-            githubToken = "token",
+            tokenProvider = tokenProvider,
             httpSender = HttpStringSender { request ->
                 TestHttpResponse(
                     200,

@@ -2,6 +2,7 @@ package no.nav.zizmor
 
 import io.ktor.util.logging.KtorSimpleLogger
 import io.ktor.util.logging.Logger
+import no.nav.github.GithubTokenProvider
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -26,7 +27,10 @@ fun String.runCommand(workingDir: File, logger: Logger): String {
     return proc.inputStream.bufferedReader().readText()
 }
 
-class ZizmorService(val githubToken: String, val zizmorCommand: String) {
+class ZizmorService(
+    private val githubTokenProvider: GithubTokenProvider,
+    val zizmorCommand: String,
+) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
     fun runZizmorOnRepo(org: String, repo: String): String {
@@ -38,6 +42,7 @@ class ZizmorService(val githubToken: String, val zizmorCommand: String) {
                 ?: throw ZizmorException("Could not read zizmor_big_result.json")
         }
 
+        val githubToken = githubTokenProvider.getToken()
         val resultString = "$zizmorCommand --quiet --cache-dir /tmp --format=json --gh-token=$githubToken $org/$repo"
             .runCommand(File("."), logger)
 

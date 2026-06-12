@@ -4,6 +4,7 @@ import java.io.IOException
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.github.GithubGitTreeClientInterface
 import no.nav.github.GithubRepositoryContentsClientInterface
+import no.nav.github.StaticGithubTokenProvider
 import no.nav.kafka.DummyKafkaSender
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -31,7 +32,7 @@ class DataCollectorServiceUnitTest {
         val service = DataCollectorService(
             bigQueryClient = bigQueryClient,
             kafkaSender = kafkaSender,
-            githubToken = "dummy",
+            githubTokenProvider = StaticGithubTokenProvider("dummy"),
             zizmorCommand = "TESTING",
             githubContentsClient = githubRepositoryClient,
             githubTreeClient = githubRepositoryClient,

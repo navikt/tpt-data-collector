@@ -3,6 +3,7 @@ package no.nav.github
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.generateHmac
 import no.nav.github.DummyGithubRepositoryClient
+import no.nav.github.StaticGithubTokenProvider
 import no.nav.kafka.DummyKafkaSender
 import no.nav.service.DataCollectorService
 import org.junit.jupiter.api.Test
@@ -21,7 +22,7 @@ class GithubWebhookServiceUnitTest {
         val dataCollectorService = DataCollectorService(
             bigQueryClient = bigQueryClient,
             kafkaSender = kafkaSender,
-            githubToken = "dummy",
+            githubTokenProvider = StaticGithubTokenProvider("dummy"),
             zizmorCommand = "TESTING",
             githubContentsClient = DummyGithubRepositoryClient(
                 mapOf(
@@ -96,7 +97,7 @@ class GithubWebhookServiceUnitTest {
         val dataCollectorService = DataCollectorService(
             bigQueryClient = bigQueryClient,
             kafkaSender = kafkaSender,
-            githubToken = "dummy",
+            githubTokenProvider = StaticGithubTokenProvider("dummy"),
             zizmorCommand = "TESTING",
             githubContentsClient = DummyGithubRepositoryClient(
                 mapOf(
@@ -143,7 +144,7 @@ class GithubWebhookServiceUnitTest {
         val dataCollectorService = DataCollectorService(
             bigQueryClient = bigQueryClient,
             kafkaSender = kafkaSender,
-            githubToken = "dummy",
+            githubTokenProvider = StaticGithubTokenProvider("dummy"),
             zizmorCommand = "TESTING",
             githubContentsClient = DummyGithubRepositoryClient(
                 mapOf(

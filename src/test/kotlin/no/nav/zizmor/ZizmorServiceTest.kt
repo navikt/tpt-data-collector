@@ -1,5 +1,6 @@
 package no.nav.zizmor
 
+import no.nav.github.StaticGithubTokenProvider
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
@@ -20,7 +21,7 @@ class ZizmorServiceTest {
 
     @Test
     fun `ZizmorService should process result`() {
-        val zizmorService = ZizmorService("dummy", "zizmor")
+        val zizmorService = ZizmorService(StaticGithubTokenProvider("dummy"), "zizmor")
         val jsonString = this::class.java.getResource("/zizmor_big_result.json")?.readText() ?: "wops"
         val processed = zizmorService.analyzeZizmorResult("test", jsonString)
         assertEquals("High", processed.severity)
@@ -33,7 +34,7 @@ class ZizmorServiceTest {
 
     @Test
     fun `ZizmorService should calculate severity correctly ()`() {
-        val zizmorService = ZizmorService("dummy", "zizmor")
+        val zizmorService = ZizmorService(StaticGithubTokenProvider("dummy"), "zizmor")
         val jsonString = "[\n" +
                 "]\n"
         val processed = zizmorService.analyzeZizmorResult("test", jsonString)
@@ -42,7 +43,7 @@ class ZizmorServiceTest {
 
     @Test
     fun `ZizmorService should calculate severity correctly (Informational)`() {
-        val zizmorService = ZizmorService("dummy", "zizmor")
+        val zizmorService = ZizmorService(StaticGithubTokenProvider("dummy"), "zizmor")
         val jsonString = "[\n" +
                 makeResult("Informational") +
                 "]\n"
@@ -52,7 +53,7 @@ class ZizmorServiceTest {
 
     @Test
     fun `ZizmorService should calculate severity correctly (Informational, Low)`() {
-        val zizmorService = ZizmorService("dummy", "zizmor")
+        val zizmorService = ZizmorService(StaticGithubTokenProvider("dummy"), "zizmor")
         val jsonString = "[\n" +
                 makeResult("Informational") + ",\n"+
                 makeResult("Low") +
@@ -63,7 +64,7 @@ class ZizmorServiceTest {
 
     @Test
     fun `ZizmorService should calculate severity correctly (Informational, Medium, Low)`() {
-        val zizmorService = ZizmorService("dummy", "zizmor")
+        val zizmorService = ZizmorService(StaticGithubTokenProvider("dummy"), "zizmor")
         val jsonString = "[\n" +
                 makeResult("Informational") + ",\n"+
                 makeResult("Medium") + ",\n"+
@@ -75,7 +76,7 @@ class ZizmorServiceTest {
 
     @Test
     fun `ZizmorService should calculate severity correctly (Informational, High, Low, Medium)`() {
-        val zizmorService = ZizmorService("dummy", "zizmor")
+        val zizmorService = ZizmorService(StaticGithubTokenProvider("dummy"), "zizmor")
         val jsonString = "[\n" +
                 makeResult("Informational") + ",\n"+
                 makeResult("High") + ",\n"+
@@ -88,7 +89,7 @@ class ZizmorServiceTest {
 
     @Test
     fun `ZizmorService should calculate severity correctly (Low, Medium, High)`() {
-        val zizmorService = ZizmorService("dummy", "zizmor")
+        val zizmorService = ZizmorService(StaticGithubTokenProvider("dummy"), "zizmor")
         val jsonString = "[\n" +
                 makeResult("Low") + ",\n"+
                 makeResult("Medium") + ",\n"+

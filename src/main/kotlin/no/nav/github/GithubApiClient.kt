@@ -15,7 +15,7 @@ import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 
 class GithubApiClient internal constructor(
-    private val githubToken: String,
+    private val tokenProvider: GithubTokenProvider,
     private val userAgent: String = DEFAULT_USER_AGENT,
     private val apiBaseUrl: String = DEFAULT_API_BASE_URL,
     private val clock: Clock = Clock.systemUTC(),
@@ -61,7 +61,7 @@ class GithubApiClient internal constructor(
                 .uri(uri)
                 .timeout(REQUEST_TIMEOUT)
                 .header("Accept", accept)
-                .header("Authorization", "Bearer $githubToken")
+                .header("Authorization", "Bearer ${tokenProvider.getToken()}")
                 .header("User-Agent", userAgent)
                 .header("X-GitHub-Api-Version", GITHUB_API_VERSION)
                 .build()
