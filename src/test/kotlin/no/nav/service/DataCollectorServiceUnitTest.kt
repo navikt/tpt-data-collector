@@ -2,6 +2,7 @@ package no.nav.service
 
 import java.io.IOException
 import no.nav.bigquery.BigQueryClientInterface
+import no.nav.github.DummyGithubRepositoryClient
 import no.nav.github.GithubGitTreeClientInterface
 import no.nav.github.GithubRepositoryContentsClientInterface
 import no.nav.github.StaticGithubTokenProvider
@@ -36,6 +37,7 @@ class DataCollectorServiceUnitTest {
             zizmorCommand = "TESTING",
             githubContentsClient = githubRepositoryClient,
             githubTreeClient = githubRepositoryClient,
+            githubCodeScanningClient = DummyGithubRepositoryClient(),
         )
 
         val processedCount = service.processChangedDockerfilesAndSendToKafka(
