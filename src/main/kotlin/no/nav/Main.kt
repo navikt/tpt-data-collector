@@ -14,10 +14,13 @@ import no.nav.bigquery.BigQueryClientInterface
 import no.nav.bigquery.DummyBigQuery
 import no.nav.config.ApplikasjonsConfig
 import no.nav.github.DummyGithubRepositoryClient
+import no.nav.github.GithubAppAuth
 import no.nav.github.GithubApiClient
 import no.nav.github.GithubGitTreeClient
+import no.nav.github.GithubTokenProvider
 import no.nav.github.GithubRepositoryContentsClient
 import no.nav.github.GithubWebhookService
+import no.nav.github.StaticGithubTokenProvider
 import no.nav.github.WebhookException
 import no.nav.kafka.DummyKafkaSender
 import no.nav.kafka.KafkaSender
@@ -46,9 +49,14 @@ fun Application.module(testing: Boolean = false) {
     else
         KafkaSender()
 
+    val githubTokenProvider = if (testing) {
+        StaticGithubTokenProvider("dummy")
+    } else {
+        createGithubTokenProvider(config)
+    }
     val githubRepositoryClient = if (testing) DummyGithubRepositoryClient() else null
     val githubApiClient = if (testing) null else GithubApiClient(
-        githubToken = config.githubToken,
+        tokenProvider = githubTokenProvider,
         userAgent = config.githubUserAgent,
     )
     val githubContentsClient = if (testing) {
@@ -65,7 +73,7 @@ fun Application.module(testing: Boolean = false) {
     val dataCollectorService = DataCollectorService(
         bigQueryClient = bigQueryClient,
         kafkaSender = kafkaSender,
-        githubToken = config.githubToken,
+        githubTokenProvider = githubTokenProvider,
         zizmorCommand = if (testing) "TESTING" else "/app/zizmor",
         githubContentsClient = githubContentsClient,
         githubTreeClient = githubTreeClient,
@@ -104,6 +112,18 @@ fun Application.module(testing: Boolean = false) {
             metricsRoute()
         }
     }
+}
+
+private fun createGithubTokenProvider(config: ApplikasjonsConfig): GithubTokenProvider {
+    if (config.hasGithubAppConfig) {
+        return GithubAppAuth(
+            appId = config.githubAppId!!,
+            privateKeyContent = config.githubAppPrivateKey!!,
+            installationId = config.githubAppInstallationId!!,
+            userAgent = config.githubUserAgent,
+        )
+    }
+    return StaticGithubTokenProvider(config.githubToken)
 }
 
 fun generateHmac(data: String, key: String): String {

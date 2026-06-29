@@ -11,6 +11,7 @@ import no.nav.data.isDockerfileCandidate
 import no.nav.github.GithubGitTreeClientInterface
 import no.nav.github.GithubRepositoryContentsClientInterface
 import no.nav.github.GithubRequestException
+import no.nav.github.GithubTokenProvider
 import no.nav.github.logGithubFetchFailure
 import no.nav.kafka.KafkaSenderInterface
 import no.nav.zizmor.ZizmorResult
@@ -21,14 +22,14 @@ import kotlin.time.Duration.Companion.hours
 class DataCollectorService(
     val bigQueryClient: BigQueryClientInterface,
     val kafkaSender: KafkaSenderInterface,
-    githubToken: String,
+    githubTokenProvider: GithubTokenProvider,
     zizmorCommand: String,
     val githubContentsClient: GithubRepositoryContentsClientInterface,
     val githubTreeClient: GithubGitTreeClientInterface,
 ) {
     var lastOkRun = Clock.System.now()
     val logger = KtorSimpleLogger(this::class.java.name)
-    val zizmorService = ZizmorService(githubToken, zizmorCommand)
+    val zizmorService = ZizmorService(githubTokenProvider, zizmorCommand)
     private val dockerfileFeatureExtractor = DockerfileFeatureExtractor()
 
     fun processDockerfileFeaturesAndSendToKafka(): Int {

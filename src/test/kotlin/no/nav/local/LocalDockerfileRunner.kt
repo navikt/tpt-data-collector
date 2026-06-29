@@ -5,6 +5,7 @@ import no.nav.data.isDockerfileCandidate
 import no.nav.github.GithubApiClient
 import no.nav.github.GithubGitTreeClient
 import no.nav.github.GithubRepositoryContentsClient
+import no.nav.github.StaticGithubTokenProvider
 import no.nav.kafka.DummyKafkaSender
 import no.nav.service.DataCollectorService
 import kotlin.system.exitProcess
@@ -20,7 +21,7 @@ fun main() {
     }
 
     val githubApiClient = GithubApiClient(
-        githubToken = config.githubToken,
+        tokenProvider = StaticGithubTokenProvider(config.githubToken),
         userAgent = config.githubUserAgent,
     )
     val githubContentsClient = GithubRepositoryContentsClient(githubApiClient)
@@ -29,7 +30,7 @@ fun main() {
     val dataCollectorService = DataCollectorService(
         bigQueryClient = NoopBigQueryClient,
         kafkaSender = kafkaSender,
-        githubToken = config.githubToken,
+        githubTokenProvider = StaticGithubTokenProvider(config.githubToken),
         zizmorCommand = "TESTING",
         githubContentsClient = githubContentsClient,
         githubTreeClient = githubTreeClient,
