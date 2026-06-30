@@ -30,7 +30,24 @@ data class CodeScanningToolStatus(
             collectedAt: String,
             analyses: List<CodeScanningAnalysis>,
         ): CodeScanningToolStatus {
-            TODO("🔴 Rød sone: implementer CodeScanningToolStatus.from() selv — se kommentar over")
+            val tools = analyses
+                .groupBy { it.tool.name }
+                .map { (_, analysesForTool) ->
+                    val latest = analysesForTool.maxBy { it.createdAt }
+                    ToolStatus(
+                        name = latest.tool.name,
+                        status = if (latest.error.isEmpty()) "ok" else "error",
+                        lastAnalysisAt = latest.createdAt,
+                        resultCount = latest.resultsCount,
+                        error = latest.error.ifEmpty { null },
+                    )
+                }
+            return CodeScanningToolStatus(
+                repoId = repoId,
+                repoName = repoName,
+                collectedAt = collectedAt,
+                tools = tools,
+            )
         }
     }
 }
