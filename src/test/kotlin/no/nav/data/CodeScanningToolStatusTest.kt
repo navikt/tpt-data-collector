@@ -3,63 +3,92 @@ package no.nav.data
 import no.nav.github.AnalysisTool
 import no.nav.github.CodeScanningAnalysis
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * 🔴 Rød sone — implementer testene og [CodeScanningToolStatus.from] selv.
- *
- * Når du er ferdig, svar gjerne på:
- * «Hva gjør CodeScanningToolStatus.from(), og hvorfor valgte du den tilnærmingen?»
- */
 class CodeScanningToolStatusTest {
     private val repoId = "123456"
     private val repoName = "navikt/demo"
     private val collectedAt = "2026-06-29T02:00:00Z"
 
     @Test
-    fun `TODO - repo uten analyser får tom tools-liste`() {
-        // TODO: kall CodeScanningToolStatus.from() med tom liste og verifiser tools == emptyList()
+    fun `repo uten analyser får tom tools-liste`() {
+        val result = CodeScanningToolStatus.from(repoId, repoName, collectedAt, emptyList())
+
+        assertTrue(result.tools.isEmpty())
     }
 
     @Test
-    fun `TODO - verktøy med tomt error-felt får status ok`() {
-        // TODO: lag en CodeScanningAnalysis med error = "" og verifiser status == "ok"
+    fun `verktøy med tomt error-felt får status ok`() {
+        val result = CodeScanningToolStatus.from(repoId, repoName, collectedAt, listOf(analysis("CodeQL", error = "")))
+
+        assertEquals("ok", result.tools.single().status)
     }
 
     @Test
-    fun `TODO - verktøy med ikke-tomt error-felt får status error`() {
-        // TODO: lag en CodeScanningAnalysis med error = "exit status 1" og verifiser status == "error"
+    fun `verktøy med ikke-tomt error-felt får status error`() {
+        val result = CodeScanningToolStatus.from(repoId, repoName, collectedAt, listOf(analysis("CodeQL", error = "exit status 1")))
+
+        assertEquals("error", result.tools.single().status)
     }
 
     @Test
-    fun `TODO - error-feltet bevares i ToolStatus ved feil`() {
-        // TODO: verifiser at feilmeldingen fra GitHub vises i ToolStatus.error
+    fun `error-feltet bevares i ToolStatus ved feil`() {
+        val result = CodeScanningToolStatus.from(repoId, repoName, collectedAt, listOf(analysis("CodeQL", error = "exit status 1")))
+
+        assertEquals("exit status 1", result.tools.single().error)
     }
 
     @Test
-    fun `TODO - kun nyeste analyse per verktøy brukes`() {
-        // TODO: lag to analyser for samme verktøy med ulik createdAt,
-        //       verifiser at kun den nyeste brukes
+    fun `error-feltet er null når verktøyet er ok`() {
+        val result = CodeScanningToolStatus.from(repoId, repoName, collectedAt, listOf(analysis("CodeQL", error = "")))
+
+        assertNull(result.tools.single().error)
     }
 
     @Test
-    fun `TODO - flere ulike verktøy gir én ToolStatus per verktøy`() {
-        // TODO: lag analyser for CodeQL og Trivy, verifiser at begge er representert
+    fun `kun nyeste analyse per verktøy brukes`() {
+        val analyses = listOf(
+            analysis("CodeQL", createdAt = "2026-06-27T04:00:00Z"),
+            analysis("CodeQL", createdAt = "2026-06-28T04:00:00Z"),
+        )
+
+        val result = CodeScanningToolStatus.from(repoId, repoName, collectedAt, analyses)
+
+        assertEquals(1, result.tools.size)
+        assertEquals("2026-06-28T04:00:00Z", result.tools.single().lastAnalysisAt)
     }
 
     @Test
-    fun `TODO - repoId og repoName bevares i resultatet`() {
-        // TODO: verifiser at repoId og repoName fra input vises i CodeScanningToolStatus
+    fun `flere ulike verktøy gir én ToolStatus per verktøy`() {
+        val analyses = listOf(
+            analysis("CodeQL"),
+            analysis("Trivy"),
+        )
+
+        val result = CodeScanningToolStatus.from(repoId, repoName, collectedAt, analyses)
+
+        assertEquals(2, result.tools.size)
+        assertTrue(result.tools.any { it.name == "CodeQL" })
+        assertTrue(result.tools.any { it.name == "Trivy" })
     }
 
     @Test
-    fun `TODO - collectedAt bevares i resultatet`() {
-        // TODO: verifiser at collectedAt fra input vises i CodeScanningToolStatus
+    fun `repoId og repoName bevares i resultatet`() {
+        val result = CodeScanningToolStatus.from(repoId, repoName, collectedAt, emptyList())
+
+        assertEquals(repoId, result.repoId)
+        assertEquals(repoName, result.repoName)
     }
 
-    // Hjelpemetode — bruk gjerne denne i testene over
+    @Test
+    fun `collectedAt bevares i resultatet`() {
+        val result = CodeScanningToolStatus.from(repoId, repoName, collectedAt, emptyList())
+
+        assertEquals(collectedAt, result.collectedAt)
+    }
+
     private fun analysis(
         toolName: String,
         createdAt: String = "2026-06-28T04:00:00Z",
