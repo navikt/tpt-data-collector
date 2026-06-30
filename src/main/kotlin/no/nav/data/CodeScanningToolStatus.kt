@@ -14,16 +14,6 @@ data class CodeScanningToolStatus(
     fun toJson(): String = Json.encodeToString(this)
 
     companion object {
-        /**
-         * 🔴 Rød sone — implementer denne funksjonen selv.
-         *
-         * Logikken skal:
-         * - Gruppere [analyses] per verktøynavn (tool.name)
-         * - Plukke den nyeste analysen per verktøy (høyest createdAt)
-         * - Sette status = "ok" hvis error == "", ellers "error"
-         * - Returnere én [ToolStatus] per unikt verktøy som har kjørt
-         * - Returnere tom liste hvis [analyses] er tom (= ingen code scanning konfigurert)
-         */
         fun from(
             repoId: String,
             repoName: String,

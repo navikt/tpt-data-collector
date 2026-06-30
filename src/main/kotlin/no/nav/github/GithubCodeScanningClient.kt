@@ -1,11 +1,8 @@
-@file:OptIn(ExperimentalSerializationApi::class)
-
 package no.nav.github
 
-import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNames
 
 class GithubCodeScanningClient(
     private val apiClient: GithubApiClient,
@@ -34,8 +31,8 @@ class GithubCodeScanningClient(
 @Serializable
 data class CodeScanningAnalysis(
     val tool: AnalysisTool,
-    @JsonNames("created_at") val createdAt: String,
-    @JsonNames("results_count") val resultsCount: Int,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("results_count") val resultsCount: Int,
     val error: String,
 )
 
