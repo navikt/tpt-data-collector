@@ -15,7 +15,7 @@ class GithubCodeScanningClient(
             owner = owner,
             repo = repo,
             path = "code-scanning/analyses",
-            endpoint = "/repos/$owner/${encodePathSegment(repo)}/code-scanning/analyses?per_page=10",
+            endpoint = "/repos/$owner/${encodePathSegment(repo)}/code-scanning/analyses?per_page=100",
             accept = "application/vnd.github+json",
             allow404 = true,
         )

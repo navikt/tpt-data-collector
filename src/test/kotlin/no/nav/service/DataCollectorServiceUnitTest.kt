@@ -109,6 +109,7 @@ class DataCollectorServiceUnitTest {
         val service = makeService(
             kafkaSender = kafkaSender,
             bigQuery = bigQueryWithRepos(repo("123", "navikt/demo")),
+            codeScanningClient = DummyGithubRepositoryClient(analysesPerRepo = mapOf("demo" to listOf(analysis("CodeQL")))),
         )
 
         service.processCodeScanningToolsAndSendToKafka()
@@ -122,6 +123,7 @@ class DataCollectorServiceUnitTest {
         val service = makeService(
             kafkaSender = kafkaSender,
             bigQuery = bigQueryWithRepos(repo("42", "navikt/my-repo")),
+            codeScanningClient = DummyGithubRepositoryClient(analysesPerRepo = mapOf("my-repo" to listOf(analysis("CodeQL")))),
         )
 
         service.processCodeScanningToolsAndSendToKafka()
@@ -143,7 +145,7 @@ class DataCollectorServiceUnitTest {
                     kind = GithubRequestErrorKind.PERMANENT,
                     message = "Forbidden",
                 )
-                return emptyList()
+                return listOf(analysis("CodeQL"))
             }
         }
         val service = makeService(
@@ -198,4 +200,59 @@ class DataCollectorServiceUnitTest {
         githubTreeClient = DummyGithubRepositoryClient(),
         githubCodeScanningClient = codeScanningClient,
     )
+
+    private fun analysis(toolName: String) = CodeScanningAnalysis(
+        tool = AnalysisTool(name = toolName),
+        createdAt = "2026-06-28T04:00:00Z",
+        resultsCount = 0,
+        error = "",
+    )
+}
+
+class DataCollectorServiceCodeScanningExtraTest {
+    private fun makeService(
+        kafkaSender: DummyKafkaSender = DummyKafkaSender(),
+        bigQuery: BigQueryClientInterface,
+        codeScanningClient: GithubCodeScanningClientInterface = DummyGithubRepositoryClient(),
+    ) = DataCollectorService(
+        bigQueryClient = bigQuery,
+        kafkaSender = kafkaSender,
+        githubTokenProvider = StaticGithubTokenProvider("dummy"),
+        zizmorCommand = "TESTING",
+        githubContentsClient = DummyGithubRepositoryClient(),
+        githubTreeClient = DummyGithubRepositoryClient(),
+        githubCodeScanningClient = codeScanningClient,
+    )
+
+    private fun bigQueryWithRepos(vararg repos: Map<String, String>) = object : BigQueryClientInterface {
+        override fun isAlive(): Boolean = true
+        override fun readTable(tableName: String): List<Map<String, String>> = repos.toList()
+    }
+
+    @Test
+    fun `processCodeScanningTools - skips repo with no analyses`() {
+        val kafkaSender = DummyKafkaSender()
+        val service = makeService(
+            kafkaSender = kafkaSender,
+            bigQuery = bigQueryWithRepos(mapOf("repo_id" to "1", "full_name" to "navikt/no-scanning")),
+        )
+
+        service.processCodeScanningToolsAndSendToKafka()
+
+        assertTrue(kafkaSender.sentMessages.isEmpty())
+    }
+
+    @Test
+    fun `processCodeScanningTools - skips repo with malformed full_name`() {
+        val kafkaSender = DummyKafkaSender()
+        val service = makeService(
+            kafkaSender = kafkaSender,
+            bigQuery = bigQueryWithRepos(mapOf("repo_id" to "1", "full_name" to "malformed-no-slash")),
+        )
+
+        val result = service.processCodeScanningToolsAndSendToKafka()
+
+        assertEquals(0, result)
+        assertTrue(kafkaSender.sentMessages.isEmpty())
+    }
 }

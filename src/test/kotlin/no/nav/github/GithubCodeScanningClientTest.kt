@@ -129,7 +129,7 @@ class GithubCodeScanningClientTest {
         client.getLatestAnalyses("navikt", "my-repo")
 
         assertEquals(
-            "https://api.github.com/repos/navikt/my-repo/code-scanning/analyses?per_page=10",
+            "https://api.github.com/repos/navikt/my-repo/code-scanning/analyses?per_page=100",
             requests.single().uri().toString(),
         )
     }

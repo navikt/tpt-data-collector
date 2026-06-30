@@ -31,6 +31,7 @@ class DataCollectorService(
     val githubCodeScanningClient: GithubCodeScanningClientInterface,
 ) {
     var lastOkRun = Clock.System.now()
+    private var lastOkCodeScanningRun = Clock.System.now()
     val logger = KtorSimpleLogger(this::class.java.name)
     val zizmorService = ZizmorService(githubTokenProvider, zizmorCommand)
     private val dockerfileFeatureExtractor = DockerfileFeatureExtractor()
@@ -122,7 +123,8 @@ class DataCollectorService(
     }
 
     fun isAlive(): Boolean {
-        return lastOkRun > Clock.System.now().minus(26.hours)
+        val now = Clock.System.now()
+        return lastOkRun > now.minus(26.hours) && lastOkCodeScanningRun > now.minus(26.hours)
     }
 
     fun processCodeScanningToolsAndSendToKafka(): Int {
@@ -145,9 +147,16 @@ class DataCollectorService(
                 logger.warn("Code scanning job: skipping repo without full_name (repo_id=$repoId)")
                 return@forEach
             }
-            val repoName = fullName.substringAfter("/")
+            val repoName = fullName.substringAfter("/", missingDelimiterValue = "").takeIf { it.isNotEmpty() } ?: run {
+                logger.warn("Code scanning job: skipping repo with malformed full_name \"$fullName\" (repo_id=$repoId)")
+                return@forEach
+            }
             try {
                 val analyses = githubCodeScanningClient.getLatestAnalyses("navikt", repoName)
+                if (analyses.isEmpty()) {
+                    logger.debug("Code scanning job: no analyses for \"$fullName\", skipping")
+                    return@forEach
+                }
                 val status = CodeScanningToolStatus.from(repoId, fullName, collectedAt, analyses)
                 kafkaSender.sendToKafka("code_scanning_tools", status.toJson())
                 processedCount++
@@ -159,6 +168,7 @@ class DataCollectorService(
         }
 
         logger.info("Code scanning job finished: $processedCount/${reposList.size} repos published")
+        lastOkCodeScanningRun = Clock.System.now()
         return processedCount
     }
 }
