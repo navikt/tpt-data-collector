@@ -101,4 +101,12 @@ tasks {
         classpath = projectSourceSets.named("test").get().runtimeClasspath
         mainClass.set("no.nav.local.LocalDockerfileRunnerKt")
     }
+
+    register<JavaExec>("runLocalCodeScanningCheck") {
+        group = "verification"
+        description = "Runs the local code scanning check with real GitHub API and prints the result"
+        dependsOn("testClasses")
+        classpath = projectSourceSets.named("test").get().runtimeClasspath
+        mainClass.set("no.nav.local.LocalCodeScanningRunnerKt")
+    }
 }

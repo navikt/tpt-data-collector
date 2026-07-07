@@ -2,6 +2,7 @@ package no.nav.local
 
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.data.isDockerfileCandidate
+import no.nav.github.DummyGithubRepositoryClient
 import no.nav.github.GithubApiClient
 import no.nav.github.GithubGitTreeClient
 import no.nav.github.GithubRepositoryContentsClient
@@ -34,6 +35,7 @@ fun main() {
         zizmorCommand = "TESTING",
         githubContentsClient = githubContentsClient,
         githubTreeClient = githubTreeClient,
+        githubCodeScanningClient = DummyGithubRepositoryClient(),
     )
 
     val repoFullName = "${config.owner}/${config.repo}"

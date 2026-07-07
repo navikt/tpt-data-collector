@@ -50,6 +50,7 @@ class GithubWebhookServiceUnitTest {
                     """.trimIndent(),
                 )
             ),
+            githubCodeScanningClient = DummyGithubRepositoryClient(),
         )
         val webhookService = GithubWebhookService(dataCollectorService, runAsync = { task -> task() })
         val body = """
@@ -108,6 +109,7 @@ class GithubWebhookServiceUnitTest {
                     "docker/CustomDockerfile" to "\u0000PNG",
                 )
             ),
+            githubCodeScanningClient = DummyGithubRepositoryClient(),
         )
         val webhookService = GithubWebhookService(dataCollectorService, runAsync = { task -> task() })
         val body = """
@@ -156,6 +158,7 @@ class GithubWebhookServiceUnitTest {
                     "docker/RemainingDockerfile" to "FROM cgr.dev/chainguard/wolfi-base:latest",
                 )
             ),
+            githubCodeScanningClient = DummyGithubRepositoryClient(),
         )
         val webhookService = GithubWebhookService(dataCollectorService, runAsync = { task -> task() })
         val body = """

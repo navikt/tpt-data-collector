@@ -14,6 +14,8 @@ import no.nav.github.GithubRequestException
 import no.nav.github.GithubTokenProvider
 import no.nav.github.logGithubFetchFailure
 import no.nav.kafka.KafkaSenderInterface
+import no.nav.data.CodeScanningToolStatus
+import no.nav.github.GithubCodeScanningClientInterface
 import no.nav.zizmor.ZizmorResult
 import no.nav.zizmor.ZizmorService
 import kotlin.time.Clock
@@ -26,8 +28,10 @@ class DataCollectorService(
     zizmorCommand: String,
     val githubContentsClient: GithubRepositoryContentsClientInterface,
     val githubTreeClient: GithubGitTreeClientInterface,
+    val githubCodeScanningClient: GithubCodeScanningClientInterface,
 ) {
     var lastOkRun = Clock.System.now()
+    private var lastOkCodeScanningRun = Clock.System.now()
     val logger = KtorSimpleLogger(this::class.java.name)
     val zizmorService = ZizmorService(githubTokenProvider, zizmorCommand)
     private val dockerfileFeatureExtractor = DockerfileFeatureExtractor()
@@ -119,6 +123,52 @@ class DataCollectorService(
     }
 
     fun isAlive(): Boolean {
-        return lastOkRun > Clock.System.now().minus(26.hours)
+        val now = Clock.System.now()
+        return lastOkRun > now.minus(26.hours) && lastOkCodeScanningRun > now.minus(26.hours)
+    }
+
+    fun processCodeScanningToolsAndSendToKafka(): Int {
+        logger.info("Code scanning job started")
+        val reposList = bigQueryClient.readTable("repos")
+        if (reposList.isEmpty()) {
+            logger.warn("Code scanning job: repos table returned 0 rows, skipping")
+            return 0
+        }
+        logger.info("Code scanning job: processing ${reposList.size} repos")
+        val collectedAt = Clock.System.now().toString()
+        var processedCount = 0
+
+        reposList.forEach { row ->
+            val repoId = row["repo_id"] ?: run {
+                logger.warn("Code scanning job: skipping row without repo_id")
+                return@forEach
+            }
+            val fullName = row["full_name"] ?: run {
+                logger.warn("Code scanning job: skipping repo without full_name (repo_id=$repoId)")
+                return@forEach
+            }
+            val repoName = fullName.substringAfter("/", missingDelimiterValue = "").takeIf { it.isNotEmpty() } ?: run {
+                logger.warn("Code scanning job: skipping repo with malformed full_name \"$fullName\" (repo_id=$repoId)")
+                return@forEach
+            }
+            try {
+                val analyses = githubCodeScanningClient.getLatestAnalyses("navikt", repoName)
+                if (analyses.isEmpty()) {
+                    logger.debug("Code scanning job: no analyses for \"$fullName\", skipping")
+                    return@forEach
+                }
+                val status = CodeScanningToolStatus.from(repoId, fullName, collectedAt, analyses)
+                kafkaSender.sendToKafka("code_scanning_tools", status.toJson())
+                processedCount++
+            } catch (e: GithubRequestException) {
+                logger.warn("Code scanning job: GitHub request failed for \"$fullName\": ${e.message}")
+            } catch (e: Exception) {
+                logger.warn("Code scanning job: unexpected error for \"$fullName\"", e)
+            }
+        }
+
+        logger.info("Code scanning job finished: $processedCount/${reposList.size} repos published")
+        lastOkCodeScanningRun = Clock.System.now()
+        return processedCount
     }
 }

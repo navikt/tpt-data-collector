@@ -20,6 +20,7 @@ import no.nav.bigquery.BigQueryClient
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.bigquery.DummyBigQuery
 import no.nav.config.ApplikasjonsConfig
+import no.nav.github.GithubCodeScanningClient
 import no.nav.github.DummyGithubRepositoryClient
 import no.nav.github.GithubApiClient
 import no.nav.github.GithubAppAuth
@@ -73,6 +74,11 @@ fun Application.module(testing: Boolean = false) {
     } else {
         GithubGitTreeClient(githubApiClient!!)
     }
+    val githubCodeScanningClient = if (testing) {
+        githubRepositoryClient!!
+    } else {
+        GithubCodeScanningClient(githubApiClient!!)
+    }
 
     val dataCollectorService = DataCollectorService(
         bigQueryClient = bigQueryClient,
@@ -81,6 +87,7 @@ fun Application.module(testing: Boolean = false) {
         zizmorCommand = if (testing) "TESTING" else "/app/zizmor",
         githubContentsClient = githubContentsClient,
         githubTreeClient = githubTreeClient,
+        githubCodeScanningClient = githubCodeScanningClient,
     )
     val githubWebhookService = GithubWebhookService(dataCollectorService)
 
@@ -92,6 +99,14 @@ fun Application.module(testing: Boolean = false) {
             dataCollectorService.logger.error("Scheduled job failed with unhandled exception", e)
         }
     }, calculateInitialDelayUntilClock(4, 0), TimeUnit.DAYS.toMillis(1))
+
+    Timer().scheduleAtFixedRate(timerTask {
+        try {
+            dataCollectorService.processCodeScanningToolsAndSendToKafka()
+        } catch (e: Exception) {
+            dataCollectorService.logger.error("Code scanning job failed with unhandled exception", e)
+        }
+    }, calculateInitialDelayUntilClock(2, 0), TimeUnit.DAYS.toMillis(1))
 
     routing {
         get("/internal/isAlive") {
