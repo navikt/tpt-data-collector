@@ -1,14 +1,12 @@
 package no.nav.github
 
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlinx.serialization.json.Json
 import no.nav.bigquery.BigQueryClientInterface
-import no.nav.generateHmac
-import no.nav.github.DummyGithubRepositoryClient
-import no.nav.github.StaticGithubTokenProvider
 import no.nav.kafka.DummyKafkaSender
 import no.nav.service.DataCollectorService
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class GithubWebhookServiceUnitTest {
     private val bigQueryClient = object : BigQueryClientInterface {
@@ -53,7 +51,7 @@ class GithubWebhookServiceUnitTest {
                 )
             ),
         )
-        val webhookService = GithubWebhookService("secret", dataCollectorService, runAsync = { task -> task() })
+        val webhookService = GithubWebhookService(dataCollectorService, runAsync = { task -> task() })
         val body = """
             {
               "ref": "refs/heads/main",
@@ -80,7 +78,8 @@ class GithubWebhookServiceUnitTest {
             }
         """.trimIndent()
 
-        val response = webhookService.handleWebhookEvent(body, generateHmac(body, "secret"))
+        val reqPayload = Json.decodeFromString<WebhookPayload>(body)
+        val response = webhookService.handleWebhookEvent(reqPayload)
 
         assertEquals("Queued 2 Dockerfile candidate(s) for processing", response)
         assertEquals(2, kafkaSender.sentMessages.size)
@@ -110,7 +109,7 @@ class GithubWebhookServiceUnitTest {
                 )
             ),
         )
-        val webhookService = GithubWebhookService("secret", dataCollectorService, runAsync = { task -> task() })
+        val webhookService = GithubWebhookService(dataCollectorService, runAsync = { task -> task() })
         val body = """
             {
               "ref": "refs/heads/main",
@@ -132,7 +131,8 @@ class GithubWebhookServiceUnitTest {
             }
         """.trimIndent()
 
-        val response = webhookService.handleWebhookEvent(body, generateHmac(body, "secret"))
+        val reqPayload = Json.decodeFromString<WebhookPayload>(body)
+        val response = webhookService.handleWebhookEvent(reqPayload)
 
         assertEquals("Queued 1 Dockerfile candidate(s) for processing", response)
         assertTrue(kafkaSender.sentMessages.isEmpty())
@@ -157,7 +157,7 @@ class GithubWebhookServiceUnitTest {
                 )
             ),
         )
-        val webhookService = GithubWebhookService("secret", dataCollectorService, runAsync = { task -> task() })
+        val webhookService = GithubWebhookService(dataCollectorService, runAsync = { task -> task() })
         val body = """
             {
               "ref": "refs/heads/main",
@@ -179,7 +179,8 @@ class GithubWebhookServiceUnitTest {
             }
         """.trimIndent()
 
-        val response = webhookService.handleWebhookEvent(body, generateHmac(body, "secret"))
+        val reqPayload = Json.decodeFromString<WebhookPayload>(body)
+        val response = webhookService.handleWebhookEvent(reqPayload)
 
         assertEquals("Queued 1 Dockerfile candidate(s) for processing", response)
         assertEquals(1, kafkaSender.sentMessages.size)

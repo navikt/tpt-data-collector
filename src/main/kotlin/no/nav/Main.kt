@@ -9,28 +9,32 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import java.util.Calendar
+import java.util.TimeZone
+import java.util.Timer
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.timerTask
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 import no.nav.bigquery.BigQueryClient
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.bigquery.DummyBigQuery
 import no.nav.config.ApplikasjonsConfig
 import no.nav.github.DummyGithubRepositoryClient
-import no.nav.github.GithubAppAuth
 import no.nav.github.GithubApiClient
+import no.nav.github.GithubAppAuth
 import no.nav.github.GithubGitTreeClient
-import no.nav.github.GithubTokenProvider
 import no.nav.github.GithubRepositoryContentsClient
+import no.nav.github.GithubTokenProvider
 import no.nav.github.GithubWebhookService
 import no.nav.github.StaticGithubTokenProvider
-import no.nav.github.WebhookException
+import no.nav.github.WebhookPayload
 import no.nav.kafka.DummyKafkaSender
 import no.nav.kafka.KafkaSender
 import no.nav.metrics.metricsRoute
 import no.nav.service.DataCollectorService
 import no.nav.zizmor.ZizmorException
 import org.apache.commons.codec.digest.HmacUtils
-import java.util.*
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.timerTask
 
 fun main(args: Array<String>): Unit = EngineMain.main(args)
 
@@ -78,7 +82,7 @@ fun Application.module(testing: Boolean = false) {
         githubContentsClient = githubContentsClient,
         githubTreeClient = githubTreeClient,
     )
-    val githubWebhookService = GithubWebhookService(config.githubWebhookSecret, dataCollectorService)
+    val githubWebhookService = GithubWebhookService(dataCollectorService)
 
     //Start a timer to update every 24h
     Timer().scheduleAtFixedRate(timerTask {
@@ -96,13 +100,25 @@ fun Application.module(testing: Boolean = false) {
             call.respond(HttpStatusCode.OK, "OK")
         }
 
+        val json = Json { ignoreUnknownKeys = true }
         post("/webhook/github") {
-            val signature = call.request.headers["X-Hub-Signature-256"]
+            val body = call.receiveText()
+            val signature = call.request.headers["X-Hub-Signature-256"] ?: ""
+            if (signature.isEmpty() || signature != generateHmac(body, config.githubWebhookSecret)) {
+                call.respond(HttpStatusCode.Unauthorized, "Signature is invalid")
+                return@post
+            }
+
+            val payload = try {
+                json.decodeFromString<WebhookPayload>(body)
+            } catch (_: SerializationException) {
+                call.respond(HttpStatusCode.BadRequest)
+                return@post
+            }
+
             try {
-                val returnMessage = githubWebhookService.handleWebhookEvent(jsonString = call.receiveText(), signature = signature)
+                val returnMessage = githubWebhookService.handleWebhookEvent(payload)
                 call.respond(HttpStatusCode.OK, returnMessage)
-            } catch (e: WebhookException) {
-                call.respond(e.statusCode, e.message ?: "")
             } catch (e: ZizmorException) {
                 call.respond(HttpStatusCode.InternalServerError, e.message ?: "")
             }

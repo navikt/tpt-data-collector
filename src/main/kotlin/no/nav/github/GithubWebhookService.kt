@@ -1,36 +1,19 @@
 package no.nav.github
 
-import no.nav.service.DataCollectorService
-import javax.swing.text.ChangedCharSetException
+import io.ktor.util.logging.KtorSimpleLogger
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import io.ktor.http.HttpStatusCode
-import io.ktor.util.logging.KtorSimpleLogger
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import no.nav.data.isDockerfileCandidate
-import no.nav.generateHmac
+import no.nav.service.DataCollectorService
 
 class GithubWebhookService(
-    val githubWebhookSecret: String,
     val dataCollectorService: DataCollectorService,
     runAsync: ((() -> Unit) -> Unit)? = null,
 ) {
-    val json = Json { ignoreUnknownKeys = true }
     val logger = KtorSimpleLogger(this::class.java.name)
     private val runAsync = runAsync ?: defaultRunAsync()
 
-    fun handleWebhookEvent(jsonString: String, signature: String?): String {
-        validateWebhookEvent(jsonString, signature)
-
-        val webhookPayload = try {
-            jsonToPayload(jsonString)
-        } catch (e: SerializationException) {
-            logger.warn("Failed to parse webhook event with SerializationException: ${e.message}", e)
-            logger.debug("Event json: $jsonString")
-            throw WebhookException(HttpStatusCode.BadRequest, "Bad webhook payload")
-        }
-
+    fun handleWebhookEvent(webhookPayload: WebhookPayload): String {
         if (isRelevant(webhookPayload)) {
             logger.info("running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
             val allFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified + it.removed }.toSet()
@@ -86,10 +69,6 @@ class GithubWebhookService(
             .flatMap { it.added + it.modified }.toSet()
     }
 
-    private fun jsonToPayload(jsonString: String): WebhookPayload {
-        return json.decodeFromString<WebhookPayload>(jsonString)
-    }
-
     private fun isRelevant(payload: WebhookPayload): Boolean {
         if (!payload.repository.fullName.startsWith("navikt/")) {
             logger.warn("Wrong org in event \"${payload.repository.fullName}\" - skipping checks")
@@ -101,21 +80,6 @@ class GithubWebhookService(
             return false
         }
         return true
-    }
-
-    private fun validateWebhookEvent(jsonString: String, signature: String?){
-        if (signature == null) {
-            throw WebhookException(HttpStatusCode.Unauthorized, "Signature is missing")
-        }
-        if (
-            signature.length != 71 ||
-            !signature.startsWith("sha256=")
-        ) {
-            throw WebhookException(HttpStatusCode.Unauthorized, "Signature is bad")
-        }
-        if (signature != generateHmac(jsonString, githubWebhookSecret)) {
-            throw WebhookException(HttpStatusCode.Unauthorized, "Signature is wrong")
-        }
     }
 
     companion object {
@@ -143,5 +107,3 @@ class GithubWebhookService(
         }
     }
 }
-
-class WebhookException(val statusCode: HttpStatusCode, message: String): RuntimeException(message)
