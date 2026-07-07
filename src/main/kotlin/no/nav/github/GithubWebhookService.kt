@@ -14,48 +14,43 @@ class GithubWebhookService(
     private val runAsync = runAsync ?: defaultRunAsync()
 
     fun handleWebhookEvent(webhookPayload: WebhookPayload): String {
-        if (isRelevant(webhookPayload)) {
-            logger.info("running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
-            val allFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified + it.removed }.toSet()
-            val changedFiles: Set<String> = addedAndModifiedFiles(webhookPayload)
-            val removedFiles: Set<String> = webhookPayload.commits.flatMap { it.removed }.toSet()
-            logger.info("Changed files: $changedFiles")
-
-            if (shouldRunZizmor(changedFiles)) {
-                logger.info("MOCK: Changes in workflow-files - running Zizmor on repo ${webhookPayload.repository.name}")
-                //dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
-            }
-            if (shouldUpdateDockerfiles(allFiles)) {
-                logger.info("MOCK: Changes in dockerfiles - running updateDockerfiles on repo ${webhookPayload.repository.name}")
-                
-                val dockerfileCandidates = changedFiles.filter(::isDockerfileCandidate).toSet()
-                val removedDockerfileCandidates = removedFiles.filter(::isDockerfileCandidate).toSet()
-                val toggleDockerfileProcessing = true 
-                if (toggleDockerfileProcessing) {
-                    // TODO: Skip for now, test in prod later. We need to be sure that we don't trigger too much processing while we tune the candidate detection and processing logic.
-                    runAsync {
-                        try {
-                            dataCollectorService.processChangedDockerfilesAndSendToKafka(
-                                repoId = webhookPayload.repository.id.toString(),
-                                repoFullName = webhookPayload.repository.fullName,
-                                ref = webhookPayload.after,
-                                candidatePaths = dockerfileCandidates,
-                                removedPaths = removedDockerfileCandidates,
-                            )
-                        } catch (e: Exception) {
-                            logger.error("Webhook-triggered Dockerfile processing failed for \"${webhookPayload.repository.fullName}\"", e)
-                        }
-                    }
-                    logger.info("Queued ${(dockerfileCandidates + removedDockerfileCandidates).size} Dockerfile candidate(s) for processing")
-                    return ("Queued ${(dockerfileCandidates + removedDockerfileCandidates).size} Dockerfile candidate(s) for processing")
-                }
-            }
-            return "Hello git!"
-        } else {
-            return "Skipping  on repo \"${webhookPayload.repository.name}\""
+        if (!isRelevant(webhookPayload)) {
+            return "Skipping  on repo '${webhookPayload.repository.name}'"
         }
+        logger.info("running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
+        val allFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified + it.removed }.toSet()
+        val changedFiles: Set<String> = addedAndModifiedFiles(webhookPayload)
+        val removedFiles: Set<String> = webhookPayload.commits.flatMap { it.removed }.toSet()
+        logger.info("Changed files: $changedFiles")
+
+        if (shouldRunZizmor(changedFiles)) {
+            logger.info("MOCK: Changes in workflow-files - running Zizmor on repo ${webhookPayload.repository.name}")
+            //dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
+        }
+        if (!shouldUpdateDockerfiles(allFiles)) {
+            return "No Dockerfiles have changed, skipping"
+        }
+        logger.info("MOCK: Changes in dockerfiles - running updateDockerfiles on repo ${webhookPayload.repository.name}")
+
+        val dockerfileCandidates = changedFiles.filter(::isDockerfileCandidate).toSet()
+        val removedDockerfileCandidates = removedFiles.filter(::isDockerfileCandidate).toSet()
+        runAsync {
+            try {
+                dataCollectorService.processChangedDockerfilesAndSendToKafka(
+                    repoId = webhookPayload.repository.id.toString(),
+                    repoFullName = webhookPayload.repository.fullName,
+                    ref = webhookPayload.after,
+                    candidatePaths = dockerfileCandidates,
+                    removedPaths = removedDockerfileCandidates,
+                )
+            } catch (e: Exception) {
+                logger.error("Webhook-triggered Dockerfile processing failed for \"${webhookPayload.repository.fullName}\"", e)
+            }
+        }
+        logger.info("Queued ${(dockerfileCandidates + removedDockerfileCandidates).size} Dockerfile candidate(s) for processing")
+        return ("Queued ${(dockerfileCandidates + removedDockerfileCandidates).size} Dockerfile candidate(s) for processing")
     }
-    
+
     private fun shouldUpdateDockerfiles(changedFiles: Set<String>): Boolean {
         return changedFiles.any { isDockerfileCandidate(it) }
     }
@@ -63,7 +58,7 @@ class GithubWebhookService(
     private fun shouldRunZizmor(changedFiles: Set<String>): Boolean {
         return changedFiles.any { it.startsWith(".github/workflows/") }
     }
-    
+
     private fun addedAndModifiedFiles(payload: WebhookPayload): Set<String> {
         return payload.commits
             .flatMap { it.added + it.modified }.toSet()
