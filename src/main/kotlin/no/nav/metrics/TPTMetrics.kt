@@ -7,6 +7,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.micrometer.core.instrument.Clock
+import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.binder.MeterBinder
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics
@@ -20,7 +21,7 @@ import io.prometheus.metrics.model.registry.PrometheusRegistry
 
 fun Application.metricsRoute(additionalMetrics: List<MeterBinder> = emptyList()) {
     install(MicrometerMetrics) {
-        registry = Metrics.registry
+        registry = TPTMetrics.registry
         meterBinders = listOf(
             LogbackMetrics(),
             JvmGcMetrics(),
@@ -33,12 +34,12 @@ fun Application.metricsRoute(additionalMetrics: List<MeterBinder> = emptyList())
 
     routing {
         get("/metrics") {
-            call.respond(Metrics.registry.scrape())
+            call.respond(TPTMetrics.registry.scrape())
         }
     }
 }
 
-object Metrics {
+object TPTMetrics {
     private val collectorRegistry = PrometheusRegistry.defaultRegistry
 
     val registry =
@@ -47,4 +48,9 @@ object Metrics {
             collectorRegistry,
             Clock.SYSTEM,
         )
+
+    private val webhookCounter = Counter.builder("webhooks_received")
+        .register(registry)
+
+    fun countWebhook() = webhookCounter.increment()
 }

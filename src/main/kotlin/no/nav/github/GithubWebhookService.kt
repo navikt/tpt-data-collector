@@ -4,6 +4,7 @@ import io.ktor.util.logging.KtorSimpleLogger
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import no.nav.data.isDockerfileCandidate
+import no.nav.metrics.TPTMetrics
 import no.nav.service.DataCollectorService
 
 class GithubWebhookService(
@@ -17,11 +18,11 @@ class GithubWebhookService(
         if (!isRelevant(webhookPayload)) {
             return "Skipping  on repo '${webhookPayload.repository.name}'"
         }
+        TPTMetrics.countWebhook()
         logger.info("running on \"${webhookPayload.repository.name}\" triggered by push to \"${webhookPayload.ref}\"")
         val allFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified + it.removed }.toSet()
         val changedFiles: Set<String> = addedAndModifiedFiles(webhookPayload)
         val removedFiles: Set<String> = webhookPayload.commits.flatMap { it.removed }.toSet()
-        logger.info("Changed files: $changedFiles")
 
         if (shouldRunZizmor(changedFiles)) {
             logger.info("MOCK: Changes in workflow-files - running Zizmor on repo ${webhookPayload.repository.name}")
