@@ -14,6 +14,7 @@ import java.util.TimeZone
 import java.util.Timer
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import no.nav.bigquery.BigQueryClient
@@ -26,7 +27,7 @@ import no.nav.github.GithubAppAuth
 import no.nav.github.GithubGitTreeClient
 import no.nav.github.GithubRepositoryContentsClient
 import no.nav.github.GithubTokenProvider
-import no.nav.github.GithubWebhookService
+import no.nav.github.GithubWebhookHandler
 import no.nav.github.StaticGithubTokenProvider
 import no.nav.github.WebhookPayload
 import no.nav.kafka.DummyKafkaSender
@@ -36,7 +37,6 @@ import no.nav.service.DataCollectorService
 import org.apache.commons.codec.digest.HmacUtils
 
 fun main(args: Array<String>): Unit = EngineMain.main(args)
-
 
 fun Application.module(testing: Boolean = false) {
     val config = ApplikasjonsConfig()
@@ -80,7 +80,7 @@ fun Application.module(testing: Boolean = false) {
         githubContentsClient = githubContentsClient,
         githubTreeClient = githubTreeClient,
     )
-    val githubWebhookService = GithubWebhookService(dataCollectorService)
+    val githubWebhookService = GithubWebhookHandler(config.repoChecks, githubContentsClient)
 
     //Start a timer to update every 24h
     Timer().scheduleAtFixedRate(timerTask {
@@ -114,8 +114,10 @@ fun Application.module(testing: Boolean = false) {
                 return@post
             }
 
-            val returnMessage = githubWebhookService.handleWebhookEvent(payload)
-            call.respond(HttpStatusCode.OK, returnMessage)
+            launch {
+                githubWebhookService.handleWebhookEvent(payload)
+            }
+            call.respond(HttpStatusCode.OK)
 
         }
 

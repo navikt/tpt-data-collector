@@ -32,4 +32,4 @@ class Repository (
 )
 
 @Serializable
-class Commit(val modified: List<String>, val added: List<String>, val removed: List<String>)
+class Commit(val id: String, val modified: List<String>, val added: List<String>, val removed: List<String>)
