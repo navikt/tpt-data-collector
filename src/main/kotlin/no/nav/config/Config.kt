@@ -53,9 +53,9 @@ class ApplikasjonsConfig(
     val githubAppPrivateKey: String? = getOptionalEnvVar("GITHUB_APP_PRIVATE_KEY"),
     val githubWebhookSecret: String = getEnvVar("GITHUB_WEBHOOK_SECRET", "dummy"),
     val githubUserAgent: String = getEnvVar("TPT_DATA_COLLECTOR_GITHUB_USER_AGENT", "tpt-data-collector"),
-    val neo4jUri: String = getEnvVar("NEO4J_URI"),
-    val neo4jUser: String = getEnvVar("NEO4J_USER"),
-    val neo4Password: String = getEnvVar("NEO4J_PASSWORD"),
+    val neo4jUri: String = getEnvVar("NEO4J_URI", "dummy"),
+    val neo4jUser: String = getEnvVar("NEO4J_USER", "dummy"),
+    val neo4Password: String = getEnvVar("NEO4J_PASSWORD", "dummy"),
 ) {
     val hasGithubAppConfig: Boolean =
         !githubAppId.isNullOrBlank() &&
