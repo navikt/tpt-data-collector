@@ -7,7 +7,7 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(25)
 }
 
 dependencies {
@@ -91,7 +91,7 @@ tasks {
     }
 
     withType<Wrapper> {
-        gradleVersion = "8.14.2"
+        gradleVersion = "9.6.1"
     }
 
     register<JavaExec>("runLocalDockerfileCheck") {
