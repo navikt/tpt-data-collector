@@ -23,7 +23,7 @@ class GithubWebhookHandler(val repoChecks: List<RepoBasedCheck>, val ghFileLoade
             ghFileLoader.readFile("navikt", webhookPayload.repository.name, it, webhookPayload.commits[0].id)
         }
 
-        logger.info("Read the contents of ${fileContents.keys}")
+        logger.info("Read the contents of ${fileContents.keys.size} files")
     }
 
     private fun addedAndModifiedFiles(payload: WebhookPayload): Set<String> {
