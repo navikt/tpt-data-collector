@@ -9,7 +9,7 @@ class GithubWebhookHandler(val repoChecks: List<RepoBasedCheck>, val ghFileLoade
 
     fun handleWebhookEvent(webhookPayload: WebhookPayload) {
         TPTMetrics.countWebhook()
-        logger.info("'${webhookPayload.repository.name}' had a push to push to '${webhookPayload.commits[0].id}'")
+        logger.info("'${webhookPayload.repository.name}' had a push to push to '${webhookPayload.ref}'")
         if (!isRelevant(webhookPayload)) {
             logger.warn("Skipping checks for '${webhookPayload.repository.name}, it is not relevant'")
             return
