@@ -33,7 +33,6 @@ class DataCollectorServiceUnitTest {
             bigQueryClient = bigQueryClient,
             kafkaSender = kafkaSender,
             githubTokenProvider = StaticGithubTokenProvider("dummy"),
-            zizmorCommand = "TESTING",
             githubContentsClient = githubRepositoryClient,
             githubTreeClient = githubRepositoryClient,
         )

@@ -2,6 +2,8 @@ package no.nav.service
 
 import io.ktor.util.logging.KtorSimpleLogger
 import java.io.IOException
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import no.nav.bigquery.BigQueryClientInterface
@@ -14,22 +16,16 @@ import no.nav.github.GithubRequestException
 import no.nav.github.GithubTokenProvider
 import no.nav.github.logGithubFetchFailure
 import no.nav.kafka.KafkaSenderInterface
-import no.nav.zizmor.ZizmorResult
-import no.nav.zizmor.ZizmorService
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.hours
 
 class DataCollectorService(
     val bigQueryClient: BigQueryClientInterface,
     val kafkaSender: KafkaSenderInterface,
     githubTokenProvider: GithubTokenProvider,
-    zizmorCommand: String,
     val githubContentsClient: GithubRepositoryContentsClientInterface,
     val githubTreeClient: GithubGitTreeClientInterface,
 ) {
     var lastOkRun = Clock.System.now()
     val logger = KtorSimpleLogger(this::class.java.name)
-    val zizmorService = ZizmorService(githubTokenProvider, zizmorCommand)
     private val dockerfileFeatureExtractor = DockerfileFeatureExtractor()
 
     fun processDockerfileFeaturesAndSendToKafka(): Int {
@@ -52,14 +48,6 @@ class DataCollectorService(
         lastOkRun = Clock.System.now()
         logger.info("Scheduled update job finished")
         return mainTableList.size
-    }
-
-    fun checkRepoWithZizmorAndSendToKafka(repo: String): ZizmorResult {
-        val saferRepo = repo.replace("/[^a-zA-ZÀ-Ÿ0-9-_.]/g".toRegex(), "")
-        val resultString = zizmorService.runZizmorOnRepo("navikt", saferRepo)
-        val result = zizmorService.analyzeZizmorResult("navikt/$saferRepo", resultString)
-        kafkaSender.sendToKafka("zizmor", result.toJson())
-        return result
     }
 
     fun processChangedDockerfilesAndSendToKafka(

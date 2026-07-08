@@ -33,7 +33,6 @@ import no.nav.kafka.DummyKafkaSender
 import no.nav.kafka.KafkaSender
 import no.nav.metrics.metricsRoute
 import no.nav.service.DataCollectorService
-import no.nav.zizmor.ZizmorException
 import org.apache.commons.codec.digest.HmacUtils
 
 fun main(args: Array<String>): Unit = EngineMain.main(args)
@@ -78,7 +77,6 @@ fun Application.module(testing: Boolean = false) {
         bigQueryClient = bigQueryClient,
         kafkaSender = kafkaSender,
         githubTokenProvider = githubTokenProvider,
-        zizmorCommand = if (testing) "TESTING" else "/app/zizmor",
         githubContentsClient = githubContentsClient,
         githubTreeClient = githubTreeClient,
     )
@@ -116,12 +114,9 @@ fun Application.module(testing: Boolean = false) {
                 return@post
             }
 
-            try {
-                val returnMessage = githubWebhookService.handleWebhookEvent(payload)
-                call.respond(HttpStatusCode.OK, returnMessage)
-            } catch (e: ZizmorException) {
-                call.respond(HttpStatusCode.InternalServerError, e.message ?: "")
-            }
+            val returnMessage = githubWebhookService.handleWebhookEvent(payload)
+            call.respond(HttpStatusCode.OK, returnMessage)
+
         }
 
         if (!testing) {

@@ -21,7 +21,6 @@ class GithubWebhookServiceUnitTest {
             bigQueryClient = bigQueryClient,
             kafkaSender = kafkaSender,
             githubTokenProvider = StaticGithubTokenProvider("dummy"),
-            zizmorCommand = "TESTING",
             githubContentsClient = DummyGithubRepositoryClient(
                 mapOf(
                     "Dockerfile" to "FROM ghcr.io/navikt/baseimages/temurin:21\nADD app.jar /app/app.jar",
@@ -97,7 +96,6 @@ class GithubWebhookServiceUnitTest {
             bigQueryClient = bigQueryClient,
             kafkaSender = kafkaSender,
             githubTokenProvider = StaticGithubTokenProvider("dummy"),
-            zizmorCommand = "TESTING",
             githubContentsClient = DummyGithubRepositoryClient(
                 mapOf(
                     "docker/CustomDockerfile" to "\u0000PNG",
@@ -145,7 +143,6 @@ class GithubWebhookServiceUnitTest {
             bigQueryClient = bigQueryClient,
             kafkaSender = kafkaSender,
             githubTokenProvider = StaticGithubTokenProvider("dummy"),
-            zizmorCommand = "TESTING",
             githubContentsClient = DummyGithubRepositoryClient(
                 mapOf(
                     "docker/RemainingDockerfile" to "FROM cgr.dev/chainguard/wolfi-base:latest",

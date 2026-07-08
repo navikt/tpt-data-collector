@@ -24,10 +24,6 @@ class GithubWebhookService(
         val changedFiles: Set<String> = addedAndModifiedFiles(webhookPayload)
         val removedFiles: Set<String> = webhookPayload.commits.flatMap { it.removed }.toSet()
 
-        if (shouldRunZizmor(changedFiles)) {
-            logger.info("MOCK: Changes in workflow-files - running Zizmor on repo ${webhookPayload.repository.name}")
-            //dataCollectorService.checkRepoWithZizmorAndSendToKafka(webhookPayload.repository.name)
-        }
         if (!shouldUpdateDockerfiles(allFiles)) {
             return "No Dockerfiles have changed, skipping"
         }
@@ -54,10 +50,6 @@ class GithubWebhookService(
 
     private fun shouldUpdateDockerfiles(changedFiles: Set<String>): Boolean {
         return changedFiles.any { isDockerfileCandidate(it) }
-    }
-
-    private fun shouldRunZizmor(changedFiles: Set<String>): Boolean {
-        return changedFiles.any { it.startsWith(".github/workflows/") }
     }
 
     private fun addedAndModifiedFiles(payload: WebhookPayload): Set<String> {

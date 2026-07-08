@@ -31,7 +31,6 @@ fun main() {
         bigQueryClient = NoopBigQueryClient,
         kafkaSender = kafkaSender,
         githubTokenProvider = StaticGithubTokenProvider(config.githubToken),
-        zizmorCommand = "TESTING",
         githubContentsClient = githubContentsClient,
         githubTreeClient = githubTreeClient,
     )
