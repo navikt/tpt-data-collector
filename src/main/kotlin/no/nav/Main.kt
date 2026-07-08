@@ -21,6 +21,9 @@ import no.nav.bigquery.BigQueryClient
 import no.nav.bigquery.BigQueryClientInterface
 import no.nav.bigquery.DummyBigQuery
 import no.nav.config.ApplikasjonsConfig
+import no.nav.datastore.Datastore
+import no.nav.datastore.DummyDatastore
+import no.nav.datastore.Neo4jDatastore
 import no.nav.github.DummyGithubRepositoryClient
 import no.nav.github.GithubApiClient
 import no.nav.github.GithubAppAuth
@@ -35,6 +38,8 @@ import no.nav.kafka.KafkaSender
 import no.nav.metrics.metricsRoute
 import no.nav.service.DataCollectorService
 import org.apache.commons.codec.digest.HmacUtils
+import org.neo4j.driver.AuthTokens
+import org.neo4j.driver.GraphDatabase
 
 fun main(args: Array<String>): Unit = EngineMain.main(args)
 
@@ -71,6 +76,14 @@ fun Application.module(testing: Boolean = false) {
         githubRepositoryClient!!
     } else {
         GithubGitTreeClient(githubApiClient!!)
+    }
+
+    val datastore = if (testing) {
+        DummyDatastore()
+    } else {
+        val driver = GraphDatabase.driver(config.neo4jUri, AuthTokens.basic(config.neo4jUser, config.neo4Password))
+        driver.verifyConnectivity()
+        Neo4jDatastore(driver)
     }
 
     val dataCollectorService = DataCollectorService(

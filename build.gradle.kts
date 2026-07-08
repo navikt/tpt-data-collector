@@ -12,14 +12,6 @@ kotlin {
 
 dependencies {
     implementation(libs.bundles.ktor)
-    constraints{
-        implementation("io.netty:netty-codec-http:4.2.15.Final") {
-            because("Netty HTTP/2 CONTINUATION Frame Flood DoS via Zero-Byte Frame Bypass")
-        }
-        implementation("io.netty:netty-codec-http2:4.2.15.Final") {
-            because("Netty HTTP/2 CONTINUATION Frame Flood DoS via Zero-Byte Frame Bypass")
-        }
-    }
 
     implementation(libs.bundles.logging)
     constraints {
@@ -52,6 +44,8 @@ dependencies {
     implementation(libs.metrics.ktor)
     implementation(libs.metrics.prometheus)
 
+    // Neo4j
+    implementation(libs.neo4j)
 
     //Test
     testImplementation(libs.kotlin.test.junit)

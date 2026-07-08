@@ -18,6 +18,8 @@ spec:
     outbound:
       external:
         - host: github.com
+      rules:
+        - application: neo4j
   liveness:
     path: /internal/isAlive
   readiness:
@@ -51,3 +53,4 @@ spec:
       value: tpt-data-collector
   envFrom:
     - secret: tpt-data-collector
+    - secret: tpt-graph
