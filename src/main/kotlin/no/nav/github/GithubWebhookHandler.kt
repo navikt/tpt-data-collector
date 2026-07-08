@@ -8,7 +8,7 @@ class GithubWebhookHandler(val repoChecks: List<RepoBasedCheck>, val ghFileLoade
     val logger = KtorSimpleLogger(this::class.java.name)
 
     fun handleWebhookEvent(webhookPayload: WebhookPayload) {
-        TPTMetrics.countWebhook()
+        TPTMetrics.webhookReceived()
         logger.info("'${webhookPayload.repository.name}' had a push to push to '${webhookPayload.ref}'")
         if (!isRelevant(webhookPayload)) {
             logger.warn("Skipping checks for '${webhookPayload.repository.name}, it is not relevant'")
@@ -19,11 +19,15 @@ class GithubWebhookHandler(val repoChecks: List<RepoBasedCheck>, val ghFileLoade
         val filesNeededByChecks =
             repoChecks.flatMap { it.filesICareAbout(changedFiles) }.toSet()
 
-        val fileContents = filesNeededByChecks.associateWith {
-            ghFileLoader.readFile("navikt", webhookPayload.repository.name, it, webhookPayload.commits[0].id)
+        try {
+            val fileContents = filesNeededByChecks.associateWith {
+                ghFileLoader.readFile("navikt", webhookPayload.repository.name, it, webhookPayload.commits[0].id)
+            }
+            logger.info("Read the contents of ${fileContents.keys.size} files")
+        } catch (ex: Exception) {
+            logger.error("Error while reading files from GitHub", ex)
+            TPTMetrics.webhookFailed()
         }
-
-        logger.info("Read the contents of ${fileContents.keys.size} files")
     }
 
     private fun addedAndModifiedFiles(payload: WebhookPayload): Set<String> {
