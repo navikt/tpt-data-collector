@@ -15,7 +15,7 @@ class RootImageCheck(val datastore: Datastore): DatastoreBasedCheck {
     override fun run(repo: String): CheckResult {
         val result = datastore.containersAbleToRunAsRoot(repo)
         return if (result.isNotEmpty()) {
-            NeedsWork(name, repo, result.map { "$it is running in a non-rootless container" })
+            NeedsWork(name, repo, result.map { "$repo is running in a non-rootless container named $it" })
         } else {
             AllGood(name, repo)
         }
