@@ -52,10 +52,10 @@ object TPTMetrics {
     private val webhookReceivedCounter = Counter.builder("webhooks_received")
         .register(registry)
 
-    private val webhookFailedCounter = Counter.builder("webhooks_failed")
+    private val failedChecksCounter = Counter.builder("webhooks_failed")
         .register(registry)
 
     fun webhookReceived() = webhookReceivedCounter.increment()
 
-    fun webhookFailed() = webhookFailedCounter.increment()
+    fun checkFailed() = failedChecksCounter.increment()
 }

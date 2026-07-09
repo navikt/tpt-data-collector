@@ -7,7 +7,7 @@ import no.nav.checks.NeedsWork
 
 interface RepoBasedCheck {
     fun filesICareAbout(allAvailableFiles: Set<String>): List<String>
-    fun run(repo: String, fileName: String, fileContents: String): CheckResult
+    fun run(repo: String, filesToCheck: Map<String, String>): CheckResult
 }
 
 class ChainguardBaseImageCheck: RepoBasedCheck {
@@ -17,10 +17,12 @@ class ChainguardBaseImageCheck: RepoBasedCheck {
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
-    override fun run(repo: String, fileName: String, fileContents: String): CheckResult {
-        val itemsToFix = fileContents.lines()
-            .filter { it.startsWith("FROM") }
-            .filterNot { it.startsWith("FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no") }
+    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val itemsToFix = filesToCheck.flatMap{ (filename, fileContents) ->
+            fileContents.lines()
+                .filter { it.startsWith("FROM") }
+                .filterNot { it.startsWith("FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no") }
+        }
         return if (itemsToFix.isEmpty()) {
             AllGood(name, repo)
         }
