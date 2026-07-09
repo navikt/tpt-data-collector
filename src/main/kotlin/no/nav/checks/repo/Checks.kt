@@ -18,7 +18,7 @@ class ChainguardBaseImageCheck: FileBasedCheck {
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
-        val itemsToFix = filesToCheck.flatMap{ (filename, fileContents) ->
+        val itemsToFix = filesToCheck.flatMap{ (_, fileContents) ->
             fileContents.lines()
                 .filter { it.startsWith("FROM") }
                 .filterNot { it.startsWith("FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no") }
@@ -28,6 +28,30 @@ class ChainguardBaseImageCheck: FileBasedCheck {
         }
         else {
             NeedsWork(name, repo, itemsToFix.map { "Baseimage '$it' is not from the Nav registry" })
+        }
+    }
+}
+
+class UnpinnedActionVersionsCheck: FileBasedCheck {
+    private val name = "Pinned GitHub action versions check"
+    private val workflowFilePattern = Regex("""^\.github\/workflows\/[A-Za-z0-9_-]+\.ya?ml$""")
+    private val unpinnedPattern = Regex("""^\s*-\s*uses:\s*[A-Za-z0-9_\-/]+@v.*$""")
+
+    override fun filesICareAbout(allAvailableFiles: Set<String>) =
+        allAvailableFiles.filter { workflowFilePattern.matches(it) }
+
+    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val filesToFix = filesToCheck.flatMap{ (filename, fileContents) ->
+            fileContents.lines()
+                .filter { unpinnedPattern.matches(it) }
+                .map { filename }
+                .distinct()
+        }
+        return if (filesToFix.isEmpty()) {
+            AllGood(name, repo)
+        }
+        else {
+            NeedsWork(name, repo, filesToFix.map { "Repo '$repo' contains workflow '$it' with non-pinned action versions" })
         }
     }
 }
