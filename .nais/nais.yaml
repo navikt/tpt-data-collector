@@ -8,13 +8,7 @@ spec:
     - https://tpt-data-collector.nav.no
   image: {{image}}
   port: 8080
-  azure:
-    application:
-      enabled: true
   accessPolicy:
-    inbound:
-      rules:
-        - application: tpt-backend
     outbound:
       external:
         - host: github.com
