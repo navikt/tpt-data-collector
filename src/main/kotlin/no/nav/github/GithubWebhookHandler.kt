@@ -4,13 +4,14 @@ import io.ktor.util.logging.KtorSimpleLogger
 import no.nav.checks.CheckResult
 import no.nav.checks.datastore.RootImageCheck
 import no.nav.checks.repo.ChainguardBaseImageCheck
+import no.nav.checks.repo.UnpinnedActionVersionsCheck
 import no.nav.datastore.Datastore
 import no.nav.metrics.TPTMetrics
 
 class GithubWebhookHandler(val ghFileLoader: GithubRepositoryContentsClientInterface, val datastore: Datastore) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
-    private val fileBasedChecks = listOf(ChainguardBaseImageCheck())
+    private val fileBasedChecks = listOf(ChainguardBaseImageCheck(), UnpinnedActionVersionsCheck())
 
     private val datastoreBasedChesks = listOf(RootImageCheck(datastore))
 
