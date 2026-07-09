@@ -43,8 +43,6 @@ class KafkaConfig(
 }
 
 class ApplikasjonsConfig(
-    val projectId: String = getEnvVar("GCP_TEAM_PROJECT_ID", "appsec"),
-    val datasetName: String = getEnvVar("BIGQUERY_DATASET_ID", "appsec"),
     val githubToken: String = getEnvVar("TPT_DATA_COLLECTOR_GITHUB_TOKEN", "dummy"),
     val githubAppId: String? = getOptionalEnvVar("GITHUB_APP_ID"),
     val githubAppInstallationId: String? = getOptionalEnvVar("GITHUB_APP_INSTALLATION_ID"),

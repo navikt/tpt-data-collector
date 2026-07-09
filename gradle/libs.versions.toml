@@ -1,9 +1,7 @@
 [versions]
 ktor = "3.5.1"
 kotlinx-serialization = "1.11.0"
-kotlinx-datetime = "0.8.0"
 kotlin-test = "2.4.0"
-bigquery = "2.67.0"
 prometheus = "1.17.0"
 logback = "1.5.37"
 logstash = "9.0"
@@ -17,8 +15,6 @@ ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "k
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin-test" }
 kotlinx-serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization"}
-kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime"}
-bigquery = { module = "com.google.cloud:google-cloud-bigquery", version.ref = "bigquery"}
 metrics-ktor = { module = "io.ktor:ktor-server-metrics-micrometer", version.ref = "ktor" }
 metrics-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "prometheus" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit-jupiter" }

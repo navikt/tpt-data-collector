@@ -34,10 +34,6 @@ spec:
   prometheus:
     enabled: true
     path: /metrics
-  gcp:
-    bigQueryDatasets:
-      - name: appsec
-        permission: READ
   env:
     - name: BIGQUERY_DATASET_ID
       value: appsec

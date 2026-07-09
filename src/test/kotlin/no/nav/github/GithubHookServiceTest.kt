@@ -6,6 +6,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.client.request.headers
 import io.ktor.client.request.setBody
 import io.ktor.server.testing.testApplication
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlinx.serialization.json.Json
 import no.nav.config.ApplikasjonsConfig
 import no.nav.generateHmac
@@ -15,11 +17,13 @@ import kotlin.test.assertEquals
 
 class GithubHookServiceTest {
     val config = ApplikasjonsConfig()
+    val secretKey = SecretKeySpec(config.githubWebhookSecret.toByteArray(), "HmacSHA256")
+    val mac = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
 
     @Test
     fun `Should generate Hmac as excpected`() {
         val data = "Hello World"
-        val hmac = generateHmac(data, config.githubWebhookSecret)
+        val hmac = generateHmac(data, mac)
         assertEquals("sha256=4bde0d92d5842a7aea772bc7b267296c76fc703bde0fd950705aeb403d5ea57d", hmac)
     }
 
@@ -63,7 +67,7 @@ class GithubHookServiceTest {
             module(testing = true)
         }
         val body = Json.encodeToString("Bad body")
-        val hmac = generateHmac(body, "dummy")
+        val hmac = generateHmac(body, mac)
         val response = client.post("/webhook/github") {
             headers {
                 append("X-Hub-Signature-256", hmac)
@@ -81,7 +85,7 @@ class GithubHookServiceTest {
 
         val body = this::class.java.getResource("/github_push_webhook.json")?.readText() ?: "wops"
 
-        val hmac = generateHmac(body, config.githubWebhookSecret)
+        val hmac = generateHmac(body, mac)
         val response = client.post("/webhook/github") {
             headers {
                 append("X-Hub-Signature-256", hmac)
