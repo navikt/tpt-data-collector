@@ -2,11 +2,17 @@ package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
 import no.nav.checks.CheckResult
-import no.nav.checks.repo.RepoBasedCheck
+import no.nav.checks.datastore.RootImageCheck
+import no.nav.checks.repo.ChainguardBaseImageCheck
+import no.nav.datastore.Datastore
 import no.nav.metrics.TPTMetrics
 
-class GithubWebhookHandler(val repoChecks: List<RepoBasedCheck>, val ghFileLoader: GithubRepositoryContentsClientInterface) {
+class GithubWebhookHandler(val ghFileLoader: GithubRepositoryContentsClientInterface, val datastore: Datastore) {
     val logger = KtorSimpleLogger(this::class.java.name)
+
+    private val fileBasedChecks = listOf(ChainguardBaseImageCheck())
+
+    private val datastoreBasedChesks = listOf(RootImageCheck(datastore))
 
     fun handleWebhookEvent(webhookPayload: WebhookPayload) {
         TPTMetrics.webhookReceived()
@@ -15,8 +21,8 @@ class GithubWebhookHandler(val repoChecks: List<RepoBasedCheck>, val ghFileLoade
             logger.warn("Skipping checks for '${webhookPayload.repository.name}, it is not relevant'")
             return
         }
-        val repoResults = runRepoBasedChecks(webhookPayload, repoChecks)
-        logger.info("Ran ${repoResults.size} repo based checks for '${webhookPayload.repository}'")
+        val checkResults = runFileBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
+        logger.info("Ran ${checkResults.size} checks for '${webhookPayload.repository}'")
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
@@ -25,10 +31,10 @@ class GithubWebhookHandler(val repoChecks: List<RepoBasedCheck>, val ghFileLoade
                 && pushBranch == payload.repository.masterBranch
     }
 
-    private fun runRepoBasedChecks(webhookPayload: WebhookPayload, checks: List<RepoBasedCheck>): List<CheckResult> {
+    private fun runFileBasedChecks(webhookPayload: WebhookPayload): List<CheckResult> {
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val filesNeededByChecks =
-            repoChecks.flatMap { it.filesICareAbout(changedFiles) }.toSet()
+            fileBasedChecks.flatMap { it.filesICareAbout(changedFiles) }.toSet()
         if (filesNeededByChecks.isEmpty()) {
             logger.info("No repo based checks to run for '${webhookPayload.repository.name}'")
             return emptyList()
@@ -39,10 +45,23 @@ class GithubWebhookHandler(val repoChecks: List<RepoBasedCheck>, val ghFileLoade
                 ghFileLoader.readFile("navikt", webhookPayload.repository.name, it, webhookPayload.commits[0].id)
             }
             logger.info("Read the contents of ${allFilesWeNeed.size} files")
-            checks.map { check ->
+            fileBasedChecks.map { check ->
                 val filesNeededForThisCheck =
                     check.filesICareAbout(allFilesWeNeed.keys).toSet()
                 check.run(webhookPayload.repository.name,allFilesWeNeed.filterKeys { filesNeededForThisCheck.contains(it) })
+            }
+        } catch (ex: Exception) {
+            logger.error("Error while running repo based checks", ex)
+            TPTMetrics.checkFailed()
+            emptyList()
+        }
+        return results
+    }
+
+    private fun runDatastoreBasedChecks(webhookPayload: WebhookPayload): List<CheckResult> {
+        val results = try {
+            datastoreBasedChesks.map { check ->
+                check.run(webhookPayload.repository.name,)
             }
         } catch (ex: Exception) {
             logger.error("Error while running repo based checks", ex)

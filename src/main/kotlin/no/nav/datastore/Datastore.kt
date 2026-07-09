@@ -15,6 +15,10 @@ class Neo4jDatastore(val driver: Driver): Datastore {
 
 class DummyDatastore: Datastore {
     override fun containersAbleToRunAsRoot(originRepo: String): List<String> {
-        return emptyList()
+        return if (originRepo == "good") {
+            emptyList()
+        } else {
+            listOf("boguscontainer")
+        }
     }
 }

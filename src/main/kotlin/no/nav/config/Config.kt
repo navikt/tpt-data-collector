@@ -1,7 +1,5 @@
 package no.nav.config
 
-import no.nav.checks.repo.ChainguardBaseImageCheck
-import no.nav.checks.repo.RepoBasedCheck
 import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.config.SslConfigs
@@ -61,8 +59,6 @@ class ApplikasjonsConfig(
         !githubAppId.isNullOrBlank() &&
             !githubAppInstallationId.isNullOrBlank() &&
             !githubAppPrivateKey.isNullOrBlank()
-
-    val repoChecks: List<RepoBasedCheck> = listOf(ChainguardBaseImageCheck())
 
     init {
         val configuredGithubAppValues = listOf(githubAppId, githubAppInstallationId, githubAppPrivateKey)

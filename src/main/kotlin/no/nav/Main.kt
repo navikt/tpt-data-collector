@@ -93,7 +93,7 @@ fun Application.module(testing: Boolean = false) {
         githubContentsClient = githubContentsClient,
         githubTreeClient = githubTreeClient,
     )
-    val githubWebhookService = GithubWebhookHandler(config.repoChecks, githubContentsClient)
+    val githubWebhookService = GithubWebhookHandler(githubContentsClient, datastore)
 
     //Start a timer to update every 24h
     Timer().scheduleAtFixedRate(timerTask {

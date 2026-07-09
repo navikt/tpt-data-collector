@@ -5,12 +5,12 @@ import no.nav.checks.CheckResult
 import no.nav.checks.NeedsWork
 
 
-interface RepoBasedCheck {
+interface FileBasedCheck {
     fun filesICareAbout(allAvailableFiles: Set<String>): List<String>
     fun run(repo: String, filesToCheck: Map<String, String>): CheckResult
 }
 
-class ChainguardBaseImageCheck: RepoBasedCheck {
+class ChainguardBaseImageCheck: FileBasedCheck {
     private val name = "Chainguard base image check"
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
 
