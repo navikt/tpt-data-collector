@@ -16,7 +16,7 @@ class GithubWebhookHandler(val repoChecks: List<RepoBasedCheck>, val ghFileLoade
             return
         }
         val repoResults = runRepoBasedChecks(webhookPayload, repoChecks)
-        logger.info("Ran ${repoResults.size} repo based checks for '${webhookPayload.ref}'")
+        logger.info("Ran ${repoResults.size} repo based checks for '${webhookPayload.repository}'")
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
