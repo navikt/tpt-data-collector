@@ -15,7 +15,7 @@ import no.nav.module
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
-class GithubHookServiceTest {
+class GithubWebhookHandlerTest {
     val config = ApplikasjonsConfig()
     val secretKey = SecretKeySpec(config.githubWebhookSecret.toByteArray(), "HmacSHA256")
     val mac = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
