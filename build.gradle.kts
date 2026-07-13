@@ -17,7 +17,7 @@ dependencies {
     implementation(libs.nimbus.jose)
 
     // Kafka
-    implementation("at.yawk.lz4:lz4-java:1.11.0")
+    implementation("at.yawk.lz4:lz4-java:1.11.1")
     implementation("org.apache.kafka:kafka-clients:4.3.1")
 
     // Metrics
