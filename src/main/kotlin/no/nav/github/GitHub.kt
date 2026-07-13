@@ -50,6 +50,7 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         val url = "$apiBaseUrl/repos/navikt/$repoName/contents/$filePath"
         val authToken = retrieveAccessToken()
         val response: FileContentsResponse = makeHttpRequest(Get, url, authToken)
+        println(response)
         return response.decode()
     }
 
