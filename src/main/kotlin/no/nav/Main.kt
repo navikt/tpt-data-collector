@@ -1,5 +1,7 @@
 package no.nav
 
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.netty.EngineMain
@@ -16,13 +18,9 @@ import kotlinx.serialization.json.Json
 import no.nav.config.ApplikasjonsConfig
 import no.nav.datastore.DummyDatastore
 import no.nav.datastore.Neo4jDatastore
-import no.nav.github.DummyGithubRepositoryClient
-import no.nav.github.GithubApiClient
-import no.nav.github.GithubAppAuth
-import no.nav.github.GithubRepositoryContentsClient
-import no.nav.github.GithubTokenProvider
+import no.nav.github.FakeGitHub
 import no.nav.github.GithubWebhookHandler
-import no.nav.github.StaticGithubTokenProvider
+import no.nav.github.RealGitHub
 import no.nav.github.WebhookPayload
 import no.nav.metrics.metricsRoute
 import org.neo4j.driver.AuthTokens
@@ -33,20 +31,11 @@ fun main(args: Array<String>): Unit = EngineMain.main(args)
 fun Application.module(testing: Boolean = false) {
     val config = ApplikasjonsConfig()
 
-    val githubTokenProvider = if (testing) {
-        StaticGithubTokenProvider("dummy")
+    val gitHub = if (testing) {
+        FakeGitHub()
     } else {
-        createGithubTokenProvider(config)
-    }
-    val githubRepositoryClient = if (testing) DummyGithubRepositoryClient() else null
-    val githubApiClient = if (testing) null else GithubApiClient(
-        tokenProvider = githubTokenProvider,
-        userAgent = config.githubUserAgent,
-    )
-    val githubContentsClient = if (testing) {
-        githubRepositoryClient!!
-    } else {
-        GithubRepositoryContentsClient(githubApiClient!!)
+        val httpClient = HttpClient(CIO)
+        RealGitHub(httpClient, config.githubAppId!!, config.githubAppInstallationId!!, config.githubAppPrivateKey!!)
     }
 
     val datastore = if (testing) {
@@ -60,14 +49,14 @@ fun Application.module(testing: Boolean = false) {
     val secretKey = SecretKeySpec(config.githubWebhookSecret.toByteArray(), "HmacSHA256")
     val mac = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
 
-    val githubWebhookService = GithubWebhookHandler(githubContentsClient, datastore)
+    val githubWebhookService = GithubWebhookHandler(gitHub, datastore)
 
     routing {
         get("/internal/isAlive") {
             call.respond(HttpStatusCode.OK, "OK")
         }
 
-        // todo isalive
+        // todo isReady
 
         val json = Json { ignoreUnknownKeys = true }
         post("/webhook/github") {
@@ -96,18 +85,6 @@ fun Application.module(testing: Boolean = false) {
             metricsRoute()
         }
     }
-}
-
-private fun createGithubTokenProvider(config: ApplikasjonsConfig): GithubTokenProvider {
-    if (config.hasGithubAppConfig) {
-        return GithubAppAuth(
-            appId = config.githubAppId!!,
-            privateKeyContent = config.githubAppPrivateKey!!,
-            installationId = config.githubAppInstallationId!!,
-            userAgent = config.githubUserAgent,
-        )
-    }
-    return StaticGithubTokenProvider(config.githubToken)
 }
 
 fun generateHmac(data: String, mac: Mac): String {

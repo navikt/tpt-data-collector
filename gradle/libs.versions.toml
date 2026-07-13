@@ -8,11 +8,15 @@ logstash = "9.0"
 junit-jupiter = "6.1.1"
 bouncycastle = "1.84"
 neo4j = "6.1.0"
+nimbus = "10.9.1"
 
 [libraries]
 ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+ktor-client = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-serialization = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin-test" }
 kotlinx-serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization"}
 metrics-ktor = { module = "io.ktor:ktor-server-metrics-micrometer", version.ref = "ktor" }
@@ -23,12 +27,16 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 logstash = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstash" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
+nimbus-jose = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus" }
 neo4j = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "neo4j" }
 
 [bundles]
 ktor = [
     "ktor-server-core",
     "ktor-server-netty",
+    "ktor-client",
+    "ktor-client-serialization",
+    "ktor-client-content-negotiation"
 ]
 logging = [
     "logback",

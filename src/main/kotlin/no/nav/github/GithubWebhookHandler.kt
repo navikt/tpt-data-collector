@@ -8,21 +8,21 @@ import no.nav.checks.repo.UnpinnedActionVersionsCheck
 import no.nav.datastore.Datastore
 import no.nav.metrics.TPTMetrics
 
-class GithubWebhookHandler(val ghFileLoader: GithubRepositoryContentsClientInterface, val datastore: Datastore) {
+class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
     private val fileBasedChecks = listOf(ChainguardBaseImageCheck(), UnpinnedActionVersionsCheck())
 
     private val datastoreBasedChesks = listOf(RootImageCheck(datastore))
 
-    fun handleWebhookEvent(webhookPayload: WebhookPayload) {
+    suspend fun handleWebhookEvent(webhookPayload: WebhookPayload) {
         TPTMetrics.webhookReceived()
         logger.info("'${webhookPayload.repository.name}' had a push to push to '${webhookPayload.ref}'")
         if (!isRelevant(webhookPayload)) {
             logger.warn("Skipping checks for '${webhookPayload.repository.name}, it is not relevant'")
             return
         }
-        val checkResults = runFileBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
+        val checkResults = runRepoBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
         logger.info("Ran ${checkResults.size} checks for '${webhookPayload.repository}'")
     }
 
@@ -32,7 +32,7 @@ class GithubWebhookHandler(val ghFileLoader: GithubRepositoryContentsClientInter
                 && pushBranch == payload.repository.masterBranch
     }
 
-    private fun runFileBasedChecks(webhookPayload: WebhookPayload): List<CheckResult> {
+    private suspend fun runRepoBasedChecks(webhookPayload: WebhookPayload): List<CheckResult> {
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val filesNeededByChecks =
             fileBasedChecks.flatMap { it.filesICareAbout(changedFiles) }.toSet()
@@ -43,7 +43,7 @@ class GithubWebhookHandler(val ghFileLoader: GithubRepositoryContentsClientInter
 
         val results = try {
             val allFilesWeNeed = filesNeededByChecks.associateWith {
-                ghFileLoader.readFile("navikt", webhookPayload.repository.name, it, webhookPayload.commits[0].id)
+                gitHub.readFileContents(webhookPayload.repository.name, it)
             }
             logger.info("Read the contents of ${allFilesWeNeed.size} files")
             fileBasedChecks.map { check ->

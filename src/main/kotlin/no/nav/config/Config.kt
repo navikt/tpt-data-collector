@@ -43,21 +43,14 @@ class KafkaConfig(
 }
 
 class ApplikasjonsConfig(
-    val githubToken: String = getEnvVar("TPT_DATA_COLLECTOR_GITHUB_TOKEN", "dummy"),
-    val githubAppId: String? = getOptionalEnvVar("GITHUB_APP_ID"),
-    val githubAppInstallationId: String? = getOptionalEnvVar("GITHUB_APP_INSTALLATION_ID"),
-    val githubAppPrivateKey: String? = getOptionalEnvVar("GITHUB_APP_PRIVATE_KEY"),
+    val githubAppId: String? = getEnvVar("GITHUB_APP_ID", "dummy"),
+    val githubAppInstallationId: String? = getEnvVar("GITHUB_APP_INSTALLATION_ID", "dummy"),
+    val githubAppPrivateKey: String? = getEnvVar("GITHUB_APP_PRIVATE_KEY", "dummy"),
     val githubWebhookSecret: String = getEnvVar("GITHUB_WEBHOOK_SECRET", "dummy"),
-    val githubUserAgent: String = getEnvVar("TPT_DATA_COLLECTOR_GITHUB_USER_AGENT", "tpt-data-collector"),
     val neo4jUri: String = getEnvVar("NEO4J_URI", "dummy"),
     val neo4jUser: String = getEnvVar("NEO4J_USER", "dummy"),
     val neo4Password: String = getEnvVar("NEO4J_PASSWORD", "dummy"),
 ) {
-    val hasGithubAppConfig: Boolean =
-        !githubAppId.isNullOrBlank() &&
-            !githubAppInstallationId.isNullOrBlank() &&
-            !githubAppPrivateKey.isNullOrBlank()
-
     init {
         val configuredGithubAppValues = listOf(githubAppId, githubAppInstallationId, githubAppPrivateKey)
             .count { !it.isNullOrBlank() }

@@ -14,6 +14,7 @@ dependencies {
 
     implementation(libs.kotlinx.serialization)
     implementation(libs.bouncycastle.pkix)
+    implementation(libs.nimbus.jose)
 
     // Kafka
     implementation("at.yawk.lz4:lz4-java:1.11.0")
