@@ -17,6 +17,7 @@ import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonConfiguration
 import no.nav.config.ApplikasjonsConfig
 import no.nav.datastore.DummyDatastore
 import no.nav.datastore.Neo4jDatastore
@@ -38,9 +39,7 @@ fun Application.module(testing: Boolean = false) {
     } else {
         val httpClient = HttpClient(CIO) {
             install(ContentNegotiation) {
-                Json {
-                    ignoreUnknownKeys = true
-                }
+                json(Json { ignoreUnknownKeys = true })
             }
         }
         RealGitHub(httpClient, config.githubAppId!!, config.githubAppInstallationId!!, config.githubAppPrivateKey!!)
