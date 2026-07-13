@@ -2,6 +2,7 @@ package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
 import no.nav.checks.CheckResult
+import no.nav.checks.NeedsWork
 import no.nav.checks.datastore.RootImageCheck
 import no.nav.checks.repo.ChainguardBaseImageCheck
 import no.nav.checks.repo.UnpinnedActionVersionsCheck
@@ -23,7 +24,8 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
             return
         }
         val checkResults = runRepoBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
-        logger.info("Ran ${checkResults.size} checks for '${webhookPayload.repository}'")
+        logger.info("Ran ${checkResults.size} checks for '${webhookPayload.repository}, " +
+                "found ${checkResults.filterIsInstance<NeedsWork>().size} things to fix'")
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
