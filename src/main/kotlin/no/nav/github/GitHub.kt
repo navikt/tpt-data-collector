@@ -47,7 +47,7 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     private var installationAccessToken: AtomicReference<AccessToken?> = AtomicReference(null)
 
     override suspend fun readFileContents(repoName: String, filePath: String): String {
-        val url = "$apiBaseUrl/$repoName/contents/$filePath"
+        val url = "$apiBaseUrl/repos/navikt/$repoName/contents/$filePath"
         val authToken = retrieveAccessToken()
         val response: FileContentsResponse = makeHttpRequest(Get, url, authToken)
         return response.decode()
@@ -104,12 +104,14 @@ internal fun needsRefresh(now: Instant = Clock.System.now(), expiresAt: Instant)
 }
 
 @Serializable
-private data class FileContentsResponse(val content: String) {
+private data class FileContentsResponse(
+    @SerialName("content")
+    val content: String
+) {
     fun decode() = Base64.decode(content).decodeToString()
 }
 
 @Serializable
-@OptIn(ExperimentalSerializationApi::class)
 private data class TokenExchangeResponse(
     @SerialName("token")
     val token: String,
