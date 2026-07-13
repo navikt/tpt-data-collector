@@ -38,7 +38,9 @@ fun Application.module(testing: Boolean = false) {
     } else {
         val httpClient = HttpClient(CIO) {
             install(ContentNegotiation) {
-                json()
+                Json {
+                    ignoreUnknownKeys = true
+                }
             }
         }
         RealGitHub(httpClient, config.githubAppId!!, config.githubAppInstallationId!!, config.githubAppPrivateKey!!)
