@@ -50,7 +50,6 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         val url = "$apiBaseUrl/repos/navikt/$repoName/contents/$filePath"
         val authToken = retrieveAccessToken()
         val response: FileContentsResponse = makeHttpRequest(Get, url, authToken)
-        println(response)
         return response.decode()
     }
 
@@ -109,7 +108,7 @@ private data class FileContentsResponse(
     @SerialName("content")
     val content: String
 ) {
-    fun decode() = Base64.decode(content).decodeToString()
+    fun decode() = Base64.decode(content.replace("\n", "")).decodeToString()
 }
 
 @Serializable

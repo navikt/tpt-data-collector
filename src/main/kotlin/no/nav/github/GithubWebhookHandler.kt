@@ -24,7 +24,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
             return
         }
         val checkResults = runFileBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
-        logger.info("Ran ${checkResults.size} checks for '${webhookPayload.repository}, " +
+        logger.info("Ran ${checkResults.size} checks for '${webhookPayload.repository.name}, " +
                 "found ${checkResults.filterIsInstance<NeedsWork>().size} things to fix'")
     }
 
