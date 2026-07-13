@@ -23,7 +23,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
             logger.warn("Skipping checks for '${webhookPayload.repository.name}, it is not relevant'")
             return
         }
-        val checkResults = runRepoBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
+        val checkResults = runFileBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
         logger.info("Ran ${checkResults.size} checks for '${webhookPayload.repository}, " +
                 "found ${checkResults.filterIsInstance<NeedsWork>().size} things to fix'")
     }
@@ -34,7 +34,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
                 && pushBranch == payload.repository.masterBranch
     }
 
-    private suspend fun runRepoBasedChecks(webhookPayload: WebhookPayload): List<CheckResult> {
+    private suspend fun runFileBasedChecks(webhookPayload: WebhookPayload): List<CheckResult> {
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val filesNeededByChecks =
             fileBasedChecks.flatMap { it.filesICareAbout(changedFiles) }.toSet()
