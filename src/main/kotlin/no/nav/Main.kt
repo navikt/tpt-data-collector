@@ -2,7 +2,9 @@ package no.nav
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.netty.EngineMain
 import io.ktor.server.request.receiveText
@@ -34,7 +36,11 @@ fun Application.module(testing: Boolean = false) {
     val gitHub = if (testing) {
         FakeGitHub()
     } else {
-        val httpClient = HttpClient(CIO)
+        val httpClient = HttpClient(CIO) {
+            install(ContentNegotiation) {
+                json()
+            }
+        }
         RealGitHub(httpClient, config.githubAppId!!, config.githubAppInstallationId!!, config.githubAppPrivateKey!!)
     }
 
