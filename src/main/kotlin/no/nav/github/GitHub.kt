@@ -24,8 +24,8 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonNames
 
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
@@ -111,8 +111,9 @@ private data class FileContentsResponse(val content: String) {
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
 private data class TokenExchangeResponse(
+    @SerialName("token")
     val token: String,
-    @JsonNames("expires_at")
+    @SerialName("expires_at")
     val expiresAt: Instant
 )
 

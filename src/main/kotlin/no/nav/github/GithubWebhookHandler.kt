@@ -54,7 +54,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
                 check.run(webhookPayload.repository.name,allFilesWeNeed.filterKeys { filesNeededForThisCheck.contains(it) })
             }
         } catch (ex: Exception) {
-            logger.error("Error while running repo based checks", ex)
+            logger.error("Error while running file based checks", ex)
             TPTMetrics.checkFailed()
             emptyList()
         }
@@ -67,7 +67,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
                 check.run(webhookPayload.repository.name,)
             }
         } catch (ex: Exception) {
-            logger.error("Error while running repo based checks", ex)
+            logger.error("Error while running datastore based checks", ex)
             TPTMetrics.checkFailed()
             emptyList()
         }
