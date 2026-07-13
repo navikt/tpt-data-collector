@@ -57,7 +57,7 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         httpClient.request(url) {
             method = httpMethod
             header(Authorization, "Bearer $authToken")
-            header(Accept, "application/vnd.github+json")
+            header(Accept, "application/json")
             header(UserAgent, "Nav IT McBotface")
         }.body()
 

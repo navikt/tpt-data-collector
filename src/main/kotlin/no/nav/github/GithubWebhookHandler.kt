@@ -39,7 +39,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
         val filesNeededByChecks =
             fileBasedChecks.flatMap { it.filesICareAbout(changedFiles) }.toSet()
         if (filesNeededByChecks.isEmpty()) {
-            logger.info("No repo based checks to run for '${webhookPayload.repository.name}'")
+            logger.info("No file based checks to run for '${webhookPayload.repository.name}'")
             return emptyList()
         }
 
