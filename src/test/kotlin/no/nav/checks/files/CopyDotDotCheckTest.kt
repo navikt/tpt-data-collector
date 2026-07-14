@@ -11,7 +11,7 @@ class CopyDotDotCheckTest {
     @Test
     fun `This check should only care about Dockerfiles`() {
         val allAvailableFiles = setOf("Dockerfile", "Dockerfile.test", "prod.dockerfile", "whatever")
-        val check = ChainguardBaseImageCheck()
+        val check = CopyDotDotCheck()
         val expected = listOf("Dockerfile", "Dockerfile.test", "prod.dockerfile")
         val actual = check.filesICareAbout(allAvailableFiles)
         assertEquals(expected, actual)
@@ -23,6 +23,20 @@ class CopyDotDotCheckTest {
             "Dockerfile" to """
                FROM yolo AS builder
                COPY . .
+            """.trimIndent()
+        )
+        val check = CopyDotDotCheck()
+        val results = check.run("bogusrepo", filesToCheck)
+        assertTrue(results is NeedsWork)
+        assertEquals(1, results.reasons.size)
+    }
+
+    @Test
+    fun `Copy dot dot with slashes should be flagged`() {
+        val filesToCheck = mapOf(
+            "Dockerfile" to """
+               FROM yolo AS builder
+               COPY ./ ./
             """.trimIndent()
         )
         val check = CopyDotDotCheck()

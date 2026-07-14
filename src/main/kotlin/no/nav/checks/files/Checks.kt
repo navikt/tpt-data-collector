@@ -42,7 +42,8 @@ class CopyDotDotCheck: FileBasedCheck {
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
         val hasCopyDotDot = filesToCheck.flatMap{ (_, fileContents) ->
             fileContents.lines()
-                .filter { it.trim() == "COPY . ." }
+                .map { it.trim() }
+                .filter { it == "COPY . ." || it == "COPY ./ ./" }
         }.isNotEmpty()
         return if (hasCopyDotDot) {
             NeedsWork(name, repo, listOf("'COPY . .' instructions are present"))
