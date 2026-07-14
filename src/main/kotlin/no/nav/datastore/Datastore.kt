@@ -12,8 +12,7 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
         return try {
             driver.verifyConnectivity()
             true
-        } catch (ex: Exception) {
-            println(ex.message)
+        } catch (_: Exception) {
             false
         }
     }

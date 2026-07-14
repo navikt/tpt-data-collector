@@ -110,13 +110,7 @@ fun Application.naisModule(gitHub: GitHub, datastore: Datastore) {
         }
 
         get("/internal/isReady") {
-            try {
-                val status = if (gitHub.ping() && datastore.ping()) OK else InternalServerError
-                call.respond(status)
-            } catch (ex: Exception) {
-                ex.printStackTrace()
-                call.respond(InternalServerError)
-            }
+            call.respond(OK, "OK")
         }
 
         get("/internal/metrics") {
