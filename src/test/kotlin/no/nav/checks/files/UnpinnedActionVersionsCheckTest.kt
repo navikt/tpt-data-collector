@@ -1,4 +1,4 @@
-package no.nav.checks.repo
+package no.nav.checks.files
 
 import kotlin.test.assertTrue
 import no.nav.checks.AllGood

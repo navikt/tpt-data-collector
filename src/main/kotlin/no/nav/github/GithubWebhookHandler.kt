@@ -4,8 +4,8 @@ import io.ktor.util.logging.KtorSimpleLogger
 import no.nav.checks.CheckResult
 import no.nav.checks.NeedsWork
 import no.nav.checks.datastore.RootImageCheck
-import no.nav.checks.repo.ChainguardBaseImageCheck
-import no.nav.checks.repo.UnpinnedActionVersionsCheck
+import no.nav.checks.files.ChainguardBaseImageCheck
+import no.nav.checks.files.UnpinnedActionVersionsCheck
 import no.nav.datastore.Datastore
 import no.nav.metrics.TPTMetrics
 

@@ -1,4 +1,4 @@
-package no.nav.checks.repo
+package no.nav.checks.files
 
 import no.nav.checks.AllGood
 import no.nav.checks.CheckResult
@@ -32,9 +32,29 @@ class ChainguardBaseImageCheck: FileBasedCheck {
     }
 }
 
+class CopyDotDotCheck: FileBasedCheck {
+    private val name = "Uses COPY . . check"
+    private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
+
+    override fun filesICareAbout(allAvailableFiles: Set<String>) =
+        allAvailableFiles.filter { dockerfilePattern.find(it) != null }
+
+    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val hasCopyDotDot = filesToCheck.flatMap{ (_, fileContents) ->
+            fileContents.lines()
+                .filter { it.trim() == "COPY . ." }
+        }.isNotEmpty()
+        return if (hasCopyDotDot) {
+            NeedsWork(name, repo, listOf("'COPY . .' instructions are present"))
+        } else {
+            AllGood(name, repo)
+        }
+    }
+}
+
 class UnpinnedActionVersionsCheck: FileBasedCheck {
     private val name = "Pinned GitHub action versions check"
-    private val workflowFilePattern = Regex("""^\.github\/workflows\/[A-Za-z0-9_-]+\.ya?ml$""")
+    private val workflowFilePattern = Regex("""^\.github/workflows/[A-Za-z0-9_-]+\.ya?ml$""")
     private val unpinnedPattern = Regex("""^\s*-\s*uses:\s*[A-Za-z0-9_\-/]+@v.*$""")
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =

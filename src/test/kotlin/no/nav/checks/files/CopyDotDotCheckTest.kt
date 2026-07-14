@@ -1,4 +1,4 @@
-package no.nav.checks.repo
+package no.nav.checks.files
 
 import kotlin.test.assertTrue
 import no.nav.checks.AllGood
@@ -6,7 +6,7 @@ import no.nav.checks.NeedsWork
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-class ChainguardBaseImageCheckTest {
+class CopyDotDotCheckTest {
 
     @Test
     fun `This check should only care about Dockerfiles`() {
@@ -18,34 +18,28 @@ class ChainguardBaseImageCheckTest {
     }
 
     @Test
-    fun `Non-Chainguard images should be flagged`() {
+    fun `Copy dot dot should be flagged`() {
         val filesToCheck = mapOf(
             "Dockerfile" to """
                FROM yolo AS builder
                COPY . .
-               FROM whatever/bogus
-               RUN echo "hello"
             """.trimIndent()
         )
-        val check = ChainguardBaseImageCheck()
+        val check = CopyDotDotCheck()
         val results = check.run("bogusrepo", filesToCheck)
         assertTrue(results is NeedsWork)
-        assertEquals(2, results.reasons.size)
+        assertEquals(1, results.reasons.size)
     }
 
     @Test
-    fun `Chainguard images are good`() {
+    fun `No Copy dot dots is good`() {
         val filesToCheck = mapOf(
             "Dockerfile" to """
                FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/thing:1.0 AS builder
-               COPY . .
-               FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/otherthing:1.0
-               RUN echo "hello"
+               COPY a b
             """.trimIndent()
         )
-        val allAvailableFiles = setOf("Dockerfile", "Dockerfile.test", "prod.dockerfile", "whatever")
-        val check = ChainguardBaseImageCheck()
-        val expected = listOf("")
+        val check = CopyDotDotCheck()
         val results = check.run("bogusrepo", filesToCheck)
         assertTrue(results is AllGood)
     }
