@@ -58,9 +58,6 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     override suspend fun ping(): Boolean {
         val authToken = retrieveAccessToken()
         val response: String = makeHttpRequest(Get, apiBaseUrl, authToken)
-        if (response.isEmpty()) {
-            println("Bogus response: $response")
-        }
         return response.isNotEmpty()
     }
 
