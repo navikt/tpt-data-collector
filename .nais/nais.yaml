@@ -17,7 +17,7 @@ spec:
   liveness:
     path: /internal/isAlive
   readiness:
-    path: /internal/isAlive
+    path: /internal/isReady
   replicas:
     max: 1
     min: 1

@@ -47,7 +47,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
             val allFilesWeNeed = filesNeededByChecks.associateWith {
                 gitHub.readFileContents(webhookPayload.repository.name, it)
             }
-            logger.info("Read the contents of ${allFilesWeNeed.size} files")
+            logger.info("Read the contents of ${allFilesWeNeed.size} file(s)")
             fileBasedChecks.map { check ->
                 val filesNeededForThisCheck =
                     check.filesICareAbout(allFilesWeNeed.keys).toSet()

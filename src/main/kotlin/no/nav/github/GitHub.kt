@@ -23,22 +23,24 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
+    suspend fun ping(): Boolean
 }
 
 class FakeGitHub: GitHub {
     override suspend fun readFileContents(repoName: String, filePath: String): String {
         return ""
     }
+
+    override suspend fun ping() = true
 }
 
 @OptIn(ExperimentalAtomicApi::class)
-class RealGitHub(val httpClient: HttpClient, val appId: String, val installationId: String, val privateKeyPEM: String): GitHub {
+class RealGitHub(val httpClient: HttpClient, val appId: String, val installationId: String, privateKeyPEM: String): GitHub {
     private val apiBaseUrl = "https://api.github.com"
     val logger = KtorSimpleLogger(this::class.java.name)
 
@@ -51,6 +53,12 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         val authToken = retrieveAccessToken()
         val response: FileContentsResponse = makeHttpRequest(Get, url, authToken)
         return response.decode()
+    }
+
+    override suspend fun ping(): Boolean {
+        val authToken = retrieveAccessToken()
+        val response: Map<String, String> = makeHttpRequest(Get, apiBaseUrl, authToken)
+        return response.isNotEmpty()
     }
 
     private suspend inline fun <reified T> makeHttpRequest(httpMethod: HttpMethod, url: String, authToken: String): T =
