@@ -33,7 +33,7 @@ spec:
         - id: loki
   prometheus:
     enabled: true
-    path: /metrics
+    path: /internal/metrics
   env:
     - name: BIGQUERY_DATASET_ID
       value: appsec
