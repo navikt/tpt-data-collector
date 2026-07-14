@@ -41,7 +41,7 @@ import org.neo4j.driver.GraphDatabase
 
 fun main() {
     val config = ApplikasjonsConfig()
-    embeddedServer(Netty, port = 8000) {
+    embeddedServer(Netty, port = 8080) {
         val httpClient = HttpClient(CIO) {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
@@ -110,7 +110,13 @@ fun Application.naisModule(gitHub: GitHub, datastore: Datastore) {
         }
 
         get("/internal/isReady") {
-            call.respond(OK, "OK")
+            try {
+                val status = if (gitHub.ping() && datastore.ping()) OK else InternalServerError
+                call.respond(status)
+            } catch (ex: Exception) {
+                ex.printStackTrace()
+                call.respond(InternalServerError)
+            }
         }
 
         get("/internal/metrics") {
