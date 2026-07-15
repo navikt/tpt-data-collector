@@ -1,9 +1,23 @@
 package no.nav.checks
 
 import kotlin.time.Instant
+import kotlinx.serialization.Serializable
 
-sealed class CheckResult(val name: String, val repo: String, val whenChecked: Instant)
+@Serializable
+sealed class CheckResult {
+    abstract val name: String
+    abstract val repo: String
+    abstract val whenChecked: Instant
 
-class AllGood(name: String, repo: String, whenChecked: Instant) : CheckResult(name, repo, whenChecked)
-class NeedsWork(name: String, repo: String, val reasons: List<String>, whenChecked: Instant) :
-    CheckResult(name, repo, whenChecked)
+    @Serializable
+    data class AllGood(override val name: String, override val repo: String, override val whenChecked: Instant) :
+        CheckResult()
+
+    @Serializable
+    class NeedsWork(
+        override val name: String,
+        override val repo: String,
+        override val whenChecked: Instant,
+        val reasons: List<String>
+    ) : CheckResult()
+}

@@ -1,10 +1,8 @@
 package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
-import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
 import no.nav.checks.CheckResult
-import no.nav.checks.NeedsWork
 import no.nav.checks.datastore.RootImageCheck
 import no.nav.checks.files.ChainguardBaseImageCheck
 import no.nav.checks.files.CopyDotDotCheck
@@ -30,7 +28,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
             runFileBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
         }
         logger.info("Ran ${timed.value.size} checks for '${webhookPayload.repository.name} in ${timed.duration}, " +
-                "found ${timed.value.filterIsInstance<NeedsWork>().size} things to fix'")
+                "found ${timed.value.filterIsInstance<CheckResult.NeedsWork>().size} things to fix'")
         TPTMetrics.checksRanIn(timed.duration)
     }
 

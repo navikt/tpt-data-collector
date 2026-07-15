@@ -1,8 +1,7 @@
 package no.nav.checks.files
 
 import kotlin.test.assertTrue
-import no.nav.checks.AllGood
-import no.nav.checks.NeedsWork
+import no.nav.checks.CheckResult
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -29,7 +28,7 @@ class ChainguardBaseImageCheckTest {
         )
         val check = ChainguardBaseImageCheck()
         val results = check.run("bogusrepo", filesToCheck)
-        assertTrue(results is NeedsWork)
+        assertTrue(results is CheckResult.NeedsWork)
         assertEquals(2, results.reasons.size)
     }
 
@@ -47,7 +46,7 @@ class ChainguardBaseImageCheckTest {
         val check = ChainguardBaseImageCheck()
         val expected = listOf("")
         val results = check.run("bogusrepo", filesToCheck)
-        assertTrue(results is AllGood)
+        assertTrue(results is CheckResult.AllGood)
     }
 
 }

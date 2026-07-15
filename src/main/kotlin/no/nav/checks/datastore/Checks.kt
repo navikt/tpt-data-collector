@@ -1,10 +1,7 @@
 package no.nav.checks.datastore
 
 import kotlin.time.Clock
-import kotlin.time.Instant
-import no.nav.checks.AllGood
 import no.nav.checks.CheckResult
-import no.nav.checks.NeedsWork
 import no.nav.datastore.Datastore
 
 interface DatastoreBasedCheck {
@@ -18,11 +15,13 @@ class RootImageCheck(val datastore: Datastore): DatastoreBasedCheck {
         val now = Clock.System.now()
         val result = datastore.containersAbleToRunAsRoot(repo)
         return if (result.isNotEmpty()) {
-            NeedsWork(name, repo,
-                result.map { "$repo is running in a non-rootless container named $it" },
-                now)
+            CheckResult.NeedsWork(
+                name, repo,
+                now,
+                result.map { "$repo is running in a non-rootless container named $it" }
+            )
         } else {
-            AllGood(name, repo, now)
+            CheckResult.AllGood(name, repo, now)
         }
     }
 }

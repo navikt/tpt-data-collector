@@ -1,9 +1,7 @@
 package no.nav.checks.files
 
 import kotlin.time.Clock
-import no.nav.checks.AllGood
 import no.nav.checks.CheckResult
-import no.nav.checks.NeedsWork
 
 
 interface FileBasedCheck {
@@ -26,10 +24,12 @@ class ChainguardBaseImageCheck : FileBasedCheck {
         }
         val now = Clock.System.now()
         return if (itemsToFix.isEmpty()) {
-            AllGood(name, repo, now)
+            CheckResult.AllGood(name, repo, now)
         } else {
-            NeedsWork(name, repo,
-                itemsToFix.map { "Baseimage '$it' is not from the Nav registry" }, now)
+            CheckResult.NeedsWork(
+                name, repo, now,
+                itemsToFix.map { "Baseimage '$it' is not from the Nav registry" }
+            )
         }
     }
 }
@@ -49,9 +49,9 @@ class CopyDotDotCheck : FileBasedCheck {
         }.isNotEmpty()
         val now = Clock.System.now()
         return if (hasCopyDotDot) {
-            NeedsWork(name, repo, listOf("'COPY . .' instructions are present"), now)
+            CheckResult.NeedsWork(name, repo, now, listOf("'COPY . .' instructions are present"))
         } else {
-            AllGood(name, repo, now)
+            CheckResult.AllGood(name, repo, now)
         }
     }
 }
@@ -73,11 +73,12 @@ class UnpinnedActionVersionsCheck : FileBasedCheck {
         }
         val now = Clock.System.now()
         return if (filesToFix.isEmpty()) {
-            AllGood(name, repo, now)
+            CheckResult.AllGood(name, repo, now)
         } else {
-            NeedsWork(name, repo,
-                filesToFix.map { "Repo '$repo' contains workflow '$it' with non-pinned action versions" },
-                now)
+            CheckResult.NeedsWork(
+                name, repo, now,
+                filesToFix.map { "Repo '$repo' contains workflow '$it' with non-pinned action versions" }
+            )
         }
     }
 }
