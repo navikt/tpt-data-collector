@@ -3,28 +3,9 @@
 ![workflow](https://github.com/navikt/tpt-data-collector/actions/workflows/main.yaml/badge.svg)
 
 ## Overview
-An application that collects data (from BigQuery and a webhook) and sends aggregated results to tpt.
-
-## Local Dockerfile fetch check
-
-You can verify the new GitHub Dockerfile fetching flow locally without Kafka or BigQuery by running the test-scoped runner task:
-
-```bash
-TPT_DATA_COLLECTOR_GITHUB_TOKEN=<token> \
-TPT_LOCAL_REPO_OWNER=navikt \
-TPT_LOCAL_REPO_NAME=tpt-data-collector \
-TPT_LOCAL_REPO_REF=main \
-./gradlew runLocalDockerfileCheck
-```
-
-Optional variables:
-
-- `TPT_LOCAL_DOCKERFILE_PATH`: fetch only one file instead of discovering all Dockerfile-like paths
-- `TPT_LOCAL_REPO_ID`: repo id to include in the generated Kafka payloads, defaults to `0`
-- `TPT_DATA_COLLECTOR_GITHUB_USER_AGENT`: overrides the default local runner user agent
-
-The task uses the real GitHub API clients (`GithubRepositoryContentsClient` and `GithubGitTreeClient`), but keeps BigQuery and Kafka in-memory. It prints the discovered candidate paths and any generated `dockerfile_features` payloads to stdout.
-
+An application that collects data from GitHub and the Cartography database, runs "golden path" checks on it and sends the
+results to [TPT](https://github.com/navikt/tpt-backend). The details on how this will work are not yest decided, 
+so things will likely change.
 
 ## License
 [MIT](LICENSE).
