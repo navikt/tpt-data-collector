@@ -1,6 +1,9 @@
 package no.nav.checks
 
-sealed class CheckResult(val name: String, val repo: String)
+import kotlin.time.Instant
 
-class AllGood(name: String, repo: String) : CheckResult(name, repo)
-class NeedsWork(name: String, repo: String, val reasons: List<String>) : CheckResult(name, repo)
+sealed class CheckResult(val name: String, val repo: String, val whenChecked: Instant)
+
+class AllGood(name: String, repo: String, whenChecked: Instant) : CheckResult(name, repo, whenChecked)
+class NeedsWork(name: String, repo: String, val reasons: List<String>, whenChecked: Instant) :
+    CheckResult(name, repo, whenChecked)
