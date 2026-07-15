@@ -7,6 +7,7 @@ import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import io.prometheus.metrics.model.registry.PrometheusRegistry
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
 
 object TPTMetrics {
     private val collectorRegistry = PrometheusRegistry.defaultRegistry
@@ -31,6 +32,6 @@ object TPTMetrics {
 
     fun checkFailed() = failedChecksCounter.increment()
 
-    fun checksRanIn(durationMs: Long) =
-        checksTimer.record(durationMs, TimeUnit.MILLISECONDS)
+    fun checksRanIn(duration: Duration) =
+        checksTimer.record(duration.inWholeMilliseconds, TimeUnit.MILLISECONDS)
 }

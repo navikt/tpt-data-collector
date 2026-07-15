@@ -31,7 +31,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
         }
         logger.info("Ran ${timed.value.size} checks for '${webhookPayload.repository.name} in ${timed.duration}, " +
                 "found ${timed.value.filterIsInstance<NeedsWork>().size} things to fix'")
-        TPTMetrics.checksRanIn(timed.duration.inWholeMilliseconds)
+        TPTMetrics.checksRanIn(timed.duration)
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
