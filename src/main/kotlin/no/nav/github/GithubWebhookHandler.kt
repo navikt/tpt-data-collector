@@ -32,7 +32,6 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore, val kafka: 
         logger.info("Ran ${timed.value.size} checks for '${webhookPayload.repository.name} in ${timed.duration}, " +
                 "found ${timed.value.filterIsInstance<CheckResult.NeedsWork>().size} things to fix'")
         TPTMetrics.checksRanIn(timed.duration)
-        kafka.sendToKafka(CheckResult::class.java.name, Json.encodeToString(timed.value))
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
