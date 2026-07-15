@@ -1,6 +1,8 @@
 package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
+import kotlin.time.measureTime
+import kotlin.time.measureTimedValue
 import no.nav.checks.CheckResult
 import no.nav.checks.NeedsWork
 import no.nav.checks.datastore.RootImageCheck
@@ -24,9 +26,12 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
             logger.warn("Skipping checks for '${webhookPayload.repository.name}, it is not relevant'")
             return
         }
-        val checkResults = runFileBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
-        logger.info("Ran ${checkResults.size} checks for '${webhookPayload.repository.name}, " +
-                "found ${checkResults.filterIsInstance<NeedsWork>().size} things to fix'")
+        val timed = measureTimedValue {
+            runFileBasedChecks(webhookPayload) + runDatastoreBasedChecks(webhookPayload)
+        }
+        logger.info("Ran ${timed.value.size} checks for '${webhookPayload.repository.name} in ${timed.duration}, " +
+                "found ${timed.value.filterIsInstance<NeedsWork>().size} things to fix'")
+        TPTMetrics.checksRanIn(timed.duration.inWholeMilliseconds)
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
