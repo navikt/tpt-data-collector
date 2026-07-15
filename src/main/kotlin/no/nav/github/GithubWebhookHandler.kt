@@ -2,15 +2,17 @@ package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
 import kotlin.time.measureTimedValue
+import kotlinx.serialization.json.Json
 import no.nav.checks.CheckResult
 import no.nav.checks.datastore.RootImageCheck
 import no.nav.checks.files.ChainguardBaseImageCheck
 import no.nav.checks.files.CopyDotDotCheck
 import no.nav.checks.files.UnpinnedActionVersionsCheck
 import no.nav.datastore.Datastore
+import no.nav.kafka.KafkaSenderInterface
 import no.nav.metrics.TPTMetrics
 
-class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
+class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore, val kafka: KafkaSenderInterface) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
     private val fileBasedChecks = listOf(ChainguardBaseImageCheck(), UnpinnedActionVersionsCheck(), CopyDotDotCheck())
@@ -30,6 +32,7 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore) {
         logger.info("Ran ${timed.value.size} checks for '${webhookPayload.repository.name} in ${timed.duration}, " +
                 "found ${timed.value.filterIsInstance<CheckResult.NeedsWork>().size} things to fix'")
         TPTMetrics.checksRanIn(timed.duration)
+        kafka.sendToKafka(CheckResult::class.java.name, Json.encodeToString(timed.value))
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {

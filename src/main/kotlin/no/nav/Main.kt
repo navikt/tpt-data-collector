@@ -35,6 +35,8 @@ import no.nav.github.GitHub
 import no.nav.github.GithubWebhookHandler
 import no.nav.github.RealGitHub
 import no.nav.github.WebhookPayload
+import no.nav.kafka.KafkaSender
+import no.nav.kafka.KafkaSenderInterface
 import no.nav.metrics.TPTMetrics
 import org.neo4j.driver.AuthTokens
 import org.neo4j.driver.GraphDatabase
@@ -53,16 +55,19 @@ fun main() {
         val driver = GraphDatabase.driver(config.neo4jUri, AuthTokens.basic(config.neo4jUser, config.neo4Password))
         driver.verifyConnectivity()
         val dataStore = Neo4jDatastore(driver)
-        businessModule(gitHub, dataStore, config.githubWebhookSecret)
+
+        val kafka = KafkaSender()
+
+        businessModule(gitHub, dataStore, config.githubWebhookSecret, kafka)
         naisModule(gitHub, dataStore)
     }.start(wait = true)
 }
 
-fun Application.businessModule(gitHub: GitHub, datastore: Datastore, webhookSecret: String) {
+fun Application.businessModule(gitHub: GitHub, datastore: Datastore, webhookSecret: String, kafka: KafkaSenderInterface) {
     val secretKey = SecretKeySpec(webhookSecret.toByteArray(), "HmacSHA256")
     val mac = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
 
-    val githubWebhookService = GithubWebhookHandler(gitHub, datastore)
+    val githubWebhookService = GithubWebhookHandler(gitHub, datastore, kafka)
 
     routing {
         val json = Json { ignoreUnknownKeys = true }
