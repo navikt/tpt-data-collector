@@ -35,8 +35,6 @@ spec:
     enabled: true
     path: /internal/metrics
   env:
-    - name: BIGQUERY_DATASET_ID
-      value: appsec
     - name: TPT_TOPIC
       value: appsec.tpt
     - name: KAFKA_CLIENT_ID
