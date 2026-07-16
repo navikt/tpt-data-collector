@@ -12,7 +12,6 @@ class OldDeploymentsCheckTest {
         val check = OldDeploymentsCheck(FakeDatastore())
         val result = check.run("bad")
         assertTrue(result is CheckResult.NeedsWork)
-        println(result)
     }
 
     @Test
