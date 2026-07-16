@@ -42,9 +42,7 @@ class ChainguardBaseImageCheckTest {
                RUN echo "hello"
             """.trimIndent()
         )
-        val allAvailableFiles = setOf("Dockerfile", "Dockerfile.test", "prod.dockerfile", "whatever")
         val check = ChainguardBaseImageCheck()
-        val expected = listOf("")
         val results = check.run("bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
