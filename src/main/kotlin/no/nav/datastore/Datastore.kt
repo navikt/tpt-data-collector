@@ -1,10 +1,13 @@
 package no.nav.datastore
 
+import java.time.Duration
+import java.time.LocalDateTime
+import java.time.ZoneId
 import org.neo4j.driver.Driver
 
 interface Datastore {
     suspend fun ping(): Boolean
-    fun containersAbleToRunAsRoot(originRepo: String): List<String>
+    fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, LocalDateTime>>
 }
 
 class Neo4jDatastore(val driver: Driver) : Datastore {
@@ -18,22 +21,36 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
         }
     }
 
-    override fun containersAbleToRunAsRoot(originRepo: String): List<String> {
+    override fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, LocalDateTime>> {
         val result =
-            driver.executableQuery("""MATCH (:GitHubRepository {name: "$originRepo"})<-[*..3]-(c:KubernetesContainer{run_as_non_root: false}) RETURN DISTINCT c.name""")
+            driver.executableQuery(
+                """
+                MATCH (:GitHubRepository {name: "$originRepo"})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug, d.environment_name, d.created_at
+            """.trimIndent()
+            )
                 .execute()
-        return result.records().map { it["name"].asString() }
+        return result.records()
+            .map {
+                Triple(
+                    it["team_slug"].asString(),
+                    it["environment_name"].asString(),
+                    it["created_at"].asLocalDateTime()
+                )
+            }
     }
 }
 
 class FakeDatastore : Datastore {
     override suspend fun ping(): Boolean = true
 
-    override fun containersAbleToRunAsRoot(originRepo: String): List<String> {
-        return if (originRepo == "good") {
-            emptyList()
-        } else {
-            listOf("boguscontainer")
+    override fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, LocalDateTime>> {
+        return when {
+            originRepo == "good" -> listOf(Triple("yoloteam", "env1", LocalDateTime.now()))
+            originRepo == "bad" -> listOf(
+                Triple("yoloteam", "env1", LocalDateTime.now()),
+                Triple("yoloteam", "env2", LocalDateTime.now().atZone(ZoneId.systemDefault()).toLocalDateTime().minusDays(91)),
+            )
+            else -> emptyList()
         }
     }
 }
