@@ -25,7 +25,7 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
         val result =
             driver.executableQuery(
                 """
-                MATCH (:GitHubRepository {name: "$originRepo"})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug, d.environment_name, d.created_at
+                MATCH (:GitHubRepository {name: "$originRepo"})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug AS team, d.environment_name AS env, d.created_at AS created
             """.trimIndent()
             )
                 .execute()
@@ -33,9 +33,9 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
         return result.records()
             .map {
                 Triple(
-                    it["team_slug"].asString(),
-                    it["environment_name"].asString(),
-                    it["created_at"].asLocalDateTime()
+                    it["team"].asString(),
+                    it["env"].asString(),
+                    it["created"].asLocalDateTime()
                 )
             }
     }
