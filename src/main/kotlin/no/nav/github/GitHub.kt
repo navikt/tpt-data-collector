@@ -28,12 +28,17 @@ import kotlinx.serialization.Serializable
 
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
+    suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String>
     suspend fun ping(): Boolean
 }
 
 class FakeGitHub: GitHub {
     override suspend fun readFileContents(repoName: String, filePath: String): String {
         return ""
+    }
+
+    override suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String> {
+        return mapOf("yololib" to "medium", "boguslib" to "critical")
     }
 
     override suspend fun ping() = true
@@ -53,6 +58,17 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         val authToken = retrieveAccessToken()
         val response: FileContentsResponse = makeHttpRequest(Get, url, authToken)
         return response.decode()
+    }
+
+    override suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String> {
+        val url = "$apiBaseUrl/repos/navikt/$repoName/dependabot/alerts"
+        val authToken = retrieveAccessToken()
+        val response: List<DependabotAlert> = makeHttpRequest(Get, url, authToken)
+        return response.flatMap {
+            it.advisory.vulnerabilities
+        }.associate {
+            it.pkg.name to it.severity
+        }
     }
 
     override suspend fun ping(): Boolean {
@@ -125,6 +141,34 @@ private data class TokenExchangeResponse(
     val token: String,
     @SerialName("expires_at")
     val expiresAt: Instant
+)
+
+@Serializable
+internal data class DependabotAlert(
+    @SerialName("security_advisory")
+    val advisory: SecurityAdvisory
+)
+
+@Serializable
+internal data class SecurityAdvisory(
+    @SerialName("vulnerabilities")
+    val vulnerabilities: List<Vulnerability>
+)
+
+@Serializable
+internal data class Vulnerability(
+    @SerialName("package")
+    val pkg: Package,
+    @SerialName("severity")
+    val severity: String
+)
+
+@Serializable
+internal data class Package(
+    @SerialName("ecosystem")
+    val ecosystem: String,
+    @SerialName("name")
+    val name: String
 )
 
 private data class AccessToken(val value: String, val expiry: Instant)

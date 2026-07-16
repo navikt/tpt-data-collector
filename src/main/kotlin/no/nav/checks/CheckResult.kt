@@ -14,7 +14,7 @@ sealed class CheckResult {
         CheckResult()
 
     @Serializable
-    class NeedsWork(
+    data class NeedsWork(
         override val name: String,
         override val repo: String,
         override val whenChecked: Instant,

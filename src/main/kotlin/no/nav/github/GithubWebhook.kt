@@ -10,16 +10,10 @@ import kotlinx.serialization.json.JsonNames
 class WebhookPayload (
     val ref: String,
     val after: String,
-    val pusher: Pusher,
     val repository: Repository,
     val commits: List<Commit>
 ) {
 }
-
-@Serializable
-class Pusher (
-    val name: String,
-)
 
 @Serializable
 class Repository (
