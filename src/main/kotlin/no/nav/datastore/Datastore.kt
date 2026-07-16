@@ -29,7 +29,6 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
             """.trimIndent()
             )
                 .execute()
-        result.records().forEach(::println)
         return result.records()
             .map {
                 Triple(
