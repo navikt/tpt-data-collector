@@ -7,6 +7,7 @@ import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertNotNull
 
 
 class GitHubTest {
@@ -44,11 +45,7 @@ class GitHubTest {
     fun `Is able to parse security alert response`() {
         val json = Json{ignoreUnknownKeys = true}
         val parsed = json.decodeFromString<List<DependabotAlert>>(securityVulnerabilityJson)
-        println(parsed.flatMap {
-            it.advisory.vulnerabilities
-        }.associate {
-            it.pkg.name to it.severity
-        })
+        assertNotNull(parsed)
     }
 
 }
