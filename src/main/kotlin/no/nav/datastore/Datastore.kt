@@ -1,13 +1,13 @@
 package no.nav.datastore
 
-import java.time.Duration
-import java.time.LocalDateTime
-import java.time.ZoneId
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 import org.neo4j.driver.Driver
 
 interface Datastore {
     suspend fun ping(): Boolean
-    fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, LocalDateTime>>
+    fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, Instant>>
 }
 
 class Neo4jDatastore(val driver: Driver) : Datastore {
@@ -21,7 +21,7 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
         }
     }
 
-    override fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, LocalDateTime>> {
+    override fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, Instant>> {
         val result =
             driver.executableQuery(
                 """
@@ -35,7 +35,7 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
                 Triple(
                     it["team"].asString(),
                     it["env"].asString(),
-                    it["created"].asLocalDateTime()
+                    Instant.parse(it["created"].asString())
                 )
             }
     }
@@ -44,12 +44,12 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
 class FakeDatastore : Datastore {
     override suspend fun ping(): Boolean = true
 
-    override fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, LocalDateTime>> {
+    override fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, Instant>> {
         return when {
-            originRepo == "good" -> listOf(Triple("yoloteam", "env1", LocalDateTime.now()))
+            originRepo == "good" -> listOf(Triple("yoloteam", "env1", Clock.System.now()))
             originRepo == "bad" -> listOf(
-                Triple("yoloteam", "env1", LocalDateTime.now()),
-                Triple("yoloteam", "env2", LocalDateTime.now().atZone(ZoneId.systemDefault()).toLocalDateTime().minusDays(91)),
+                Triple("yoloteam", "env1", Clock.System.now()),
+                Triple("yoloteam", "env2", Clock.System.now().minus(91.days)),
             )
             else -> emptyList()
         }

@@ -1,11 +1,8 @@
 package no.nav.checks.datastore
 
-import java.time.LocalDateTime
-import java.time.ZoneId
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
-import kotlin.time.toKotlinInstant
 import no.nav.checks.CheckResult
 import no.nav.datastore.Datastore
 
@@ -34,8 +31,6 @@ class OldDeploymentsCheck(val datastore: Datastore): DatastoreBasedCheck {
     }
 }
 
-internal fun isOlderThan(ldt: LocalDateTime, cutoff: Instant): Boolean {
-    val javaInstant: java.time.Instant = ldt.atZone(ZoneId.systemDefault()).toInstant()
-    val kotlinInstant: Instant = javaInstant.toKotlinInstant()
-    return kotlinInstant < cutoff
+internal fun isOlderThan(timeToCheck: Instant, cutoff: Instant): Boolean {
+    return timeToCheck < cutoff
 }
