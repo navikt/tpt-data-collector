@@ -37,14 +37,15 @@ class GithubWebhookHandler(val gitHub: GitHub, datastore: Datastore, val kafka: 
                 runGitHubAPIBasedChecks(webhookPayload.repository.name)
             ).awaitAll()
         }
-        val successfulChecks = timed.value.count { it.isSuccess }
         val failedChecks = timed.value.count { it.isFailure }
+        val nrOfIssuesFound = timed.value.map { kotlinResult -> kotlinResult.map { it is CheckResult.NeedsWork } }.count()
         logger.info(
             "Ran ${timed.value.size} checks for '${webhookPayload.repository.name}, " +
-                    "$successfulChecks succeeded and $failedChecks failed in ${timed.duration}"
+                    "$failedChecks of them failed in ${timed.duration}"
         )
         TPTMetrics.checksRanIn(timed.duration)
         TPTMetrics.checkFailed(failedChecks)
+        TPTMetrics.issuesFound(nrOfIssuesFound)
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
