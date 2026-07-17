@@ -30,7 +30,7 @@ object TPTMetrics {
 
     fun webhookReceived() = webhookReceivedCounter.increment()
 
-    fun checkFailed() = failedChecksCounter.increment()
+    fun checkFailed(n: Int = 1) = failedChecksCounter.increment(n.toDouble())
 
     fun checksRanIn(duration: Duration) =
         checksTimer.record(duration.inWholeMilliseconds, TimeUnit.MILLISECONDS)
