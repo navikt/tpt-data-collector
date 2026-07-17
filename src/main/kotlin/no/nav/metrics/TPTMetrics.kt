@@ -25,7 +25,7 @@ object TPTMetrics {
     private val failedChecksCounter = Counter.builder("webhooks_failed")
         .register(registry)
 
-    private val foundIssueCounter = Counter.builder("checks_needs_work")
+    private val foundIssueCounter = Counter.builder("checks_issues_found")
         .register(registry)
 
     private val checksTimer = Timer.builder("checks_runtime")
