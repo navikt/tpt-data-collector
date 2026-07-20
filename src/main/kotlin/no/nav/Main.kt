@@ -28,6 +28,7 @@ import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import no.nav.checks.Checks
 import no.nav.config.ApplikasjonsConfig
 import no.nav.datastore.Datastore
 import no.nav.datastore.Neo4jDatastore
@@ -52,9 +53,9 @@ fun main() {
         val gitHub =
             RealGitHub(httpClient, config.githubAppId!!, config.githubAppInstallationId!!, config.githubAppPrivateKey!!)
 
-        val driver = GraphDatabase.driver(config.neo4jUri, AuthTokens.basic(config.neo4jUser, config.neo4Password))
-        driver.verifyConnectivity()
-        val dataStore = Neo4jDatastore(driver)
+        val neoDriver = GraphDatabase.driver(config.neo4jUri, AuthTokens.basic(config.neo4jUser, config.neo4Password))
+        neoDriver.verifyConnectivity()
+        val dataStore = Neo4jDatastore(neoDriver)
 
         val kafka = KafkaSender()
 
@@ -67,7 +68,8 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, webhookSecr
     val secretKey = SecretKeySpec(webhookSecret.toByteArray(), "HmacSHA256")
     val mac = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
 
-    val githubWebhookService = GithubWebhookHandler(gitHub, datastore, kafka)
+    val checks = Checks(gitHub, datastore)
+    val githubWebhookService = GithubWebhookHandler(checks, kafka)
 
     routing {
         val json = Json { ignoreUnknownKeys = true }
