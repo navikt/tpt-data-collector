@@ -29,6 +29,7 @@ import kotlinx.serialization.Serializable
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
     suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String>
+    suspend fun allFilePathsIn(repoName: String): List<String>
     suspend fun ping(): Boolean
 }
 
@@ -40,6 +41,8 @@ class FakeGitHub: GitHub {
     override suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String> {
         return mapOf("yololib" to "medium", "boguslib" to "critical")
     }
+
+    override suspend fun allFilePathsIn(repoName: String): List<String> = emptyList()
 
     override suspend fun ping() = true
 }
@@ -69,6 +72,15 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         }.associate {
             it.pkg.name to it.severity
         }
+    }
+
+    override suspend fun allFilePathsIn(repoName: String): List<String> {
+        val rootRepoUrl = "$apiBaseUrl/repos/navikt/$repoName"
+        val authToken = retrieveAccessToken()
+        val rootRepoResponse: RepoRootResponse = makeHttpRequest(Get, rootRepoUrl, authToken)
+        val treeUrl = "$apiBaseUrl/repos/navikt/$repoName/git/trees/${rootRepoResponse.defaultBranch}?recursive=true"
+        val treeResponse: TreeResponse = makeHttpRequest(Get, treeUrl, authToken)
+        return treeResponse.tree.map { it.path }
     }
 
     override suspend fun ping(): Boolean {
@@ -173,3 +185,20 @@ internal data class Package(
 
 private data class AccessToken(val value: String, val expiry: Instant)
 
+@Serializable
+internal data class RepoRootResponse(
+    @SerialName("default_branch")
+    val defaultBranch: String
+)
+
+@Serializable
+internal data class TreeResponse(
+    @SerialName("tree")
+    val tree: List<TreeEntry>
+)
+
+@Serializable
+internal data class TreeEntry(
+    @SerialName("path")
+    val path: String,
+)
