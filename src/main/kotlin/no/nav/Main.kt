@@ -1,5 +1,6 @@
 package no.nav
 
+import com.auth0.jwk.JwkProviderBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -9,6 +10,11 @@ import io.ktor.http.HttpStatusCode.Companion.OK
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.jwt.jwt
+import io.ktor.server.auth.principal
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.metrics.micrometer.MicrometerMetrics
 import io.ktor.server.netty.Netty
@@ -23,6 +29,7 @@ import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics
 import io.micrometer.core.instrument.binder.logging.LogbackMetrics
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics
 import io.micrometer.core.instrument.binder.system.UptimeMetrics
+import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.launch
@@ -36,8 +43,6 @@ import no.nav.github.GitHub
 import no.nav.github.GithubWebhookHandler
 import no.nav.github.RealGitHub
 import no.nav.github.WebhookPayload
-import no.nav.kafka.KafkaSender
-import no.nav.kafka.KafkaSenderInterface
 import no.nav.metrics.TPTMetrics
 import org.neo4j.driver.AuthTokens
 import org.neo4j.driver.GraphDatabase
@@ -57,19 +62,33 @@ fun main() {
         neoDriver.verifyConnectivity()
         val dataStore = Neo4jDatastore(neoDriver)
 
-        val kafka = KafkaSender()
-
-        businessModule(gitHub, dataStore, config.githubWebhookSecret, kafka)
+        businessModule(gitHub, dataStore, config)
         naisModule(gitHub, dataStore)
     }.start(wait = true)
 }
 
-fun Application.businessModule(gitHub: GitHub, datastore: Datastore, webhookSecret: String, kafka: KafkaSenderInterface) {
-    val secretKey = SecretKeySpec(webhookSecret.toByteArray(), "HmacSHA256")
+fun Application.businessModule(gitHub: GitHub, datastore: Datastore, config: ApplikasjonsConfig) {
+    val secretKey = SecretKeySpec(config.githubWebhookSecret.toByteArray(), "HmacSHA256")
     val mac = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
 
     val checks = Checks(gitHub, datastore)
-    val githubWebhookService = GithubWebhookHandler(checks, kafka)
+    val githubWebhookHandler = GithubWebhookHandler(checks)
+
+    val jwkProvider = JwkProviderBuilder(config.openIdJwksUri)
+        .cached(10, 24, TimeUnit.HOURS)
+        .rateLimited(20, 1, TimeUnit.MINUTES)
+        .build()
+    install(Authentication) {
+        jwt("client-credentials-tpt") {
+            realm = "tpt-data-collector"
+            verifier(jwkProvider, config.openIdIssuer) {
+                withAudience(config.openIdAudience)
+            }
+            validate { credentials ->
+                JWTPrincipal(credentials.payload)
+            }
+        }
+    }
 
     routing {
         val json = Json { ignoreUnknownKeys = true }
@@ -89,9 +108,15 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, webhookSecr
             }
 
             launch {
-                githubWebhookService.handleWebhookEvent(payload)
+                githubWebhookHandler.handle(payload)
             }
             call.respond(OK)
+        }
+
+        authenticate("client-credentials-tpt") {
+            post("/team") {
+                call.respond("Hello ${call.principal<JWTPrincipal>()?.payload?.getClaim("sub") ?: "unknown"}, you're in")
+            }
         }
 
     }

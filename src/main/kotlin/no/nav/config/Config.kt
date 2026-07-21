@@ -50,6 +50,9 @@ class ApplikasjonsConfig(
     val neo4jUri: String = getEnvVar("NEO4J_URI", "dummy"),
     val neo4jUser: String = getEnvVar("NEO4J_USER", "dummy"),
     val neo4Password: String = getEnvVar("NEO4J_PASSWORD", "dummy"),
+    val openIdIssuer: String = getEnvVar("AZURE_OPENID_CONFIG_ISSUER", "dummy"),
+    val openIdAudience: String = getEnvVar("AZURE_APP_CLIENT_ID", "dummy"),
+    val openIdJwksUri: String = getEnvVar("AZURE_OPENID_CONFIG_JWKS_URI", "dummy"),
 ) {
     init {
         val configuredGithubAppValues = listOf(githubAppId, githubAppInstallationId, githubAppPrivateKey)

@@ -14,6 +14,9 @@ spec:
         - host: github.com
       rules:
         - application: neo4j
+    inbound:
+      rules:
+        - application: tpt-backend
   liveness:
     path: /internal/isAlive
   readiness:
@@ -42,3 +45,6 @@ spec:
   envFrom:
     - secret: tpt-data-collector
     - secret: tpt-graph
+  azure:
+    application:
+      enabled: true
