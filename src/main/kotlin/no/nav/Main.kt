@@ -92,7 +92,6 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, webhookSecr
                 githubWebhookService.handleWebhookEvent(payload)
             }
             call.respond(OK)
-
         }
 
     }

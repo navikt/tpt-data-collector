@@ -30,6 +30,7 @@ interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
     suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String>
     suspend fun allFilePathsIn(repoName: String): List<String>
+    suspend fun allReposForTeam(teamName: String): List<String>
     suspend fun ping(): Boolean
 }
 
@@ -43,6 +44,8 @@ class FakeGitHub: GitHub {
     }
 
     override suspend fun allFilePathsIn(repoName: String): List<String> = emptyList()
+
+    override suspend fun allReposForTeam(teamName: String): List<String> = emptyList()
 
     override suspend fun ping() = true
 }
@@ -81,6 +84,13 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         val treeUrl = "$apiBaseUrl/repos/navikt/$repoName/git/trees/${rootRepoResponse.defaultBranch}?recursive=true"
         val treeResponse: TreeResponse = makeHttpRequest(Get, treeUrl, authToken)
         return treeResponse.tree.map { it.path }
+    }
+
+    override suspend fun allReposForTeam(teamName: String): List<String> {
+        val url = "$apiBaseUrl/orgs/navikt/teams/$teamName/repos"
+        val authToken = retrieveAccessToken()
+        val reposResponse: List<ReposForTeamResponse> = makeHttpRequest(Get, url, authToken)
+        return reposResponse.map { it.name }
     }
 
     override suspend fun ping(): Boolean {
@@ -202,3 +212,6 @@ internal data class TreeEntry(
     @SerialName("path")
     val path: String,
 )
+
+@Serializable
+data class ReposForTeamResponse(val name: String)
