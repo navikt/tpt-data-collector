@@ -22,6 +22,7 @@ import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics
@@ -136,27 +137,33 @@ fun Application.naisModule(gitHub: GitHub, datastore: Datastore) {
     }
 
     routing {
-        get("/internal/isAlive") {
-            call.respond(OK, "OK")
-        }
-
-        get("/internal/isReady") {
-            try {
-                val status = if (gitHub.ping() && datastore.ping()) OK else InternalServerError
-                call.respond(status)
-            } catch (ex: Exception) {
-                ex.printStackTrace()
-                call.respond(InternalServerError)
+        route("/internal") {
+            get("/isAlive") {
+                call.respond(OK, "OK")
             }
-        }
 
-        get("/internal/metrics") {
-            call.respond(TPTMetrics.registry.scrape())
+            get("/isReady") {
+                try {
+                    val status = if (gitHub.ping() && datastore.ping()) OK else InternalServerError
+                    call.respond(status)
+                } catch (ex: Exception) {
+                    ex.printStackTrace()
+                    call.respond(InternalServerError)
+                }
+            }
+
+            get("/metrics") {
+                call.respond(TPTMetrics.registry.scrape())
+            }
         }
     }
 }
 
-fun generateHmac(data: String, mac: Mac): String {
+private fun validateSignature() {
+
+}
+
+private fun generateHmac(data: String, mac: Mac): String {
     val digest = mac.doFinal(data.toByteArray())
     return "sha256=${digest.fold("") { str, byte -> str + "%02x".format(byte) }}"
 }
