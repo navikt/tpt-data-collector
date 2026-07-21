@@ -82,3 +82,29 @@ class UnpinnedActionVersionsCheck : FileBasedCheck {
         }
     }
 }
+
+class PwnRequestCheck : FileBasedCheck {
+    private val name = "PwnRequestCheck"
+    private val workflowFilePattern = Regex("""^\.github/workflows/[A-Za-z0-9_-]+\.ya?ml$""")
+
+    override fun filesICareAbout(allAvailableFiles: Set<String>) =
+        allAvailableFiles.filter { workflowFilePattern.matches(it) }
+
+    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val filesToFix = filesToCheck.flatMap { (filename, fileContents) ->
+            fileContents.lines()
+                .filter { it.contains("pull_request_target") }
+                .map { filename }
+                .distinct()
+        }
+        val now = Clock.System.now()
+        return if (filesToFix.isEmpty()) {
+            CheckResult.AllGood(name, repo, now)
+        } else {
+            CheckResult.NeedsWork(
+                name, repo, now,
+                filesToFix.map { "Repo '$repo' contains workflow '$it' with pull_request_target trigger" }
+            )
+        }
+    }
+}

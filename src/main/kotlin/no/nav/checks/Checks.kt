@@ -9,6 +9,7 @@ import kotlinx.coroutines.coroutineScope
 import no.nav.checks.datastore.OldDeploymentsCheck
 import no.nav.checks.files.ChainguardBaseImageCheck
 import no.nav.checks.files.CopyDotDotCheck
+import no.nav.checks.files.PwnRequestCheck
 import no.nav.checks.files.UnpinnedActionVersionsCheck
 import no.nav.checks.githubapi.CriticalVulnerabilitiesCheck
 import no.nav.datastore.Datastore
@@ -18,7 +19,8 @@ import no.nav.metrics.TPTMetrics
 class Checks(val gitHub: GitHub, datastore: Datastore) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
-    private val fileBasedChecks = listOf(ChainguardBaseImageCheck(), UnpinnedActionVersionsCheck(), CopyDotDotCheck())
+    private val fileBasedChecks = listOf(ChainguardBaseImageCheck(), UnpinnedActionVersionsCheck(), CopyDotDotCheck(),
+        PwnRequestCheck())
     private val datastoreBasedChesks = listOf(OldDeploymentsCheck(datastore))
     private val gitHubAPIBasedChecks = listOf(CriticalVulnerabilitiesCheck(gitHub))
 
