@@ -1,12 +1,12 @@
 [versions]
 ktor = "3.5.1"
 kotlinx-serialization = "1.11.0"
-kotlin-test = "2.4.0"
+kotlin-test = "2.4.10"
 prometheus = "1.17.0"
 logback = "1.5.38"
 logstash = "9.0"
-junit-jupiter = "6.1.1"
-bouncycastle = "1.84"
+junit-jupiter = "6.1.2"
+bouncycastle = "1.85"
 neo4j = "6.2.0"
 nimbus = "10.9.1"
 
