@@ -32,7 +32,10 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         val allResults = timedFileBasedResults.value +
                 timedDatastoreBasedResults.value +
                 timedGitHubApiBasedResults.value
-        val failedCount = allResults.count { it.isFailure }
+        val failedCount = allResults
+            .filter { it.isFailure }
+            .onEach { println(it.exceptionOrNull()?.message ?: "Unknown error") }
+            .count()
         val nrOfIssuesFound =
             allResults.filter { it.isSuccess }
                 .mapNotNull { kotlinResult -> kotlinResult.getOrNull()}

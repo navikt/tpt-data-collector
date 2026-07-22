@@ -27,7 +27,7 @@ object TPTMetrics {
 
     private val foundIssueCounter = Counter.builder("checks_issues_found")
         .register(registry)
-    
+
 
     fun webhookReceived() = webhookReceivedCounter.increment()
 
