@@ -19,27 +19,30 @@ import no.nav.metrics.TPTMetrics
 class Checks(val gitHub: GitHub, datastore: Datastore) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
-    private val fileBasedChecks = listOf(ChainguardBaseImageCheck(), UnpinnedActionVersionsCheck(), CopyDotDotCheck(),
-        PwnRequestCheck())
-    private val datastoreBasedChesks = listOf(OldDeploymentsCheck(datastore))
+    private val fileBasedChecks = listOf(ChainguardBaseImageCheck(), UnpinnedActionVersionsCheck(),
+        CopyDotDotCheck(), PwnRequestCheck())
+    private val datastoreBasedChecks = listOf(OldDeploymentsCheck(datastore))
     private val gitHubAPIBasedChecks = listOf(CriticalVulnerabilitiesCheck(gitHub))
 
     suspend fun runAll(repoName: String, relevantFiles: Set<String>) {
-        val timed = measureTimedValue {
-            (runFileBasedChecks(repoName, relevantFiles) +
-                    runDatastoreBasedChecks(repoName) +
-                    runGitHubAPIBasedChecks(repoName)
-                    ).awaitAll()
-        }
-        val failedChecks = timed.value.count { it.isFailure }
+        val timedFileBasedResults = measureTimedValue { runFileBasedChecks(repoName, relevantFiles).awaitAll() }
+        val timedDatastoreBasedResults = measureTimedValue { runDatastoreBasedChecks(repoName).awaitAll() }
+        val timedGitHubApiBasedResults = measureTimedValue { runGitHubAPIBasedChecks(repoName).awaitAll() }
+
+        val allResults = timedFileBasedResults.value +
+                timedDatastoreBasedResults.value +
+                timedGitHubApiBasedResults.value
+        val failedCount = allResults.count { it.isFailure }
         val nrOfIssuesFound =
-            timed.value.map { kotlinResult -> kotlinResult.map { it is CheckResult.NeedsWork } }.count()
-        logger.info(
-            "Ran ${timed.value.size} checks for '$repoName, $failedChecks of them failed in ${timed.duration}"
-        )
-        TPTMetrics.checksRanIn(timed.duration)
-        TPTMetrics.checkFailed(failedChecks)
+            allResults.filter { it.isSuccess }
+                .mapNotNull { kotlinResult -> kotlinResult.getOrNull()}
+                .count{ it is CheckResult.NeedsWork }
+        logger.info("Ran ${allResults.size} checks for '$repoName, $failedCount of them failed")
+        TPTMetrics.checkFailed(failedCount)
         TPTMetrics.issuesFound(nrOfIssuesFound)
+        TPTMetrics.checksRanIn("File", timedFileBasedResults.duration)
+        TPTMetrics.checksRanIn("Datastore", timedDatastoreBasedResults.duration)
+        TPTMetrics.checksRanIn("GitHubApi", timedGitHubApiBasedResults.duration)
     }
 
     private suspend fun runFileBasedChecks(
@@ -68,13 +71,15 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                     }
                 }
             }
+
         }
 
     private suspend fun runDatastoreBasedChecks(repoName: String): List<Deferred<Result<CheckResult>>> =
         coroutineScope {
-            datastoreBasedChesks.map { check ->
+            datastoreBasedChecks.map { check ->
                 async { runCatching { check.run(repoName) } }
             }
+
         }
 
 

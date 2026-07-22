@@ -6,8 +6,8 @@ import io.micrometer.core.instrument.Timer
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import io.prometheus.metrics.model.registry.PrometheusRegistry
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 
 object TPTMetrics {
     private val collectorRegistry = PrometheusRegistry.defaultRegistry
@@ -27,9 +27,7 @@ object TPTMetrics {
 
     private val foundIssueCounter = Counter.builder("checks_issues_found")
         .register(registry)
-
-    private val checksTimer = Timer.builder("checks_runtime")
-        .register(registry)
+    
 
     fun webhookReceived() = webhookReceivedCounter.increment()
 
@@ -37,6 +35,9 @@ object TPTMetrics {
 
     fun issuesFound(n: Int = 1) = foundIssueCounter.increment(n.toDouble())
 
-    fun checksRanIn(duration: Duration) =
-        checksTimer.record(duration.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+    fun checksRanIn(type: String, duration: Duration) =
+        Timer.builder("checks_runtime")
+            .tag("type", type)
+            .register(registry)
+            .record(duration.toJavaDuration())
 }
