@@ -43,9 +43,9 @@ class KafkaConfig(
 }
 
 class ApplikasjonsConfig(
-    val githubAppId: String? = getEnvVar("GITHUB_APP_ID", "dummy"),
-    val githubAppInstallationId: String? = getEnvVar("GITHUB_APP_INSTALLATION_ID", "dummy"),
-    val githubAppPrivateKey: String? = getEnvVar("GITHUB_APP_PRIVATE_KEY", "dummy"),
+    val githubAppId: String = getEnvVar("GITHUB_APP_ID", "dummy"),
+    val githubAppInstallationId: String = getEnvVar("GITHUB_APP_INSTALLATION_ID", "dummy"),
+    val githubAppPrivateKey: String = getEnvVar("GITHUB_APP_PRIVATE_KEY", "dummy"),
     val githubWebhookSecret: String = getEnvVar("GITHUB_WEBHOOK_SECRET", "dummy"),
     val neo4jUri: String = getEnvVar("NEO4J_URI", "dummy"),
     val neo4jUser: String = getEnvVar("NEO4J_USER", "dummy"),

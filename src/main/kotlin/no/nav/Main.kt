@@ -15,7 +15,6 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
-import io.ktor.server.auth.principal
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.metrics.micrometer.MicrometerMetrics
 import io.ktor.server.netty.Netty
@@ -59,7 +58,7 @@ fun main() {
             }
         }
         val gitHub =
-            RealGitHub(httpClient, config.githubAppId!!, config.githubAppInstallationId!!, config.githubAppPrivateKey!!)
+            RealGitHub(httpClient, config.githubAppId, config.githubAppInstallationId, config.githubAppPrivateKey)
 
         val neoDriver = GraphDatabase.driver(config.neo4jUri, AuthTokens.basic(config.neo4jUser, config.neo4Password))
         neoDriver.verifyConnectivity()
@@ -111,8 +110,17 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, config: App
         }
 
         authenticate("client-credentials-tpt") {
-            post("/team") {
-                call.respond("Hello ${call.principal<JWTPrincipal>()?.payload?.getClaim("sub") ?: "unknown"}, you're in")
+            get("/team/{slug}") {
+                val teamSlug = call.pathParameters["slug"] ?: ""
+                val repos = gitHub.allReposForTeam(teamSlug)
+                val results = repos.map { repo ->
+                    val allFilesInRepo = gitHub.allFilePathsIn(repo)
+                    launch {
+                        checks.runAll(repo, allFilesInRepo.toSet())
+                    }
+                }
+
+                call.respond(OK)
             }
         }
     }

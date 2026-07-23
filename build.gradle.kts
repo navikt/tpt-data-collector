@@ -1,6 +1,9 @@
+version = "notimportant"
+
 plugins {
     kotlin("jvm") version "2.4.10"
     kotlin("plugin.serialization") version "2.4.10"
+    id("org.cyclonedx.bom") version "3.3.0"
 }
 
 kotlin {
@@ -17,8 +20,7 @@ dependencies {
     implementation(libs.nimbus.jose)
 
     // Kafka
-    implementation("at.yawk.lz4:lz4-java:1.11.1")
-    implementation("org.apache.kafka:kafka-clients:4.3.1")
+    implementation(libs.kafka)
 
     // Metrics
     implementation(libs.metrics.ktor)
@@ -65,5 +67,5 @@ tasks {
     withType<Wrapper> {
         gradleVersion = "9.6.1"
     }
-
 }
+

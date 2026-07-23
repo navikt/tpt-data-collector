@@ -9,6 +9,7 @@ junit-jupiter = "6.1.2"
 bouncycastle = "1.85"
 neo4j = "6.2.0"
 nimbus = "10.9.1"
+kafka = "4.3.1"
 
 [libraries]
 ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
@@ -30,6 +31,7 @@ logstash = { module = "net.logstash.logback:logstash-logback-encoder", version.r
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 nimbus-jose = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus" }
 neo4j = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "neo4j" }
+kafka = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka" }
 
 [bundles]
 ktor = [
