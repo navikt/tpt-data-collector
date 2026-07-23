@@ -25,13 +25,13 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
     private val gitHubAPIBasedChecks = listOf(CriticalVulnerabilitiesCheck(gitHub))
 
     suspend fun runAll(repoName: String, relevantFiles: Set<String>) {
-        val timedFileBasedResults = measureTimedValue { runFileBasedChecks(repoName, relevantFiles).awaitAll() }
-        val timedDatastoreBasedResults = measureTimedValue { runDatastoreBasedChecks(repoName).awaitAll() }
-        val timedGitHubApiBasedResults = measureTimedValue { runGitHubAPIBasedChecks(repoName).awaitAll() }
+        val timedResults = mapOf(
+            "Files" to measureTimedValue { runFileBasedChecks(repoName, relevantFiles).awaitAll() },
+            "Datastore" to measureTimedValue { runDatastoreBasedChecks(repoName).awaitAll() },
+            "GitHubApi" to measureTimedValue { runGitHubAPIBasedChecks(repoName).awaitAll() }
+        )
 
-        val allResults = timedFileBasedResults.value +
-                timedDatastoreBasedResults.value +
-                timedGitHubApiBasedResults.value
+        val allResults = timedResults.values.flatMap { it.value }
         val failedCount = allResults
             .filter { it.isFailure }
             .onEach { println(it.exceptionOrNull()?.message ?: "Unknown error") }
@@ -43,9 +43,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         logger.info("Ran ${allResults.size} checks for '$repoName, $failedCount of them failed")
         TPTMetrics.checkFailed(failedCount)
         TPTMetrics.issuesFound(nrOfIssuesFound)
-        TPTMetrics.checksRanIn("File", timedFileBasedResults.duration)
-        TPTMetrics.checksRanIn("Datastore", timedDatastoreBasedResults.duration)
-        TPTMetrics.checksRanIn("GitHubApi", timedGitHubApiBasedResults.duration)
+        timedResults.forEach { (k, v) ->  TPTMetrics.checksRanIn(k, v.duration) }
     }
 
     private suspend fun runFileBasedChecks(

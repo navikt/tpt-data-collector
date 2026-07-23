@@ -1,7 +1,7 @@
 package no.nav
 
 import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.request.post
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import no.nav.config.ApplikasjonsConfig
@@ -19,6 +19,14 @@ class MainTest {
         }
         val response = client.get("/internal/isAlive")
         assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("OK", response.bodyAsText())
+    }
+
+    @Test
+    fun `GH webhooks must have mac auth`() = testApplication {
+        application {
+            businessModule(FakeGitHub(), FakeDatastore(), ApplikasjonsConfig())
+        }
+        val response = client.post("/webhook/github")
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
     }
 }

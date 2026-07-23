@@ -9,6 +9,7 @@ import io.ktor.http.HttpStatusCode.Companion.InternalServerError
 import io.ktor.http.HttpStatusCode.Companion.OK
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
@@ -24,6 +25,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.ktor.util.AttributeKey
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics
@@ -69,17 +71,14 @@ fun main() {
 }
 
 fun Application.businessModule(gitHub: GitHub, datastore: Datastore, config: ApplikasjonsConfig) {
-    val secretKey = SecretKeySpec(config.githubWebhookSecret.toByteArray(), "HmacSHA256")
-    val mac = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
-
     val checks = Checks(gitHub, datastore)
     val githubWebhookHandler = GithubWebhookHandler(checks)
 
-    val jwkProvider = JwkProviderBuilder(config.openIdJwksUri)
-        .cached(10, 24, TimeUnit.HOURS)
-        .rateLimited(20, 1, TimeUnit.MINUTES)
-        .build()
     install(Authentication) {
+        val jwkProvider = JwkProviderBuilder(config.openIdJwksUri)
+            .cached(10, 24, TimeUnit.HOURS)
+            .rateLimited(20, 1, TimeUnit.MINUTES)
+            .build()
         jwt("client-credentials-tpt") {
             realm = "tpt-data-collector"
             verifier(jwkProvider, config.openIdIssuer) {
@@ -92,26 +91,23 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, config: App
     }
 
     routing {
-        val json = Json { ignoreUnknownKeys = true }
-        post("/webhook/github") {
-            val body = call.receiveText()
-            val signature = call.request.headers["X-Hub-Signature-256"] ?: ""
-            if (signature.isEmpty() || signature != generateHmac(body, mac)) {
-                call.respond(HttpStatusCode.Unauthorized, "Signature is invalid")
-                return@post
-            }
+        route("/webhook/github") {
+            install(createGhWebhookAuthPlugin(config.githubWebhookSecret))
+            val json = Json { ignoreUnknownKeys = true }
+            post {
+                val body = call.attributes[AttributeKey<String>("body")]
+                val payload = try {
+                    json.decodeFromString<WebhookPayload>(body)
+                } catch (_: SerializationException) {
+                    call.respond(HttpStatusCode.BadRequest)
+                    return@post
+                }
 
-            val payload = try {
-                json.decodeFromString<WebhookPayload>(body)
-            } catch (_: SerializationException) {
-                call.respond(HttpStatusCode.BadRequest)
-                return@post
+                launch {
+                    githubWebhookHandler.handle(payload)
+                }
+                call.respond(OK)
             }
-
-            launch {
-                githubWebhookHandler.handle(payload)
-            }
-            call.respond(OK)
         }
 
         authenticate("client-credentials-tpt") {
@@ -119,7 +115,6 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, config: App
                 call.respond("Hello ${call.principal<JWTPrincipal>()?.payload?.getClaim("sub") ?: "unknown"}, you're in")
             }
         }
-
     }
 }
 
@@ -159,13 +154,25 @@ fun Application.naisModule(gitHub: GitHub, datastore: Datastore) {
     }
 }
 
-private fun validateSignature() {
-
+private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlugin("GitHubWebhookReceiver") {
+    val secretKey = SecretKeySpec(macSecret.toByteArray(), "HmacSHA256")
+    val mac = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
+    onCall { call ->
+        val bodyAsText = call.receiveText()
+        call.attributes[AttributeKey<String>("body")] = bodyAsText
+        val signature = call.request.headers["X-Hub-Signature-256"] ?: ""
+        if (signature.isEmpty()) {
+            call.respond(HttpStatusCode.Unauthorized, "Signature is missing")
+            return@onCall
+        }
+        val digest = mac.doFinal(bodyAsText.toByteArray())
+        val hmac = "sha256=${digest.fold("") { str, byte -> str + "%02x".format(byte) }}"
+        if (signature != hmac) {
+            call.respond(HttpStatusCode.Unauthorized, "Signature is invalid")
+            return@onCall
+        }
+    }
 }
 
-private fun generateHmac(data: String, mac: Mac): String {
-    val digest = mac.doFinal(data.toByteArray())
-    return "sha256=${digest.fold("") { str, byte -> str + "%02x".format(byte) }}"
-}
 
 
