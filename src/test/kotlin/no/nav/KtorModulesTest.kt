@@ -62,7 +62,6 @@ class KtorModulesTest {
         val response = client.post("/webhook/github") {
             contentType(ContentType.Application.Json)
             setBody(requestBody)
-            // Signature calculated using the default dummy secret from ApplikasjonsConfig
             header("X-Hub-Signature-256", "sha256=568d75ef1e0ef6b498c78f0b46a3484c65bcc115c136f18a045aa6433bcf313e")
         }
         assertEquals(HttpStatusCode.Unauthorized, response.status)
