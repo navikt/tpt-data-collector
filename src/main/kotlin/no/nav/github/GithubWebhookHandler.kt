@@ -15,7 +15,8 @@ class GithubWebhookHandler(val checks: Checks) {
             return
         }
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
-        checks.runAll(webhookPayload.repository.name, changedFiles)
+        val results = checks.runAll(webhookPayload.repository.name, changedFiles)
+        // TODO: send results to TPT
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {

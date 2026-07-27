@@ -46,6 +46,7 @@ import no.nav.github.GithubWebhookHandler
 import no.nav.github.RealGitHub
 import no.nav.github.WebhookPayload
 import no.nav.metrics.TPTMetrics
+import no.nav.tpt.TptRequestHandler
 import org.neo4j.driver.AuthTokens
 import org.neo4j.driver.GraphDatabase
 
@@ -72,6 +73,7 @@ fun main() {
 fun Application.businessModule(gitHub: GitHub, datastore: Datastore, config: ApplikasjonsConfig) {
     val checks = Checks(gitHub, datastore)
     val githubWebhookHandler = GithubWebhookHandler(checks)
+    val tptRequestHandler = TptRequestHandler(gitHub, checks)
 
     install(Authentication) {
         val jwkProvider = JwkProviderBuilder(config.openIdJwksUri)
@@ -112,15 +114,11 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, config: App
         authenticate("client-credentials-tpt") {
             get("/team/{slug}") {
                 val teamSlug = call.pathParameters["slug"] ?: ""
-                val repos = gitHub.allReposForTeam(teamSlug)
-                val results = repos.map { repo ->
-                    val allFilesInRepo = gitHub.allFilePathsIn(repo)
-                    launch {
-                        checks.runAll(repo, allFilesInRepo.toSet())
-                    }
+                if (teamSlug.isBlank()) {
+                    call.respond(HttpStatusCode.BadRequest)
+                    return@get
                 }
-
-                call.respond(OK)
+                call.respond(tptRequestHandler.runAllChecksFor(teamSlug))
             }
         }
     }
