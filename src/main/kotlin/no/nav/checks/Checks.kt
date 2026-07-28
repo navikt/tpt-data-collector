@@ -33,12 +33,16 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
 
         val allResults = timedResults.values.flatMap { it.value }
         val successfulResults = allResults.mapNotNull { it.getOrNull() }
-        val failedCount = allResults.size - successfulResults.size
+        val failedResults = allResults.filter { it.isFailure }
+        if (failedResults.isNotEmpty()) {
+            logger.warn("Failures during checks: ${failedResults.mapNotNull { it.exceptionOrNull() }.joinToString(" -- ")}")
+        }
         val nrOfIssuesFound = successfulResults.count{ it is CheckResult.NeedsWork }
-        logger.info("Ran ${allResults.size} checks for '$repoName, $failedCount of them failed")
-        TPTMetrics.checkFailed(failedCount)
+        logger.info("Ran ${allResults.size} checks for '$repoName, ${failedResults.size} of them failed")
+        TPTMetrics.checkFailed(failedResults.size)
         TPTMetrics.issuesFound(nrOfIssuesFound)
         timedResults.forEach { (checkType, v) ->  TPTMetrics.checksRanIn(checkType, v.duration) }
+
         return successfulResults
     }
 
