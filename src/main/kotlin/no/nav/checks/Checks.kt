@@ -19,8 +19,10 @@ import no.nav.metrics.TPTMetrics
 class Checks(val gitHub: GitHub, datastore: Datastore) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
-    private val fileBasedChecks = listOf(ChainguardBaseImageCheck(), UnpinnedActionVersionsCheck(),
-        CopyDotDotCheck(), PwnRequestCheck())
+    private val fileBasedChecks = listOf(
+        ChainguardBaseImageCheck(), UnpinnedActionVersionsCheck(),
+        CopyDotDotCheck(), PwnRequestCheck()
+    )
     private val datastoreBasedChecks = listOf(OldDeploymentsCheck(datastore))
     private val gitHubAPIBasedChecks = listOf(CriticalVulnerabilitiesCheck(gitHub))
 
@@ -35,13 +37,17 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         val successfulResults = allResults.mapNotNull { it.getOrNull() }
         val failedResults = allResults.filter { it.isFailure }
         if (failedResults.isNotEmpty()) {
-            logger.warn("Failures during checks: ${failedResults.mapNotNull { it.exceptionOrNull() }.joinToString(" -- ")}")
+            logger.warn(
+                "Failures during checks: ${
+                    failedResults.mapNotNull { it.exceptionOrNull() }.joinToString(" -- ")
+                }"
+            )
         }
-        val nrOfIssuesFound = successfulResults.count{ it is CheckResult.NeedsWork }
+        val nrOfIssuesFound = successfulResults.count { it is CheckResult.NeedsWork }
         logger.info("Ran ${allResults.size} checks for '$repoName, ${failedResults.size} of them failed")
         TPTMetrics.checkFailed(failedResults.size)
         TPTMetrics.issuesFound(nrOfIssuesFound)
-        timedResults.forEach { (checkType, v) ->  TPTMetrics.checksRanIn(checkType, v.duration) }
+        timedResults.forEach { (checkType, v) -> TPTMetrics.checksRanIn(checkType, v.duration) }
 
         return successfulResults
     }
@@ -62,16 +68,17 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
             }
             logger.info("Read the contents of ${allFilesWeNeed.size} file(s)")
 
-            fileBasedChecks.map { check ->
-                async {
-                    runCatching {
-                        val filesNeededForThisCheck = check.filesICareAbout(allFilesWeNeed.keys).toSet()
-                        check.run(
-                            repoName,
-                            allFilesWeNeed.filterKeys { filesNeededForThisCheck.contains(it) })
+            fileBasedChecks.filter { it.filesICareAbout(allFilesWeNeed.keys).toSet().isNotEmpty() }
+                .map { check ->
+                    val  filesNeededForThisCheck = check.filesICareAbout(allFilesWeNeed.keys).toSet()
+                    async {
+                        runCatching {
+                            check.run(
+                                repoName,
+                                allFilesWeNeed.filterKeys { filesNeededForThisCheck.contains(it) })
+                        }
                     }
                 }
-            }
 
         }
 
