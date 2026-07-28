@@ -34,6 +34,7 @@ import io.micrometer.core.instrument.binder.system.UptimeMetrics
 import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -45,6 +46,8 @@ import no.nav.github.GitHub
 import no.nav.github.GithubWebhookHandler
 import no.nav.github.RealGitHub
 import no.nav.github.WebhookPayload
+import no.nav.kafka.KafkaSender
+import no.nav.kafka.KafkaSenderInterface
 import no.nav.metrics.TPTMetrics
 import no.nav.tpt.TptRequestHandler
 import org.neo4j.driver.AuthTokens
@@ -65,14 +68,16 @@ fun main() {
         neoDriver.verifyConnectivity()
         val dataStore = Neo4jDatastore(neoDriver)
 
-        businessModule(gitHub, dataStore, config)
+        val kafka = KafkaSender()
+
+        businessModule(gitHub, dataStore, kafka, config)
         naisModule(gitHub, dataStore)
     }.start(wait = true)
 }
 
-fun Application.businessModule(gitHub: GitHub, datastore: Datastore, config: ApplikasjonsConfig) {
+fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: KafkaSenderInterface, config: ApplikasjonsConfig) {
     val checks = Checks(gitHub, datastore)
-    val githubWebhookHandler = GithubWebhookHandler(checks)
+    val githubWebhookHandler = GithubWebhookHandler(checks, kafka)
     val tptRequestHandler = TptRequestHandler(gitHub, checks)
 
     install(Authentication) {
@@ -104,7 +109,7 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, config: App
                     return@post
                 }
 
-                launch {
+                launch(Dispatchers.IO) {
                     githubWebhookHandler.handle(payload)
                 }
                 call.respond(OK)
