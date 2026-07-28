@@ -6,8 +6,16 @@ on:
     paths-ignore:
       - "*.md"
   workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   test-build-deploy:
+    name: test-build-deploy
     permissions:
       actions: read # for sarif
       contents: write # for dependency graph & sarif
@@ -46,10 +54,11 @@ jobs:
         with:
           sarif_file: 'trivy.sarif'
   deploy:
+    name: deploy
     runs-on: ubuntu-latest
     permissions:
-        contents: read
-        id-token: write
+        contents: read # needs to read app descriptor
+        id-token: write # for nais deploy
     needs: test-build-deploy
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

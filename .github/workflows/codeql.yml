@@ -7,15 +7,23 @@ on:
   schedule:
     - cron: '32 13 * * 1'
   workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze-kotlin:
+    name: analyze-kotlin
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      security-events: write
-      packages: read
-      actions: read
-      contents: read
+      security-events: write # required by codeql
+      packages: read # required by codeql
+      actions: read # required by codeql
+      contents: read # required by codeql
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -41,13 +49,14 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
   analyze-github-actions:
+    name: analyze-github-actions
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      security-events: write
-      packages: read
-      actions: read
-      contents: read
+      security-events: write # required by codeql
+      packages: read # required by codeql
+      actions: read # required by codeql
+      contents: read # required by codeql
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:

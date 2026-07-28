@@ -5,11 +5,18 @@ on:
     - cron: '0 7 * * 1-5'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
 jobs:
   automerge:
+    name: automerge
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # muse be able to apply dependency changes
     steps:
       - name: Automerge Dependabot PRs
         uses: navikt/automerge-dependabot@70455df4433fac78f20d5a248f9ebf07ccac11fe # v1.5
