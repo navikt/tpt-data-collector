@@ -64,7 +64,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
             }
 
             val allFilesWeNeed = filesNeededByChecks.associateWith {
-                gitHub.readFileContents(repoName, it)
+                async { gitHub.readFileContents(repoName, it) }.await()
             }
             logger.info("Read the contents of ${allFilesWeNeed.size} file(s)")
 
