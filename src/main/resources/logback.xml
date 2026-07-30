@@ -7,4 +7,6 @@
         <appender-ref ref="STDOUT_JSON"/>
     </root>
 
+    <logger name="io.ktor.auth.jwt" level="DEBUG" appender="STDOUT_JSON" />
+
 </configuration>
