@@ -33,6 +33,7 @@ import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics
 import io.micrometer.core.instrument.binder.logging.LogbackMetrics
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics
 import io.micrometer.core.instrument.binder.system.UptimeMetrics
+import java.security.KeyManagementException
 import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -86,6 +87,15 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
 
     install(Authentication) {
         println("Obtaining JWKS from ${config.openIdJwksUri}")
+        try {
+            val p = JwkProviderBuilder(config.openIdJwksUri)
+                .cached(10, 24, TimeUnit.HOURS)
+                .rateLimited(20, 1, TimeUnit.MINUTES)
+                .build()
+            println("Created JWK provider: $p")
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+        }
         val jwkProvider = JwkProviderBuilder(config.openIdJwksUri)
             .cached(10, 24, TimeUnit.HOURS)
             .rateLimited(20, 1, TimeUnit.MINUTES)
