@@ -32,15 +32,18 @@ class GithubToolingStatusCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
 
     override suspend fun run(repo: String): CheckResult {
         val now = Clock.System.now()
-        val toolingStatus = gitHub.latestCodeScanningAnalysesFor(repo)
-        return if (toolingStatus != "ok") {
-            CheckResult.NeedsWork(
-                name, repo,
-                now,
-                listOf("$repo has a tooling status of $toolingStatus")
-            )
-        } else {
-            CheckResult.AllGood(name, repo, now)
+        val latestToolConfigResults = gitHub.latestCodeScanningAnalysesFor(repo)
+        if (latestToolConfigResults.isEmpty()) {
+            // No code scanning enabled
+            return CheckResult.NeedsWork(name, repo, now, listOf("$repo has no code scanning analyses, possibly no tools configured"))
+        }
+        if (latestToolConfigResults.any { it.error.isNotEmpty() }) {
+            val errors = latestToolConfigResults.filter { it.error.isNotEmpty() }.map { it.error }
+            return CheckResult.NeedsWork(name, repo, now, listOf("$repo has code scanning analyses with errors: ${errors.joinToString(", ")}"))
+            //TODO: Return tool, url, error-message?
+        }
+        else {
+            return CheckResult.AllGood(name, repo, now)
         }
     }
 }

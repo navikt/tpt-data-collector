@@ -45,7 +45,7 @@ class FakeGitHub: GitHub {
         return listOf(GithubCodeScanningAnalysis(
             ".github/workflows/codeql-analysis.yml:analyse/language:perl",
             CodeScanningTool("CodeQL"),
-            "No errors here",
+            "",
             Clock.System.now().toString(),
             "https://api.github.com/repos/octocat/hello-world/code-scanning/analyses/201"
         ))
