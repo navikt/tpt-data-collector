@@ -86,24 +86,18 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
     val teamSlugPattern = Regex("^[a-z0-9][a-z0-9-]*$")
 
     install(Authentication) {
-        println("Obtaining JWKS from ${config.openIdJwksUri}")
-        try {
-            val p = JwkProviderBuilder(config.openIdJwksUri)
-                .cached(10, 24, TimeUnit.HOURS)
-                .rateLimited(20, 1, TimeUnit.MINUTES)
-                .build()
-            println("Created JWK provider: $p")
-        } catch (ex: Exception) {
-            ex.printStackTrace()
-        }
         val jwkProvider = JwkProviderBuilder(config.openIdJwksUri)
             .cached(10, 24, TimeUnit.HOURS)
             .rateLimited(20, 1, TimeUnit.MINUTES)
             .build()
         jwt("client-credentials-tpt") {
             realm = "tpt-data-collector"
-            verifier(jwkProvider, config.openIdIssuer) {
-                withAudience(config.openIdAudience)
+            try {
+                verifier(jwkProvider, config.openIdIssuer) {
+                    withAudience(config.openIdAudience)
+                }
+            } catch (ex: Exception) {
+                ex.printStackTrace()
             }
             validate { credentials ->
                 JWTPrincipal(credentials.payload)
