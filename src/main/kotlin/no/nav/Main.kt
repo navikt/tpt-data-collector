@@ -19,6 +19,7 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.metrics.micrometer.MicrometerMetrics
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.request.path
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
@@ -101,6 +102,9 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
 
     install(CallLogging) {
         level = Level.INFO
+        filter { call ->
+            !call.request.path().startsWith("/internal")
+        }
     }
 
     routing {
