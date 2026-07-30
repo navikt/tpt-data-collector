@@ -89,6 +89,7 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
         jwt("client-credentials-tpt") {
             realm = "tpt-data-collector"
             verifier(jwkProvider, config.openIdIssuer) {
+                println("------- expecting issuer ${config.openIdIssuer} and audience: ${config.openIdAudience}")
 //                withAudience(config.openIdAudience)
             }
             validate { credentials ->
