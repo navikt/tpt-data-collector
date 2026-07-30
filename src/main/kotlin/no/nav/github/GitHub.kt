@@ -32,6 +32,7 @@ interface GitHub {
     suspend fun allFilePathsIn(repoName: String): List<String>
     suspend fun allReposForTeam(teamName: String): List<String>
     suspend fun ping(): Boolean
+    suspend fun githubToolingStatusFor(repoName: String): List<GithubCodeScanningAnalysis>
 }
 
 class FakeGitHub: GitHub {
@@ -41,6 +42,10 @@ class FakeGitHub: GitHub {
 
     override suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String> {
         return mapOf("yololib" to "medium", "boguslib" to "critical")
+    }
+
+    override suspend fun githubToolingStatusFor(repoName: String): String {
+        return "ok"
     }
 
     override suspend fun allFilePathsIn(repoName: String): List<String> = emptyList()
@@ -75,6 +80,18 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         }.associate {
             it.pkg.name to it.severity
         }
+    }
+
+    override suspend fun githubToolingStatusFor(repoName: String): List<GithubCodeScanningAnalysis> {
+        val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100"
+        val authToken = retrieveAccessToken()
+        val response: List<GithubCodeScanningAnalysis> = makeHttpRequest(Get, url, authToken)
+        // TODO: Parse response and deliver to GithubToolingStatusCheck() for judgement and reporting
+        // HOWTO: For each unique category: Take most recent result, flag on non-empty error field
+        val latestUniqueConfigurations: List<GithubCodeScanningAnalysis> = response
+            .groupBy { it.category }
+            .map { (_, analyses) -> analyses.maxBy { it.createdAt } }
+        return latestUniqueConfigurations
     }
 
     override suspend fun allFilePathsIn(repoName: String): List<String> {
