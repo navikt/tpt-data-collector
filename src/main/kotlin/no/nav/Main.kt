@@ -18,6 +18,7 @@ import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.metrics.micrometer.MicrometerMetrics
 import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
@@ -52,6 +53,7 @@ import no.nav.metrics.TPTMetrics
 import no.nav.tpt.TptRequestHandler
 import org.neo4j.driver.AuthTokens
 import org.neo4j.driver.GraphDatabase
+import org.slf4j.event.Level
 
 fun main() {
     val config = ApplikasjonsConfig()
@@ -89,14 +91,16 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
         jwt("client-credentials-tpt") {
             realm = "tpt-data-collector"
             verifier(jwkProvider, config.openIdIssuer) {
-                println("------- expecting issuer ${config.openIdIssuer} and audience: ${config.openIdAudience}")
-//                withAudience(config.openIdAudience)
+                withAudience(config.openIdAudience)
             }
             validate { credentials ->
-                println("------- issuer ${credentials.issuer} audience: ${credentials.audience}")
                 JWTPrincipal(credentials.payload)
             }
         }
+    }
+
+    install(CallLogging) {
+        level = Level.INFO
     }
 
     routing {
