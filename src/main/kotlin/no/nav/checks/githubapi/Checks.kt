@@ -32,7 +32,7 @@ class GithubToolingStatusCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
 
     override suspend fun run(repo: String): CheckResult {
         val now = Clock.System.now()
-        val toolingStatus = gitHub.githubToolingStatusFor(repo)
+        val toolingStatus = gitHub.latestCodeScanningAnalysesFor(repo)
         return if (toolingStatus != "ok") {
             CheckResult.NeedsWork(
                 name, repo,
