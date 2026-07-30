@@ -92,12 +92,8 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
             .build()
         jwt("client-credentials-tpt") {
             realm = "tpt-data-collector"
-            try {
-                verifier(jwkProvider, config.openIdIssuer) {
-                    withAudience(config.openIdAudience)
-                }
-            } catch (ex: Exception) {
-                ex.printStackTrace()
+            verifier(jwkProvider, config.openIdIssuer) {
+                withAudience(config.openIdAudience)
             }
             validate { credentials ->
                 JWTPrincipal(credentials.payload)

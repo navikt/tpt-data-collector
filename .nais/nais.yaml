@@ -5,7 +5,7 @@ metadata:
   namespace: appsec
 spec:
   ingresses:
-    - https://tpt-data-collector.nav.no
+    - https://tpt-data-collector.nav.no/webhook/github
   image: {{image}}
   port: 8080
   accessPolicy:
