@@ -85,6 +85,7 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
     val teamSlugPattern = Regex("^[a-z0-9][a-z0-9-]*$")
 
     install(Authentication) {
+        println("Obtaining JWKS from ${config.openIdJwksUri}")
         val jwkProvider = JwkProviderBuilder(config.openIdJwksUri)
             .cached(10, 24, TimeUnit.HOURS)
             .rateLimited(20, 1, TimeUnit.MINUTES)
