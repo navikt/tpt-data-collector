@@ -26,3 +26,21 @@ class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
         }
     }
 }
+
+class GithubToolingStatusCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
+    private val name = "githubToolingStatus"
+
+    override suspend fun run(repo: String): CheckResult {
+        val now = Clock.System.now()
+        val toolingStatus = gitHub.githubToolingStatusFor(repo)
+        return if (toolingStatus != "ok") {
+            CheckResult.NeedsWork(
+                name, repo,
+                now,
+                listOf("$repo has a tooling status of $toolingStatus")
+            )
+        } else {
+            CheckResult.AllGood(name, repo, now)
+        }
+    }
+}
