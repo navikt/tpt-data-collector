@@ -42,7 +42,13 @@ class FakeGitHub: GitHub {
     }
 
     override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
-        return listOf(GithubCodeScanningAnalysis(".github/workflows/codeql-analysis.yml:analyse/language:perl", ("CodeQL"), Clock.System.now()))
+        return listOf(GithubCodeScanningAnalysis(
+            ".github/workflows/codeql-analysis.yml:analyse/language:perl",
+            CodeScanningTool("CodeQL"),
+            "No errors here",
+            Clock.System.now().toString(),
+            "https://api.github.com/repos/octocat/hello-world/code-scanning/analyses/201"
+        ))
     }
 
     override suspend fun allFilePathsIn(repoName: String): List<String> = emptyList()
