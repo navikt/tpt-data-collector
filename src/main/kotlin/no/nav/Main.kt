@@ -79,6 +79,7 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
     val checks = Checks(gitHub, datastore)
     val githubWebhookHandler = GithubWebhookHandler(checks, kafka)
     val tptRequestHandler = TptRequestHandler(gitHub, checks)
+    val teamSlugPattern = Regex("^[a-z0-9][a-z0-9-]*$")
 
     install(Authentication) {
         val jwkProvider = JwkProviderBuilder(config.openIdJwksUri)
@@ -119,7 +120,7 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
         authenticate("client-credentials-tpt") {
             get("/team/{slug}") {
                 val teamSlug = call.pathParameters["slug"] ?: ""
-                if (teamSlug.isBlank()) {
+                if (teamSlug.isBlank() || !teamSlug.matches(teamSlugPattern)) {
                     call.respond(HttpStatusCode.BadRequest)
                     return@get
                 }
