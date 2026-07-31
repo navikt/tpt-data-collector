@@ -32,7 +32,7 @@ interface GitHub {
     suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
 }
 
-class FakeGitHub: GitHub {
+open class FakeGitHub: GitHub {
     override suspend fun readFileContents(repoName: String, filePath: String): String {
         return ""
     }
@@ -89,8 +89,7 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100"
         val authToken = retrieveAccessToken()
         val response: List<GithubCodeScanningAnalysis> = makeHttpRequest(Get, url, authToken)
-        // TODO: Parse response and deliver to GithubToolingStatusCheck() for judgement and reporting
-        // HOWTO: For each unique category: Take most recent result, flag on non-empty error field
+
         val latestUniqueConfigurations: List<GithubCodeScanningAnalysis> = response
             .groupBy { it.category }
             .map { (_, analyses) -> analyses.maxBy { it.createdAt } }

@@ -40,7 +40,6 @@ class GithubToolingStatusCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
         if (latestToolConfigResults.any { it.error.isNotEmpty() }) {
             val errors = latestToolConfigResults.filter { it.error.isNotEmpty() }.map { it.error }
             return CheckResult.NeedsWork(name, repo, now, listOf("$repo has code scanning analyses with errors: ${errors.joinToString(", ")}"))
-            //TODO: Return tool, url, error-message?
         }
         else {
             return CheckResult.AllGood(name, repo, now)
