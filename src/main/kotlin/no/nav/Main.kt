@@ -4,6 +4,7 @@ import com.auth0.jwk.JwkProviderBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.HttpStatusCode.Companion.InternalServerError
 import io.ktor.http.HttpStatusCode.Companion.OK
@@ -18,7 +19,9 @@ import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.metrics.micrometer.MicrometerMetrics
 import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.request.header
 import io.ktor.server.request.path
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
@@ -97,6 +100,11 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
             }
             validate { credentials ->
                 JWTPrincipal(credentials.payload)
+            }
+            challenge { _, _ ->
+                call.request.headers["Authorization"]?.let { authHeader ->
+                    println("Got auth! ${authHeader.substring(0, 10)}")
+                } ?: throw BadRequestException("Authorization header can not be blank!")
             }
         }
     }
