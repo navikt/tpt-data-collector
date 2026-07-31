@@ -1,6 +1,7 @@
 package no.nav
 
 import com.auth0.jwk.JwkProviderBuilder
+import com.auth0.jwt.JWT
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -21,6 +22,7 @@ import io.ktor.server.metrics.micrometer.MicrometerMetrics
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.request.authorization
 import io.ktor.server.request.header
 import io.ktor.server.request.path
 import io.ktor.server.request.receiveText
@@ -99,6 +101,11 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
                 withAudience(config.openIdAudience)
             }
             validate { credentials ->
+                println("---------------")
+                println("issuer: ${credentials.payload.issuer}")
+                println("audience: ${credentials.payload.audience}")
+                println("claims: ${credentials.payload.claims}")
+                println("---------------")
                 JWTPrincipal(credentials.payload)
             }
         }
