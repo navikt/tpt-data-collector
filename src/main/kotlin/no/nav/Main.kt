@@ -101,11 +101,6 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
             validate { credentials ->
                 JWTPrincipal(credentials.payload)
             }
-            challenge { _, _ ->
-                call.request.headers["Authorization"]?.let { authHeader ->
-                    println("Got auth! ${authHeader.substring(0, 10)}")
-                } ?: throw BadRequestException("Authorization header can not be blank!")
-            }
         }
     }
 
