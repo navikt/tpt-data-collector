@@ -109,8 +109,8 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
                 println(authHeader?.substring(0, 10) ?: "it's empty")
                 val jwt = JWT.decode( authHeader?.substringAfter("Bearer "))
                 println("---------------")
-                println("issuer: ${jwt.issuer}")
-                println("audience: ${jwt.audience}")
+                println("issuer: ${jwt.issuer}, should be ${config.openIdIssuer}")
+                println("audience: ${jwt.audience}, should be ${config.openIdAudience}")
                 println("claims: ${jwt.claims}")
                 println("---------------")
 
