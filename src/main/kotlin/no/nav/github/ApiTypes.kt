@@ -32,7 +32,7 @@ data class GithubCodeScanningAnalysis(
     @SerialName("category") val category: String,
     @SerialName("tool") val tool: CodeScanningTool,
     @SerialName("error") val error: String,
-    @SerialName("created_at") val createdAt: String,
+    @SerialName("created_at") val createdAt: Instant,
     @SerialName("url") val url: String,
 )
 
