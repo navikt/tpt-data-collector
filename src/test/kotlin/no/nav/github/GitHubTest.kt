@@ -63,7 +63,41 @@ class GitHubTest {
         assertEquals(42, parsed.tree.size)
     }
 
+    @Test
+    fun `Is able to parse code scanning analyses response`() {
+        val json = Json{ignoreUnknownKeys = true}
+        val parsed = json.decodeFromString<List<GithubCodeScanningAnalysis>>(codeScanningAnalysesJson)
+        assertEquals("CodeQL", parsed[0].tool.name)
+        assertEquals("", parsed[0].error)
+    }
+
 }
+
+private val codeScanningAnalysesJson = """
+    [
+      {
+        "ref": "refs/heads/main",
+        "commit_sha": "d99612c3e1f2970085cfbaeadf8f010ef69bad83",
+        "analysis_key": ".github/workflows/codeql-analysis.yml:analyze",
+        "environment": "{\"language\":\"python\"}",
+        "error": "",
+        "category": ".github/workflows/codeql-analysis.yml:analyze/language:python",
+        "created_at": "2020-08-27T15:05:21Z",
+        "results_count": 17,
+        "rules_count": 49,
+        "id": 201,
+        "url": "https://api.github.com/repos/octocat/hello-world/code-scanning/analyses/201",
+        "sarif_id": "6c81cd8e-b078-4ac3-a3be-1dad7dbd0b53",
+        "tool": {
+          "name": "CodeQL",
+          "guid": null,
+          "version": "2.4.0"
+        },
+        "deletable": true,
+        "warning": ""
+      }
+  ]
+""".trimIndent()
 
 private val securityVulnerabilityJson = """
     [
