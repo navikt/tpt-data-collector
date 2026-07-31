@@ -105,7 +105,9 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
                 JWTPrincipal(credentials.payload)
             }
             challenge { _, _ ->
-                val jwt = JWT.decode( call.request.authorization()?.substringAfter("Bearer"))
+                val authHeader = call.request.authorization()
+                println(authHeader?.substring(0, 10) ?: "it's empty")
+                val jwt = JWT.decode( authHeader?.substringAfter("Bearer"))
                 println("---------------")
                 println("issuer: ${jwt.issuer}")
                 println("audience: ${jwt.audience}")
