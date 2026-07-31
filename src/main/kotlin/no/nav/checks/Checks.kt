@@ -12,6 +12,7 @@ import no.nav.checks.files.CopyDotDotCheck
 import no.nav.checks.files.PwnRequestCheck
 import no.nav.checks.files.UnpinnedActionVersionsCheck
 import no.nav.checks.githubapi.CriticalVulnerabilitiesCheck
+import no.nav.checks.githubapi.GithubToolingStatusCheck
 import no.nav.datastore.Datastore
 import no.nav.github.GitHub
 import no.nav.metrics.TPTMetrics
@@ -24,7 +25,10 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         CopyDotDotCheck(), PwnRequestCheck()
     )
     private val datastoreBasedChecks = listOf(OldDeploymentsCheck(datastore))
-    private val gitHubAPIBasedChecks = listOf(CriticalVulnerabilitiesCheck(gitHub))
+    private val gitHubAPIBasedChecks = listOf(
+        CriticalVulnerabilitiesCheck(gitHub),
+        GithubToolingStatusCheck(gitHub)
+    )
 
     suspend fun runAll(repoName: String, relevantFiles: Set<String>): List<CheckResult> {
         val timedResults = mapOf(

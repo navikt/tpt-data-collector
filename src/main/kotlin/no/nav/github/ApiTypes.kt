@@ -28,6 +28,20 @@ internal data class DependabotAlert(
 )
 
 @Serializable
+data class GithubCodeScanningAnalysis(
+    @SerialName("category") val category: String,
+    @SerialName("tool") val tool: CodeScanningTool,
+    @SerialName("error") val error: String,
+    @SerialName("created_at") val createdAt: Instant,
+    @SerialName("url") val url: String,
+)
+
+@Serializable
+data class CodeScanningTool(
+    @SerialName("name") val name: String,
+)
+
+@Serializable
 internal data class SecurityAdvisory(
     @SerialName("vulnerabilities")
     val vulnerabilities: List<Vulnerability>

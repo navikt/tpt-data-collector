@@ -19,12 +19,9 @@ import io.ktor.util.logging.KtorSimpleLogger
 import java.util.Date
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
@@ -32,15 +29,26 @@ interface GitHub {
     suspend fun allFilePathsIn(repoName: String): List<String>
     suspend fun allReposForTeam(teamName: String): List<String>
     suspend fun ping(): Boolean
+    suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
 }
 
-class FakeGitHub: GitHub {
+open class FakeGitHub: GitHub {
     override suspend fun readFileContents(repoName: String, filePath: String): String {
         return ""
     }
 
     override suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String> {
         return mapOf("yololib" to "medium", "boguslib" to "critical")
+    }
+
+    override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
+        return listOf(GithubCodeScanningAnalysis(
+            ".github/workflows/codeql-analysis.yml:analyse/language:perl",
+            CodeScanningTool("CodeQL"),
+            "",
+            Clock.System.now(),
+            "https://api.github.com/repos/octocat/hello-world/code-scanning/analyses/201"
+        ))
     }
 
     override suspend fun allFilePathsIn(repoName: String): List<String> = emptyList()
@@ -75,6 +83,17 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         }.associate {
             it.pkg.name to it.severity
         }
+    }
+
+    override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
+        val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100"
+        val authToken = retrieveAccessToken()
+        val response: List<GithubCodeScanningAnalysis> = makeHttpRequest(Get, url, authToken)
+
+        val latestUniqueConfigurations: List<GithubCodeScanningAnalysis> = response
+            .groupBy { it.category }
+            .map { (_, analyses) -> analyses.maxBy { it.createdAt } }
+        return latestUniqueConfigurations
     }
 
     override suspend fun allFilePathsIn(repoName: String): List<String> {
