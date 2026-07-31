@@ -3,6 +3,7 @@ package no.nav
 import com.auth0.jwk.JwkProviderBuilder
 import com.auth0.jwt.JWT
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.callContext
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
@@ -101,12 +102,16 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
                 withAudience(config.openIdAudience)
             }
             validate { credentials ->
-                println("---------------")
-                println("issuer: ${credentials.payload.issuer}")
-                println("audience: ${credentials.payload.audience}")
-                println("claims: ${credentials.payload.claims}")
-                println("---------------")
                 JWTPrincipal(credentials.payload)
+            }
+            challenge { _, _ ->
+                val jwt = JWT.decode( call.request.authorization()?.substringAfter("Bearer"))
+                println("---------------")
+                println("issuer: ${jwt.issuer}")
+                println("audience: ${jwt.audience}")
+                println("claims: ${jwt.claims}")
+                println("---------------")
+
             }
         }
     }
