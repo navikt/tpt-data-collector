@@ -46,7 +46,7 @@ class FakeGitHub: GitHub {
             ".github/workflows/codeql-analysis.yml:analyse/language:perl",
             CodeScanningTool("CodeQL"),
             "",
-            Clock.System.now().toString(),
+            Clock.System.now(),
             "https://api.github.com/repos/octocat/hello-world/code-scanning/analyses/201"
         ))
     }
