@@ -23,11 +23,13 @@ import io.ktor.server.metrics.micrometer.MicrometerMetrics
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.authorization
 import io.ktor.server.request.header
 import io.ktor.server.request.path
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
@@ -111,6 +113,13 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
         level = Level.INFO
         filter { call ->
             !call.request.path().startsWith("/internal")
+        }
+    }
+
+    install(StatusPages) {
+        exception<Throwable> { call, cause ->
+            cause.printStackTrace()
+            call.respondText(text = "500: Well that didn't work..." , status = InternalServerError)
         }
     }
 
