@@ -153,8 +153,7 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
                     call.respond(HttpStatusCode.BadRequest)
                     return@get
                 }
-                call.respond(mapOf("message" to "yolo"))
-//                call.respond(tptRequestHandler.runAllChecksFor(teamSlug))
+                call.respond(tptRequestHandler.runAllChecksFor(teamSlug))
             }
         }
     }
