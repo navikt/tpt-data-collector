@@ -39,6 +39,7 @@ import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics
 import io.micrometer.core.instrument.binder.logging.LogbackMetrics
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics
 import io.micrometer.core.instrument.binder.system.UptimeMetrics
+import java.net.URI
 import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -91,7 +92,7 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
     val teamSlugPattern = Regex("^[a-z0-9][a-z0-9-]*$")
 
     install(Authentication) {
-        val jwkProvider = JwkProviderBuilder(config.openIdJwksUri)
+        val jwkProvider = JwkProviderBuilder(URI(config.openIdJwksUri).toURL())
             .cached(10, 24, TimeUnit.HOURS)
             .rateLimited(20, 1, TimeUnit.MINUTES)
             .build()
