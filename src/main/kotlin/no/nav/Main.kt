@@ -1,11 +1,9 @@
 package no.nav
 
 import com.auth0.jwk.JwkProviderBuilder
-import com.auth0.jwt.JWT
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.HttpStatusCode.Companion.InternalServerError
 import io.ktor.http.HttpStatusCode.Companion.OK
@@ -13,7 +11,6 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.application.install
-import io.ktor.server.application.log
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
@@ -23,7 +20,6 @@ import io.ktor.server.metrics.micrometer.MicrometerMetrics
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.request.header
 import io.ktor.server.request.path
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
@@ -103,12 +99,6 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
             }
             validate { credentials ->
                 JWTPrincipal(credentials.payload)
-            }
-            challenge { defaultScheme, realm ->
-                val authHeader = call.request.header(HttpHeaders.Authorization)
-                val creds = JWT.decode(authHeader?.substringAfter("Bearer "))
-                call.application.log.info("alg: ${creds.algorithm}")
-                call.application.log.info("claims: ${creds.claims}")
             }
         }
     }
