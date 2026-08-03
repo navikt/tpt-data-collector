@@ -12,6 +12,7 @@ spec:
     outbound:
       external:
         - host: github.com
+        - host: login.microsoftonline.com
       rules:
         - application: neo4j
     inbound:
