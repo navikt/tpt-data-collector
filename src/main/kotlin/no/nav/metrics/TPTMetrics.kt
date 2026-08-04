@@ -28,12 +28,17 @@ object TPTMetrics {
     private val foundIssueCounter = Counter.builder("checks_issues_found")
         .register(registry)
 
+    private val msgsSentCounter = Counter.builder("msgs_sent_to_tpt")
+        .register(registry)
+
 
     fun webhookReceived() = webhookReceivedCounter.increment()
 
     fun checkFailed(n: Int = 1) = failedChecksCounter.increment(n.toDouble())
 
     fun issuesFound(n: Int = 1) = foundIssueCounter.increment(n.toDouble())
+
+    fun msgsSentToTpt(n: Int = 1) = msgsSentCounter.increment(n.toDouble())
 
     fun checksRanIn(type: String, duration: Duration) =
         Timer.builder("checks_runtime")

@@ -19,6 +19,7 @@ class GithubWebhookHandler(val checks: Checks, val kafka: KafkaSenderInterface) 
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val results = checks.runAll(webhookPayload.repository.name, changedFiles)
         kafka.sendToKafka("CheckResult", Json.encodeToString(results))
+        TPTMetrics.msgsSentToTpt(1)
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
