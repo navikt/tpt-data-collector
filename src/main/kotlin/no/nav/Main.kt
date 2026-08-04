@@ -84,7 +84,7 @@ fun main() {
 fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: KafkaSenderInterface, config: ApplikasjonsConfig) {
     val checks = Checks(gitHub, datastore)
     val githubWebhookHandler = GithubWebhookHandler(checks, kafka)
-    val tptRequestHandler = TptRequestHandler(gitHub, checks)
+    val tptRequestHandler = TptRequestHandler(gitHub, checks, kafka)
     val teamSlugPattern = Regex("^[a-z0-9][a-z0-9-]*$")
 
     install(Authentication) {
@@ -138,13 +138,16 @@ fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: Kafk
         }
 
         authenticate("client-credentials-tpt") {
-            get("/team/{slug}") {
+            post("/team/{slug}") {
                 val teamSlug = call.pathParameters["slug"] ?: ""
                 if (teamSlug.isBlank() || !teamSlug.matches(teamSlugPattern)) {
                     call.respond(HttpStatusCode.BadRequest)
-                    return@get
+                    return@post
                 }
-                call.respond(tptRequestHandler.runAllChecksFor(teamSlug))
+                launch(Dispatchers.IO) {
+                    tptRequestHandler.runAllChecksFor(teamSlug)
+                }
+                call.respond(OK)
             }
         }
     }
