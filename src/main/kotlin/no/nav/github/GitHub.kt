@@ -7,6 +7,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.call.body
 import io.ktor.client.request.header
 import io.ktor.client.request.request
@@ -15,6 +16,7 @@ import io.ktor.http.HttpHeaders.Authorization
 import io.ktor.http.HttpHeaders.UserAgent
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpMethod.Companion.Get
+import io.ktor.http.HttpStatusCode
 import io.ktor.util.logging.KtorSimpleLogger
 import java.util.Date
 import kotlin.concurrent.atomics.AtomicReference
@@ -77,23 +79,25 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     override suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String> {
         val url = "$apiBaseUrl/repos/navikt/$repoName/dependabot/alerts"
         val authToken = retrieveAccessToken()
-        val response: List<DependabotAlert> = makeHttpRequest(Get, url, authToken)
-        return response.flatMap {
-            it.advisory.vulnerabilities
-        }.associate {
-            it.pkg.name to it.severity
+        return try {
+            val response: List<DependabotAlert> = makeHttpRequest(Get, url, authToken)
+            response.flatMap { it.advisory.vulnerabilities }.associate { it.pkg.name to it.severity }
+        } catch (e: ClientRequestException) {
+            if (e.response.status == HttpStatusCode.NotFound) emptyMap() else throw e
         }
     }
 
     override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
         val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100"
         val authToken = retrieveAccessToken()
-        val response: List<GithubCodeScanningAnalysis> = makeHttpRequest(Get, url, authToken)
-
-        val latestUniqueConfigurations: List<GithubCodeScanningAnalysis> = response
-            .groupBy { it.category }
-            .map { (_, analyses) -> analyses.maxBy { it.createdAt } }
-        return latestUniqueConfigurations
+        return try {
+            val response: List<GithubCodeScanningAnalysis> = makeHttpRequest(Get, url, authToken)
+            response
+                .groupBy { it.category }
+                .map { (_, analyses) -> analyses.maxBy { it.createdAt } }
+        } catch (e: ClientRequestException) {
+            if (e.response.status == HttpStatusCode.NotFound) emptyList() else throw e
+        }
     }
 
     override suspend fun allFilePathsIn(repoName: String): List<String> {

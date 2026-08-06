@@ -66,6 +66,7 @@ fun main() {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
             }
+            expectSuccess = true
         }
         val gitHub =
             RealGitHub(httpClient, config.githubAppId, config.githubAppInstallationId, config.githubAppPrivateKey)
