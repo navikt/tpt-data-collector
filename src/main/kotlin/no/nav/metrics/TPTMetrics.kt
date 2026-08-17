@@ -39,6 +39,11 @@ object TPTMetrics {
             .register(registry)
     }
 
+    private val whodisLookupCounter: Counter by lazy {
+        Counter.builder("queries_to_whodis")
+            .register(registry)
+    }
+
 
     fun webhookReceived() = webhookReceivedCounter.increment()
 
@@ -47,6 +52,8 @@ object TPTMetrics {
     fun issuesFound(n: Int = 1) = foundIssueCounter.increment(n.toDouble())
 
     fun msgsSentToTpt(n: Int = 1) = msgsSentCounter.increment(n.toDouble())
+
+    fun whodisLookups(n: Int = 1) = whodisLookupCounter.increment(n.toDouble())
 
     fun checksRanIn(type: String, duration: Duration) =
         Timer.builder("checks_runtime")

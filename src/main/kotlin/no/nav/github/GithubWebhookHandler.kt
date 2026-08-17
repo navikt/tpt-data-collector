@@ -21,6 +21,7 @@ class GithubWebhookHandler(val checks: Checks, val kafka: KafkaSenderInterface, 
         }
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val repoOwners = whodis.ownerTeamsFor(repo)
+        TPTMetrics.whodisLookups(1)
         val results = checks.runAll(webhookPayload.repository.name, changedFiles)
 //        val resultsWithOwners = ResultsWithOwners(repoOwners, results)
 //        kafka.sendToKafka("CheckResult", Json.encodeToString(resultsWithOwners))
