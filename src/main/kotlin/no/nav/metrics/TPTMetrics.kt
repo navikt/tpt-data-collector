@@ -19,17 +19,25 @@ object TPTMetrics {
             Clock.SYSTEM,
         )
 
-    private val webhookReceivedCounter = Counter.builder("webhooks_received")
-        .register(registry)
+    private val webhookReceivedCounter: Counter by lazy {
+        Counter.builder("webhooks_received")
+            .register(registry)
+    }
 
-    private val failedChecksCounter = Counter.builder("webhooks_failed")
-        .register(registry)
+    private val failedChecksCounter: Counter by lazy {
+        Counter.builder("webhooks_failed")
+            .register(registry)
+    }
 
-    private val foundIssueCounter = Counter.builder("checks_issues_found")
-        .register(registry)
+    private val foundIssueCounter: Counter by lazy {
+        Counter.builder("checks_issues_found")
+            .register(registry)
+    }
 
-    private val msgsSentCounter = Counter.builder("msgs_sent_to_tpt")
-        .register(registry)
+    private val msgsSentCounter: Counter by lazy {
+        Counter.builder("msgs_sent_to_tpt")
+            .register(registry)
+    }
 
 
     fun webhookReceived() = webhookReceivedCounter.increment()

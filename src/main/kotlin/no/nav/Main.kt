@@ -77,14 +77,20 @@ fun main() {
 
         val kafka = KafkaSender()
 
-        businessModule(gitHub, dataStore, kafka, config)
+        val whodis = RealWhodis(httpClient)
+
+        businessModule(gitHub, dataStore, kafka, whodis, config)
         naisModule(gitHub, dataStore)
     }.start(wait = true)
 }
 
-fun Application.businessModule(gitHub: GitHub, datastore: Datastore, kafka: KafkaSenderInterface, config: ApplikasjonsConfig) {
+fun Application.businessModule(gitHub: GitHub,
+                               datastore: Datastore,
+                               kafka: KafkaSenderInterface,
+                               whodis: Whodis,
+                               config: ApplikasjonsConfig) {
     val checks = Checks(gitHub, datastore)
-    val githubWebhookHandler = GithubWebhookHandler(checks, kafka)
+    val githubWebhookHandler = GithubWebhookHandler(checks, kafka, whodis)
     val tptRequestHandler = TptRequestHandler(gitHub, checks, kafka)
     val teamSlugPattern = Regex("^[a-z0-9][a-z0-9-]*$")
 

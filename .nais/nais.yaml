@@ -15,6 +15,7 @@ spec:
         - host: login.microsoftonline.com
       rules:
         - application: neo4j
+        - application: whodis
     inbound:
       rules:
         - application: tpt-backend

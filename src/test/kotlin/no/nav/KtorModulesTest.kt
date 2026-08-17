@@ -21,7 +21,8 @@ class KtorModulesTest {
     @Test
     fun `server starts and responds to liveness probe`() = testApplication {
         application {
-            businessModule(FakeGitHub(), FakeDatastore(), DummyKafkaSender(), ApplikasjonsConfig())
+            businessModule(FakeGitHub(), FakeDatastore(),
+                DummyKafkaSender(), FakeWhodis(), ApplikasjonsConfig())
             naisModule(FakeGitHub(), FakeDatastore())
         }
         val response = client.get("/internal/isAlive")
@@ -31,7 +32,8 @@ class KtorModulesTest {
     @Test
     fun `GH webhooks must have mac auth present in header`() = testApplication {
         application {
-            businessModule(FakeGitHub(), FakeDatastore(), DummyKafkaSender(), ApplikasjonsConfig())
+            businessModule(FakeGitHub(), FakeDatastore(),
+                DummyKafkaSender(), FakeWhodis(), ApplikasjonsConfig())
         }
         val response = client.post("/webhook/github")
         assertEquals(HttpStatusCode.Unauthorized, response.status)
@@ -40,7 +42,8 @@ class KtorModulesTest {
     @Test
     fun `Correct signature grants access to webhook endpoint`() = testApplication {
         application {
-            businessModule(FakeGitHub(), FakeDatastore(), DummyKafkaSender(), ApplikasjonsConfig())
+            businessModule(FakeGitHub(), FakeDatastore(),
+                DummyKafkaSender(), FakeWhodis(), ApplikasjonsConfig())
         }
         val path = Paths.get("src/test/resources/github_push_webhook.json")
         val requestBody = Files.readString(path)
@@ -56,7 +59,7 @@ class KtorModulesTest {
     @Test
     fun `Incorrect signature is denied by webhook endpoint`() = testApplication {
         application {
-            businessModule(FakeGitHub(), FakeDatastore(), DummyKafkaSender(), ApplikasjonsConfig())
+            businessModule(FakeGitHub(), FakeDatastore(), DummyKafkaSender(), FakeWhodis(), ApplikasjonsConfig())
         }
         val path = Paths.get("src/test/resources/github_push_webhook.json")
         val requestBody = Files.readString(path)

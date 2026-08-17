@@ -10,7 +10,9 @@ sealed class CheckResult {
     abstract val whenChecked: Instant
 
     @Serializable
-    data class AllGood(override val name: String, override val repo: String, override val whenChecked: Instant) :
+    data class AllGood(override val name: String,
+                       override val repo: String,
+                       override val whenChecked: Instant) :
         CheckResult()
 
     @Serializable
@@ -21,3 +23,6 @@ sealed class CheckResult {
         val reasons: List<String>
     ) : CheckResult()
 }
+
+@Serializable
+data class ResultsWithOwners(val owners: List<String>, val results : List<CheckResult>)
