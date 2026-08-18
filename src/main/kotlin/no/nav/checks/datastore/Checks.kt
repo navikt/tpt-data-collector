@@ -21,12 +21,12 @@ class OldDeploymentsCheck(val datastore: Datastore): DatastoreBasedCheck {
                 .filter { (_, _, deployTime) -> isOlderThan(deployTime, ninetyDaysAgo) }
         return if (outdatedDeployments.isNotEmpty()) {
             CheckResult.NeedsWork(
-                name, repo,
+                name,
                 now,
                 outdatedDeployments.map { "${it.first} is running an old (${it.third}) deployment of $repo in ${it.second}" }
             )
         } else {
-            CheckResult.AllGood(name, repo, now)
+            CheckResult.AllGood(name, now)
         }
     }
 }

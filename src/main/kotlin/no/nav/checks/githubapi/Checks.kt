@@ -17,12 +17,12 @@ class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
             .count { (_, severity) -> severity == "critical" }
         return if (nrOfCriticalVulns > 0) {
             CheckResult.NeedsWork(
-                name, repo,
+                name,
                 now,
                 listOf("$repo has $nrOfCriticalVulns critical vulnerabilities")
             )
         } else {
-            CheckResult.AllGood(name, repo, now)
+            CheckResult.AllGood(name, now)
         }
     }
 }
@@ -35,14 +35,14 @@ class GithubToolingStatusCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
         val latestToolConfigResults = gitHub.latestCodeScanningAnalysesFor(repo)
         if (latestToolConfigResults.isEmpty()) {
             // No code scanning enabled
-            return CheckResult.NeedsWork(name, repo, now, listOf("$repo has no code scanning analyses, possibly no tools configured"))
+            return CheckResult.NeedsWork(name, now, listOf("$repo has no code scanning analyses, possibly no tools configured"))
         }
         if (latestToolConfigResults.any { it.error.isNotEmpty() }) {
             val errors = latestToolConfigResults.filter { it.error.isNotEmpty() }.map { it.error }
-            return CheckResult.NeedsWork(name, repo, now, listOf("$repo has code scanning analyses with errors: ${errors.joinToString(", ")}"))
+            return CheckResult.NeedsWork(name, now, listOf("$repo has code scanning analyses with errors: ${errors.joinToString(", ")}"))
         }
         else {
-            return CheckResult.AllGood(name, repo, now)
+            return CheckResult.AllGood(name, now)
         }
     }
 }

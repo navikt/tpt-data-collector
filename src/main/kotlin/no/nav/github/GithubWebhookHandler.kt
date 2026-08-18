@@ -1,10 +1,9 @@
 package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
-import kotlinx.serialization.json.Json
 import no.nav.Whodis
+import no.nav.checks.CheckResultsForRepo
 import no.nav.checks.Checks
-import no.nav.checks.ResultsWithOwners
 import no.nav.kafka.KafkaSenderInterface
 import no.nav.metrics.TPTMetrics
 
@@ -28,7 +27,7 @@ class GithubWebhookHandler(val checks: Checks, val kafka: KafkaSenderInterface, 
             emptyList()
         }
         val results = checks.runAll(webhookPayload.repository.name, changedFiles)
-//        val resultsWithOwners = ResultsWithOwners(repoOwners, results)
+        val resultsForRepo = CheckResultsForRepo(repo, repoOwners, results)
 //        kafka.sendToKafka("CheckResult", Json.encodeToString(resultsWithOwners))
 //        TPTMetrics.msgsSentToTpt(1)
     }

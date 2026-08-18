@@ -24,10 +24,10 @@ class ChainguardBaseImageCheck : FileBasedCheck {
         }
         val now = Clock.System.now()
         return if (itemsToFix.isEmpty()) {
-            CheckResult.AllGood(name, repo, now)
+            CheckResult.AllGood(name, now)
         } else {
             CheckResult.NeedsWork(
-                name, repo, now,
+                name, now,
                 itemsToFix.map { "Baseimage '$it' is not from the Nav registry" }
             )
         }
@@ -49,9 +49,9 @@ class CopyDotDotCheck : FileBasedCheck {
         }.isNotEmpty()
         val now = Clock.System.now()
         return if (hasCopyDotDot) {
-            CheckResult.NeedsWork(name, repo, now, listOf("'COPY . .' instructions are present"))
+            CheckResult.NeedsWork(name, now, listOf("'COPY . .' instructions are present"))
         } else {
-            CheckResult.AllGood(name, repo, now)
+            CheckResult.AllGood(name, now)
         }
     }
 }
@@ -73,10 +73,10 @@ class UnpinnedActionVersionsCheck : FileBasedCheck {
         }
         val now = Clock.System.now()
         return if (filesToFix.isEmpty()) {
-            CheckResult.AllGood(name, repo, now)
+            CheckResult.AllGood(name, now)
         } else {
             CheckResult.NeedsWork(
-                name, repo, now,
+                name, now,
                 filesToFix.map { "Repo '$repo' contains workflow '$it' with non-pinned action versions" }
             )
         }
@@ -99,10 +99,10 @@ class PwnRequestCheck : FileBasedCheck {
         }
         val now = Clock.System.now()
         return if (filesToFix.isEmpty()) {
-            CheckResult.AllGood(name, repo, now)
+            CheckResult.AllGood(name, now)
         } else {
             CheckResult.NeedsWork(
-                name, repo, now,
+                name, now,
                 filesToFix.map { "Repo '$repo' contains workflow '$it' with pull_request_target trigger" }
             )
         }
