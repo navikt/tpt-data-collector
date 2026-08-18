@@ -9,6 +9,7 @@ import io.ktor.http.HttpStatusCode.Companion.InternalServerError
 import io.ktor.http.HttpStatusCode.Companion.OK
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -124,6 +125,8 @@ fun Application.businessModule(gitHub: GitHub,
         }
     }
 
+    install(createGitHubCircuitBreaker(gitHub))
+
     routing {
         route("/webhook/github") {
             install(createGhWebhookAuthPlugin(config.githubWebhookSecret))
@@ -180,13 +183,7 @@ fun Application.naisModule(gitHub: GitHub, datastore: Datastore) {
             }
 
             get("/isReady") {
-                try {
-                    val status = if (gitHub.ping() && datastore.ping()) OK else InternalServerError
-                    call.respond(status)
-                } catch (ex: Exception) {
-                    ex.printStackTrace()
-                    call.respond(InternalServerError)
-                }
+                call.respond(OK, "OK")
             }
 
             get("/metrics") {
@@ -215,6 +212,18 @@ private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlug
         }
     }
 }
+
+private fun createGitHubCircuitBreaker(gitHub: GitHub) = createApplicationPlugin("GitHubCircuitBreaker") {
+    onCall { call ->
+        val gitHubIsUp = gitHub.ping()
+        if (!gitHubIsUp) {
+            call.respond(HttpStatusCode.ServiceUnavailable, "GitHub is down 😱")
+            return@onCall
+        }
+    }
+}
+
+
 
 
 

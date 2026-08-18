@@ -117,9 +117,14 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     }
 
     override suspend fun ping(): Boolean {
-        val authToken = retrieveAccessToken()
-        val response: String = makeHttpRequest(Get, apiBaseUrl, authToken)
-        return response.isNotEmpty()
+        try {
+            val authToken = retrieveAccessToken()
+            val response: String = makeHttpRequest(Get, apiBaseUrl, authToken)
+            return response.isNotEmpty()
+        } catch (ex: Exception) {
+            logger.error("Unable to reach GitHub", ex)
+            return false;
+        }
     }
 
     private suspend inline fun <reified T> makeHttpRequest(httpMethod: HttpMethod, url: String, authToken: String): T =
