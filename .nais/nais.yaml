@@ -44,6 +44,8 @@ spec:
       value: appsec.tpt
     - name: KAFKA_CLIENT_ID
       value: tpt-data-collector
+    - name: WHODIS_URL
+      value: http://whodis.appsec
   envFrom:
     - secret: tpt-data-collector
     - secret: tpt-graph

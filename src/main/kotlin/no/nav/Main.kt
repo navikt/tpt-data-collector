@@ -49,6 +49,8 @@ import no.nav.config.ApplikasjonsConfig
 import no.nav.datastore.Datastore
 import no.nav.datastore.Neo4jDatastore
 import no.nav.github.GitHub
+import no.nav.github.GitHubCollectHandler
+import no.nav.github.GitHubCollectRequest
 import no.nav.github.GithubWebhookHandler
 import no.nav.github.RealGitHub
 import no.nav.github.WebhookPayload
@@ -78,7 +80,7 @@ fun main() {
 
         val kafka = KafkaSender()
 
-        val whodis = RealWhodis(httpClient)
+        val whodis = RealWhodis(httpClient, config.whodisUrl)
 
         businessModule(gitHub, dataStore, kafka, whodis, config)
         naisModule(gitHub, dataStore)
@@ -93,6 +95,7 @@ fun Application.businessModule(gitHub: GitHub,
     val checks = Checks(gitHub, datastore)
     val githubWebhookHandler = GithubWebhookHandler(checks, kafka, whodis)
     val tptRequestHandler = TptRequestHandler(gitHub, checks, kafka)
+    val gitHubCollectHandler = GitHubCollectHandler(gitHub, whodis, kafka)
     val teamSlugPattern = Regex("^[a-z0-9][a-z0-9-]*$")
 
     install(Authentication) {
@@ -158,6 +161,24 @@ fun Application.businessModule(gitHub: GitHub,
                     tptRequestHandler.runAllChecksFor(teamSlug)
                 }
                 call.respond(OK)
+            }
+
+            post("/collect/github") {
+                val json = Json { ignoreUnknownKeys = true }
+                val body = try {
+                    json.decodeFromString<GitHubCollectRequest>(call.receiveText())
+                } catch (_: SerializationException) {
+                    call.respond(HttpStatusCode.BadRequest)
+                    return@post
+                }
+                if (body.teams.isEmpty() && body.repositories.isEmpty()) {
+                    call.respond(HttpStatusCode.BadRequest)
+                    return@post
+                }
+                launch(Dispatchers.IO) {
+                    gitHubCollectHandler.collect(body)
+                }
+                call.respond(HttpStatusCode.Accepted)
             }
         }
     }

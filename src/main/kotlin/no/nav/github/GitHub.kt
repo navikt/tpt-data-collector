@@ -14,8 +14,12 @@ import io.ktor.client.request.request
 import io.ktor.http.HttpHeaders.Accept
 import io.ktor.http.HttpHeaders.Authorization
 import io.ktor.http.HttpHeaders.UserAgent
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpMethod.Companion.Get
+import io.ktor.http.HttpMethod.Companion.Post
+import io.ktor.http.contentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.util.logging.KtorSimpleLogger
 import java.util.Date
@@ -24,6 +28,13 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
@@ -32,6 +43,7 @@ interface GitHub {
     suspend fun allReposForTeam(teamName: String): List<String>
     suspend fun ping(): Boolean
     suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
+    suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode>
 }
 
 open class FakeGitHub: GitHub {
@@ -58,6 +70,8 @@ open class FakeGitHub: GitHub {
     override suspend fun allReposForTeam(teamName: String): List<String> = emptyList()
 
     override suspend fun ping() = true
+
+    override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> = emptyList()
 }
 
 @OptIn(ExperimentalAtomicApi::class)
@@ -125,6 +139,61 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
             logger.error("Unable to reach GitHub", ex)
             return false;
         }
+    }
+
+    override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> {
+        val graphqlUrl = "$apiBaseUrl/graphql"
+        val authToken = retrieveAccessToken()
+        val query = """
+            query (${"$"}owner: String!, ${"$"}repo: String!, ${"$"}vulnEndCursor: String) {
+              repository(owner: ${"$"}owner, name: ${"$"}repo) {
+                vulnerabilityAlerts(first: 100, after: ${"$"}vulnEndCursor, states: OPEN) {
+                  nodes {
+                    dependencyScope
+                    dependabotUpdate { pullRequest { permalink } }
+                    securityAdvisory {
+                      publishedAt
+                      cvss { score }
+                      summary
+                      identifiers { value type }
+                    }
+                    securityVulnerability {
+                      severity
+                      package { ecosystem name }
+                    }
+                  }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val allAlerts = mutableListOf<VulnerabilityAlertNode>()
+        var cursor: String? = null
+        do {
+            val requestBody = Json.encodeToString(
+                buildJsonObject {
+                    put("query", query)
+                    put("variables", buildJsonObject {
+                        put("owner", owner)
+                        put("repo", repo)
+                        put("vulnEndCursor", cursor?.let { JsonPrimitive(it) } ?: JsonNull)
+                    })
+                }
+            )
+            val response: VulnerabilityAlertsGraphQLResponse = httpClient.request(graphqlUrl) {
+                method = Post
+                header(Authorization, "Bearer $authToken")
+                header(UserAgent, "Nav IT McBotface")
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }.body()
+            val alerts = response.data.repository?.vulnerabilityAlerts ?: break
+            allAlerts.addAll(alerts.nodes)
+            cursor = if (alerts.pageInfo.hasNextPage) alerts.pageInfo.endCursor else null
+        } while (cursor != null)
+
+        return allAlerts
     }
 
     private suspend inline fun <reified T> makeHttpRequest(httpMethod: HttpMethod, url: String, authToken: String): T =

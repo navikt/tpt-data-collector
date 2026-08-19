@@ -9,17 +9,24 @@ import io.ktor.http.HttpMethod.Companion.Get
 
 interface Whodis {
     suspend fun ownerTeamsFor(repo: String): List<String>
+    suspend fun repositoriesForTeam(teamSlug: String): List<String>
 }
 
-class FakeWhodis: Whodis {
+open class FakeWhodis: Whodis {
     override suspend fun ownerTeamsFor(repo: String) = listOf("tulleteam")
+    override suspend fun repositoriesForTeam(teamSlug: String) = listOf("navikt/fake-repo")
 }
 
-class RealWhodis(val httpClient: HttpClient): Whodis {
-    val baseUrl = "http://whodis"
+class RealWhodis(val httpClient: HttpClient, val baseUrl: String): Whodis {
 
     override suspend fun ownerTeamsFor(repo: String): List<String> =
         httpClient.request("$baseUrl/repository/$repo/owners") {
+            method = Get
+            header(Accept, "application/json")
+        }.body()
+
+    override suspend fun repositoriesForTeam(teamSlug: String): List<String> =
+        httpClient.request("$baseUrl/nais/$teamSlug/repositories") {
             method = Get
             header(Accept, "application/json")
         }.body()

@@ -53,6 +53,7 @@ class ApplikasjonsConfig(
     val openIdIssuer: String = getEnvVar("AZURE_OPENID_CONFIG_ISSUER", "dummy"),
     val openIdAudience: String = getEnvVar("AZURE_APP_CLIENT_ID", "dummy"),
     val openIdJwksUri: String = getEnvVar("AZURE_OPENID_CONFIG_JWKS_URI", "https://localhost"),
+    val whodisUrl: String = getEnvVar("WHODIS_URL", "http://whodis"),
 ) {
     init {
         val configuredGithubAppValues = listOf(githubAppId, githubAppInstallationId, githubAppPrivateKey)

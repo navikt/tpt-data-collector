@@ -85,3 +85,81 @@ internal data class TreeEntry(
 
 @Serializable
 internal data class ReposForTeamResponse(val name: String)
+
+// GraphQL response types for vulnerability alerts
+
+@Serializable
+internal data class VulnerabilityAlertsGraphQLResponse(
+    @SerialName("data") val data: VulnerabilityAlertsData
+)
+
+@Serializable
+internal data class VulnerabilityAlertsData(
+    @SerialName("repository") val repository: VulnerabilityAlertsRepository?
+)
+
+@Serializable
+internal data class VulnerabilityAlertsRepository(
+    @SerialName("vulnerabilityAlerts") val vulnerabilityAlerts: VulnerabilityAlertsConnection
+)
+
+@Serializable
+internal data class VulnerabilityAlertsConnection(
+    @SerialName("nodes") val nodes: List<VulnerabilityAlertNode>,
+    @SerialName("pageInfo") val pageInfo: PageInfo
+)
+
+@Serializable
+internal data class PageInfo(
+    @SerialName("hasNextPage") val hasNextPage: Boolean,
+    @SerialName("endCursor") val endCursor: String?
+)
+
+@Serializable
+data class VulnerabilityAlertNode(
+    @SerialName("dependencyScope") val dependencyScope: String?,
+    @SerialName("dependabotUpdate") val dependabotUpdate: DependabotUpdateInfo?,
+    @SerialName("securityAdvisory") val securityAdvisory: GraphQLSecurityAdvisory?,
+    @SerialName("securityVulnerability") val securityVulnerability: GraphQLSecurityVulnerability?
+)
+
+@Serializable
+data class DependabotUpdateInfo(
+    @SerialName("pullRequest") val pullRequest: PullRequestInfo?
+)
+
+@Serializable
+data class PullRequestInfo(
+    @SerialName("permalink") val permalink: String
+)
+
+@Serializable
+data class GraphQLSecurityAdvisory(
+    @SerialName("publishedAt") val publishedAt: Instant?,
+    @SerialName("cvss") val cvss: CvssInfo?,
+    @SerialName("summary") val summary: String?,
+    @SerialName("identifiers") val identifiers: List<VulnerabilityIdentifier>
+)
+
+@Serializable
+data class CvssInfo(
+    @SerialName("score") val score: Double
+)
+
+@Serializable
+data class VulnerabilityIdentifier(
+    @SerialName("value") val value: String,
+    @SerialName("type") val type: String
+)
+
+@Serializable
+data class GraphQLSecurityVulnerability(
+    @SerialName("severity") val severity: String,
+    @SerialName("package") val pkg: GraphQLPackage
+)
+
+@Serializable
+data class GraphQLPackage(
+    @SerialName("ecosystem") val ecosystem: String,
+    @SerialName("name") val name: String
+)
