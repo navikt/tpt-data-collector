@@ -84,7 +84,7 @@ internal data class TreeEntry(
 )
 
 @Serializable
-internal data class ReposForTeamResponse(val name: String)
+internal data class ReposForTeamResponse(val name: String, val archived: Boolean = false)
 
 // GraphQL response types for vulnerability alerts
 

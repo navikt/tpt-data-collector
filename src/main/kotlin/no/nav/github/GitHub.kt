@@ -127,7 +127,7 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         val url = "$apiBaseUrl/orgs/navikt/teams/$teamName/repos"
         val authToken = retrieveAccessToken()
         val reposResponse: List<ReposForTeamResponse> = makeHttpRequest(Get, url, authToken)
-        return reposResponse.map { it.name }
+        return reposResponse.filter { !it.archived }.map { it.name }
     }
 
     override suspend fun ping(): Boolean {
