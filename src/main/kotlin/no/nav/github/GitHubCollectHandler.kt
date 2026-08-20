@@ -2,7 +2,6 @@ package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import no.nav.Whodis
 import no.nav.kafka.KafkaSenderInterface
@@ -29,7 +28,9 @@ class GitHubCollectHandler(
 
     suspend fun collect(request: GitHubCollectRequest) {
         val startedEvent = GitHubSyncEvent(teams = request.teams, timestamp = Instant.now().toString())
-        kafka.sendToKafka("GITHUB_VULN_SYNC_STARTED", Json.encodeToString(startedEvent))
+        // Keys must match KafkaKey constants in tpt-backend (lowercase snake_case).
+        // SseFanoutConsumer in tpt-backend forwards these to the frontend over SSE.
+        kafka.sendToKafka("github_vuln_sync_started", Json.encodeToString(startedEvent))
         logger.info("Published GITHUB_VULN_SYNC_STARTED for teams ${request.teams}")
 
         // 1. Resolve repos for each team via whodis
@@ -94,7 +95,10 @@ class GitHubCollectHandler(
         }
 
         val completedEvent = GitHubSyncEvent(teams = request.teams, timestamp = Instant.now().toString())
-        kafka.sendToKafka("GITHUB_VULN_SYNC_COMPLETE", Json.encodeToString(completedEvent))
+        // Key must match KafkaKey.GITHUB_VULN_SYNC_COMPLETE in tpt-backend (lowercase snake_case).
+        // SseFanoutConsumer in tpt-backend forwards this to the frontend over SSE to signal completion.
+        // Must be sent only once, after ALL repos for all teams in this request have been processed.
+        kafka.sendToKafka("github_vuln_sync_complete", Json.encodeToString(completedEvent))
         logger.info("Published GITHUB_VULN_SYNC_COMPLETE for teams ${request.teams}")
     }
 }

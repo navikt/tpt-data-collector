@@ -70,8 +70,8 @@ class GitHubCollectHandlerTest {
         handler.collect(GitHubCollectRequest(teams = listOf("appsec", "delta")))
 
         val keys = kafka.sentMessages.map { it.first }
-        assertEquals("GITHUB_VULN_SYNC_STARTED", keys.first())
-        assertEquals("GITHUB_VULN_SYNC_COMPLETE", keys.last())
+        assertEquals("github_vuln_sync_started", keys.first())
+        assertEquals("github_vuln_sync_complete", keys.last())
 
         val startedPayload = Json.decodeFromString<GitHubSyncEvent>(kafka.sentMessages.first().second)
         assertEquals(listOf("appsec", "delta"), startedPayload.teams.sorted())
@@ -89,8 +89,8 @@ class GitHubCollectHandlerTest {
         val handler = GitHubCollectHandler(fakeGitHub, whodis, kafka)
         handler.collect(GitHubCollectRequest(teams = listOf("team-a", "team-b")))
 
-        assertEquals(1, kafka.sentMessages.count { it.first == "GITHUB_VULN_SYNC_COMPLETE" })
-        assertEquals("GITHUB_VULN_SYNC_COMPLETE", kafka.sentMessages.last().first)
+        assertEquals(1, kafka.sentMessages.count { it.first == "github_vuln_sync_complete" })
+        assertEquals("github_vuln_sync_complete", kafka.sentMessages.last().first)
     }
 
     @Test
