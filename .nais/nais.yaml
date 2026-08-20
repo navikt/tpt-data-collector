@@ -24,14 +24,16 @@ spec:
   readiness:
     path: /internal/isReady
   replicas:
-    max: 1
-    min: 1
+    max: 2
+    min: 2
   kafka:
     pool: nav-prod
   resources:
     requests:
-      cpu: 20m
+      cpu: 50m
       memory: 256Mi
+    limit:
+      memory: 512Mi
   observability:
     logging:
       destinations:
