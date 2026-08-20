@@ -35,8 +35,9 @@ class GitHubCollectHandlerTest {
         val handler = GitHubCollectHandler(fakeGitHub, FakeWhodis(), kafka)
         handler.collect(GitHubCollectRequest(teams = listOf("my-team")))
 
-        assertEquals(1, kafka.sentMessages.size)
-        val (key, value) = kafka.sentMessages.first()
+        val dataMessages = kafka.sentMessages.filter { it.first == "github_vulnerability_data" }
+        assertEquals(1, dataMessages.size)
+        val (key, value) = dataMessages.first()
         assertEquals("github_vulnerability_data", key)
         val message = Json.decodeFromString<GitHubRepositoryMessage>(value)
         assertEquals("navikt/fake-repo", message.nameWithOwner)
@@ -54,10 +55,42 @@ class GitHubCollectHandlerTest {
         val handler = GitHubCollectHandler(emptyGitHub, FakeWhodis(), kafka)
         handler.collect(GitHubCollectRequest(repositories = listOf("navikt/some-repo")))
 
-        assertEquals(1, kafka.sentMessages.size)
-        val message = Json.decodeFromString<GitHubRepositoryMessage>(kafka.sentMessages.first().second)
+        assertEquals(1, kafka.sentMessages.count { it.first == "github_vulnerability_data" })
+        val message = Json.decodeFromString<GitHubRepositoryMessage>(
+            kafka.sentMessages.first { it.first == "github_vulnerability_data" }.second
+        )
         assertEquals("navikt/some-repo", message.nameWithOwner)
         assertTrue(message.vulnerabilities.isEmpty())
+    }
+
+    @Test
+    fun `publishes GITHUB_VULN_SYNC_STARTED before processing and GITHUB_VULN_SYNC_COMPLETE after`() = runBlocking {
+        val kafka = DummyKafkaSender()
+        val handler = GitHubCollectHandler(fakeGitHub, FakeWhodis(), kafka)
+        handler.collect(GitHubCollectRequest(teams = listOf("appsec", "delta")))
+
+        val keys = kafka.sentMessages.map { it.first }
+        assertEquals("GITHUB_VULN_SYNC_STARTED", keys.first())
+        assertEquals("GITHUB_VULN_SYNC_COMPLETE", keys.last())
+
+        val startedPayload = Json.decodeFromString<GitHubSyncEvent>(kafka.sentMessages.first().second)
+        assertEquals(listOf("appsec", "delta"), startedPayload.teams.sorted())
+
+        val completedPayload = Json.decodeFromString<GitHubSyncEvent>(kafka.sentMessages.last().second)
+        assertEquals(listOf("appsec", "delta"), completedPayload.teams.sorted())
+    }
+
+    @Test
+    fun `GITHUB_VULN_SYNC_COMPLETE is only emitted once after all repos are processed`() = runBlocking {
+        val kafka = DummyKafkaSender()
+        val whodis = object : FakeWhodis() {
+            override suspend fun repositoriesForTeam(teamSlug: String) = listOf("navikt/repo-$teamSlug")
+        }
+        val handler = GitHubCollectHandler(fakeGitHub, whodis, kafka)
+        handler.collect(GitHubCollectRequest(teams = listOf("team-a", "team-b")))
+
+        assertEquals(1, kafka.sentMessages.count { it.first == "GITHUB_VULN_SYNC_COMPLETE" })
+        assertEquals("GITHUB_VULN_SYNC_COMPLETE", kafka.sentMessages.last().first)
     }
 
     @Test
@@ -70,8 +103,10 @@ class GitHubCollectHandlerTest {
         handler.collect(GitHubCollectRequest(teams = listOf("team-a", "team-b")))
 
         // Only one message for the shared repo
-        assertEquals(1, kafka.sentMessages.size)
-        val message = Json.decodeFromString<GitHubRepositoryMessage>(kafka.sentMessages.first().second)
+        assertEquals(1, kafka.sentMessages.count { it.first == "github_vulnerability_data" })
+        val message = Json.decodeFromString<GitHubRepositoryMessage>(
+            kafka.sentMessages.first { it.first == "github_vulnerability_data" }.second
+        )
         assertEquals("navikt/shared-repo", message.nameWithOwner)
         assertEquals(listOf("team-a", "team-b"), message.naisTeams.sorted())
     }

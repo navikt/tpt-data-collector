@@ -6,11 +6,18 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import no.nav.Whodis
 import no.nav.kafka.KafkaSenderInterface
+import java.time.Instant
 
 @Serializable
 data class GitHubCollectRequest(
     val teams: List<String> = emptyList(),
     val repositories: List<String> = emptyList()
+)
+
+@Serializable
+data class GitHubSyncEvent(
+    val teams: List<String>,
+    val timestamp: String
 )
 
 class GitHubCollectHandler(
@@ -21,6 +28,10 @@ class GitHubCollectHandler(
     private val logger = KtorSimpleLogger(this::class.java.name)
 
     suspend fun collect(request: GitHubCollectRequest) {
+        val startedEvent = GitHubSyncEvent(teams = request.teams, timestamp = Instant.now().toString())
+        kafka.sendToKafka("GITHUB_VULN_SYNC_STARTED", Json.encodeToString(startedEvent))
+        logger.info("Published GITHUB_VULN_SYNC_STARTED for teams ${request.teams}")
+
         // 1. Resolve repos for each team via whodis
         val repoToTeams = mutableMapOf<String, MutableSet<String>>()
 
@@ -81,5 +92,9 @@ class GitHubCollectHandler(
             kafka.sendToKafka("github_vulnerability_data", Json.encodeToString(message))
             logger.info("Published vulnerability data for $nameWithOwner (${vulnerabilities.size} alerts)")
         }
+
+        val completedEvent = GitHubSyncEvent(teams = request.teams, timestamp = Instant.now().toString())
+        kafka.sendToKafka("GITHUB_VULN_SYNC_COMPLETE", Json.encodeToString(completedEvent))
+        logger.info("Published GITHUB_VULN_SYNC_COMPLETE for teams ${request.teams}")
     }
 }
