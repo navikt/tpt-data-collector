@@ -9,26 +9,24 @@ interface FileBasedCheck {
     fun run(repo: String, filesToCheck: Map<String, String>): CheckResult
 }
 
-class ChainguardBaseImageCheck : FileBasedCheck {
-    private val name = "ChainguardBaseImage"
+class NavBaseImageCheck : FileBasedCheck {
+    private val name = this.javaClass.simpleName
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
-        val itemsToFix = filesToCheck.flatMap { (_, fileContents) ->
-            fileContents.lines()
-                .filter { it.startsWith("FROM") }
-                .filterNot { it.startsWith("FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no") }
+        val baseImages = filesToCheck.flatMap { (_, fileContents) ->
+            fileContents.lines().filter { it.startsWith("FROM") }
         }
         val now = Clock.System.now()
-        return if (itemsToFix.isEmpty()) {
+        return if (baseImages.last().startsWith("FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no")) {
             CheckResult.AllGood(name, now)
         } else {
             CheckResult.NeedsWork(
                 name, now,
-                itemsToFix.map { "Baseimage '$it' is not from the Nav registry" }
+                listOf("'${baseImages.last().substringAfter("FROM ")}' is not from the Nav registry")
             )
         }
     }
