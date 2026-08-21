@@ -4,6 +4,7 @@ import no.nav.checks.CheckResultsForRepo
 import no.nav.checks.Checks
 import no.nav.github.GitHub
 import no.nav.kafka.KafkaSenderInterface
+import no.nav.metrics.TPTMetrics
 
 class TptRequestHandler(private val gitHub: GitHub, private val checks: Checks, private val kafka: KafkaSenderInterface) {
 
@@ -13,8 +14,8 @@ class TptRequestHandler(private val gitHub: GitHub, private val checks: Checks, 
             val checkResults = checks.runAll(repo, allFilesInRepo.toSet())
             CheckResultsForRepo(repo, listOf(teamSlug), checkResults)
         }.forEach {
-//            kafka.sendToKafka("CheckResult", Json.encodeToString(it))
-//            TPTMetrics.msgsSentToTpt(1)
+            kafka.sendToKafka("CheckResult", Json.encodeToString(it))
+            TPTMetrics.msgsSentToTpt(1)
         }
 
 }
