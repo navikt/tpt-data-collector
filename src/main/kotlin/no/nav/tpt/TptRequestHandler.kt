@@ -1,5 +1,6 @@
 package no.nav.tpt
 
+import kotlinx.serialization.json.Json
 import no.nav.checks.CheckResultsForRepo
 import no.nav.checks.Checks
 import no.nav.github.GitHub
