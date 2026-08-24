@@ -9,25 +9,36 @@ interface FileBasedCheck {
     fun run(repo: String, filesToCheck: Map<String, String>): CheckResult
 }
 
-class NavBaseImageCheck : FileBasedCheck {
+class BaseImageCheck : FileBasedCheck {
     private val name = this.javaClass.simpleName
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
+
+    private val approvedImages = listOf(
+        "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no",
+        "cgr.dev/chainguard",
+        "chainguard/",
+        "gcr.io/distroless/"
+    )
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
-        val baseImages = filesToCheck.flatMap { (_, fileContents) ->
-            fileContents.lines().filter { it.startsWith("FROM") }
-        }
+        val lastBaseImageUsed = filesToCheck.flatMap { (_, fileContents) ->
+            fileContents.lines()
+                .map { it.lowercase() }
+                .filter { it.startsWith("from") }
+        }.last().substringAfter("from ").substringBeforeLast("as ")
+        val nonApprovedImageUsed = approvedImages.filter { lastBaseImageUsed.startsWith(it) }.isEmpty()
+
         val now = Clock.System.now()
-        return if (baseImages.last().startsWith("FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no")) {
-            CheckResult.AllGood(name, now)
-        } else {
+        return if (nonApprovedImageUsed) {
             CheckResult.NeedsWork(
                 name, now,
-                listOf("'${baseImages.last().substringAfter("FROM ")}' is not from the Nav registry")
+                listOf("'$lastBaseImageUsed' is not a recommended base image. consider switching to distroless")
             )
+        } else {
+            CheckResult.AllGood(name, now)
         }
     }
 }
