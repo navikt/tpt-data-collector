@@ -4,6 +4,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import no.nav.checks.CheckResult
+import no.nav.checks.Severity.MEDIUM
 import no.nav.datastore.Datastore
 
 interface DatastoreBasedCheck {
@@ -12,6 +13,8 @@ interface DatastoreBasedCheck {
 
 class OldDeploymentsCheck(val datastore: Datastore): DatastoreBasedCheck {
     private val name = "OldDeployments"
+    private val desc = "Deployments should be refreshed regularly to get security updates."
+    private val severity = MEDIUM
 
     override fun run(repo: String): CheckResult {
         val now = Clock.System.now()
@@ -22,11 +25,13 @@ class OldDeploymentsCheck(val datastore: Datastore): DatastoreBasedCheck {
         return if (outdatedDeployments.isNotEmpty()) {
             CheckResult.NeedsWork(
                 name,
+                desc,
+                severity,
                 now,
                 outdatedDeployments.map { "${it.first} is running an old (${it.third}) deployment of $repo in ${it.second}" }
             )
         } else {
-            CheckResult.AllGood(name, now)
+            CheckResult.AllGood(name, desc, severity, now)
         }
     }
 }

@@ -2,6 +2,8 @@ package no.nav.checks.files
 
 import kotlin.time.Clock
 import no.nav.checks.CheckResult
+import no.nav.checks.Severity.HIGH
+import no.nav.checks.Severity.MEDIUM
 
 
 interface FileBasedCheck {
@@ -11,6 +13,8 @@ interface FileBasedCheck {
 
 class BaseImageCheck : FileBasedCheck {
     private val name = this.javaClass.simpleName
+    private val desc = "Distroless base images reduces the attack surface significantly."
+    private val severity = MEDIUM
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
 
     private val approvedImages = listOf(
@@ -33,18 +37,19 @@ class BaseImageCheck : FileBasedCheck {
 
         val now = Clock.System.now()
         return if (nonApprovedImageUsed) {
-            CheckResult.NeedsWork(
-                name, now,
+            CheckResult.NeedsWork(name, desc,severity, now,
                 listOf("'$lastBaseImageUsed' is not a recommended base image. consider switching to distroless")
             )
         } else {
-            CheckResult.AllGood(name, now)
+            CheckResult.AllGood(name, desc, severity, now)
         }
     }
 }
 
 class CopyDotDotCheck : FileBasedCheck {
     private val name = "CopyDotDot"
+    private val desc = "Distroless base images reduces the attack surface significantly."
+    private val severity = MEDIUM
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
@@ -58,15 +63,17 @@ class CopyDotDotCheck : FileBasedCheck {
         }.isNotEmpty()
         val now = Clock.System.now()
         return if (hasCopyDotDot) {
-            CheckResult.NeedsWork(name, now, listOf("'COPY . .' instructions are present"))
+            CheckResult.NeedsWork(name, desc, severity, now, listOf("'COPY . .' instructions are present"))
         } else {
-            CheckResult.AllGood(name, now)
+            CheckResult.AllGood(name, desc, severity, now)
         }
     }
 }
 
 class UnpinnedActionVersionsCheck : FileBasedCheck {
     private val name = "PinnedGitHubActionVersions"
+    private val desc = "GitHub Action tags are not immutable, switch to using digests."
+    private val severity = MEDIUM
     private val workflowFilePattern = Regex("""^\.github/workflows/[A-Za-z0-9_-]+\.ya?ml$""")
     private val unpinnedPattern = Regex("""^\s*-\s*uses:\s*[A-Za-z0-9_\-/]+@v.*$""")
 
@@ -82,11 +89,10 @@ class UnpinnedActionVersionsCheck : FileBasedCheck {
         }
         val now = Clock.System.now()
         return if (filesToFix.isEmpty()) {
-            CheckResult.AllGood(name, now)
+            CheckResult.AllGood(name, desc, severity, now)
         } else {
-            CheckResult.NeedsWork(
-                name, now,
-                filesToFix.map { "Repo '$repo' contains workflow '$it' with non-pinned action versions" }
+            CheckResult.NeedsWork(name, desc, severity, now,
+                filesToFix.map { "Workflow '$it' uses non-pinned action versions" }
             )
         }
     }
@@ -94,6 +100,8 @@ class UnpinnedActionVersionsCheck : FileBasedCheck {
 
 class PwnRequestCheck : FileBasedCheck {
     private val name = "PwnRequestCheck"
+    private val desc = "'pull_request_target' triggers can lead to compromised secrets."
+    private val severity = HIGH
     private val workflowFilePattern = Regex("""^\.github/workflows/[A-Za-z0-9_-]+\.ya?ml$""")
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
@@ -108,11 +116,14 @@ class PwnRequestCheck : FileBasedCheck {
         }
         val now = Clock.System.now()
         return if (filesToFix.isEmpty()) {
-            CheckResult.AllGood(name, now)
+            CheckResult.AllGood(name, desc, severity, now)
         } else {
             CheckResult.NeedsWork(
-                name, now,
-                filesToFix.map { "Repo '$repo' contains workflow '$it' with pull_request_target trigger" }
+                name,
+                desc,
+                severity,
+                now,
+                filesToFix.map { "'$it' contains a pull_request_target trigger" }
             )
         }
     }
