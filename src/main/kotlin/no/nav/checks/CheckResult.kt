@@ -1,6 +1,7 @@
 package no.nav.checks
 
 import kotlin.time.Instant
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -9,11 +10,13 @@ sealed class CheckResult {
     abstract val whenChecked: Instant
 
     @Serializable
+    @SerialName("AllGood")
     data class AllGood(override val name: String,
                        override val whenChecked: Instant) :
         CheckResult()
 
     @Serializable
+    @SerialName("NeedsWork")
     data class NeedsWork(
         override val name: String,
         override val whenChecked: Instant,
