@@ -132,3 +132,36 @@ class PwnRequestCheck : FileBasedCheck {
         }
     }
 }
+
+class NpxUsageCheck : FileBasedCheck {
+    private val name = "NpxUsageCheck"
+    private val desc = "npx bypasses package-lock and may download and execute malicious versions of packages"
+    private val severity = HIGH
+
+    override fun filesICareAbout(allAvailableFiles: Set<String>) =
+        allAvailableFiles.filter { it.contains("package.json") }
+
+    override fun run(
+        repo: String,
+        filesToCheck: Map<String, String>
+    ): CheckResult {
+        val filesToFix = filesToCheck.flatMap { (filename, fileContents) ->
+            fileContents.lines()
+                .filter { it.contains("npx ") }
+                .map { filename }
+                .distinct()
+        }
+        val now = Clock.System.now()
+        return if (filesToFix.isEmpty()) {
+            CheckResult.AllGood(name, desc, severity, now)
+        } else {
+            CheckResult.NeedsWork(
+                name,
+                desc,
+                severity,
+                now,
+                filesToFix.map { "'$it' contains npx usage" }
+            )
+        }
+    }
+}
