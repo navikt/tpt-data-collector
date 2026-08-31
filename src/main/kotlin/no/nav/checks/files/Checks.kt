@@ -165,3 +165,38 @@ class NpxUsageCheck : FileBasedCheck {
         }
     }
 }
+
+class CurlPipeShellCheck : FileBasedCheck {
+    private val name = "CurlPipeShell"
+    private val desc = "Excuting unknown shell scripts from the web is risky"
+    private val severity = MEDIUM
+    private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
+    private val workflowFilePattern = Regex("""^\.github/workflows/[A-Za-z0-9_-]+\.ya?ml$""")
+    private val pipeToShellPattern = Regex("""curl .*\s+|\s+(ba | z)+sh""")
+
+    override fun filesICareAbout(allAvailableFiles: Set<String>) =
+        allAvailableFiles.filter { dockerfilePattern.find(it) != null ||
+                workflowFilePattern.find(it) != null ||
+        it.contains("package.json")}
+
+    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val now = Clock.System.now()
+        val filesToFix = filesToCheck.flatMap { (filename, fileContents) ->
+            fileContents.lines()
+                .filter { pipeToShellPattern.find(it) != null }
+                .map { filename }
+                .distinct()
+        }
+        return if (filesToFix.isEmpty()) {
+            CheckResult.AllGood(name, desc, severity, now)
+        } else {
+            CheckResult.NeedsWork(
+                name,
+                desc,
+                severity,
+                now,
+                filesToFix.map { "'$it' pipes unknown scripts to the shell" }
+            )
+        }
+    }
+}

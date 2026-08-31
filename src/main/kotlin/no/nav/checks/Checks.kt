@@ -9,6 +9,7 @@ import kotlinx.coroutines.coroutineScope
 import no.nav.checks.datastore.OldDeploymentsCheck
 import no.nav.checks.files.CopyDotDotCheck
 import no.nav.checks.files.BaseImageCheck
+import no.nav.checks.files.CurlPipeShellCheck
 import no.nav.checks.files.NpxUsageCheck
 import no.nav.checks.files.PwnRequestCheck
 import no.nav.checks.files.UnpinnedActionVersionsCheck
@@ -23,7 +24,8 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
 
     private val fileBasedChecks = listOf(
         BaseImageCheck(), UnpinnedActionVersionsCheck(),
-        CopyDotDotCheck(), PwnRequestCheck(), NpxUsageCheck()
+        CopyDotDotCheck(), PwnRequestCheck(), NpxUsageCheck(),
+        CurlPipeShellCheck()
     )
     private val datastoreBasedChecks = listOf(OldDeploymentsCheck(datastore))
     private val gitHubAPIBasedChecks = listOf(
