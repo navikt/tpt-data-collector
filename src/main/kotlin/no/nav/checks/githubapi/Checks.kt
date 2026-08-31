@@ -31,7 +31,7 @@ class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
 
 class GithubToolingStatusCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
     private val name = "GitHubToolingStatus"
-    private val desc = "GitHub securiy tooling enables discovery of security problems."
+    private val desc = "GitHub security tooling enables discovery of security problems."
     private val severity = Severity.MEDIUM
 
     override suspend fun run(repo: String): CheckResult {
