@@ -2,7 +2,7 @@
 ktor = "3.5.2"
 kotlinx-serialization = "1.11.0"
 kotlin-test = "2.4.10"
-prometheus = "1.17.0"
+prometheus = "1.17.1"
 logback = "1.6.3"
 logstash = "9.0"
 junit-jupiter = "6.1.3"
