@@ -56,14 +56,18 @@ class CopyDotDotCheck : FileBasedCheck {
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
-        val hasCopyDotDot = filesToCheck.flatMap { (_, fileContents) ->
-            fileContents.lines()
-                .map { it.trim() }
-                .filter { it == "COPY . ." || it == "COPY ./ ./" }
-        }.isNotEmpty()
+        var idxOfLastFromLine = 0
+        var idxOfLastCopyLine = 0
+        filesToCheck.flatMap { (filename, fileContents) ->
+            fileContents.lines().map { it.lowercase() }
+        }.forEachIndexed { index, line ->
+            if (line.startsWith("from ")) idxOfLastFromLine = index
+            if (line.startsWith("copy . .") || line.startsWith("copy ./ ./")) idxOfLastCopyLine = index
+        }
+
         val now = Clock.System.now()
-        return if (hasCopyDotDot) {
-            CheckResult.NeedsWork(name, desc, severity, now, listOf("'COPY . .' instructions are present"))
+        return if (idxOfLastCopyLine > idxOfLastFromLine) {
+            CheckResult.NeedsWork(name, desc, severity, now, listOf("'COPY . .' instructions in the runtime image are present in $repo"))
         } else {
             CheckResult.AllGood(name, desc, severity, now)
         }

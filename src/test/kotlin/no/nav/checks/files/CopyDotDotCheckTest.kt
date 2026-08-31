@@ -17,7 +17,7 @@ class CopyDotDotCheckTest {
     }
 
     @Test
-    fun `Copy dot dot should be flagged`() {
+    fun `Copy dot dot in the runtime image should be flagged`() {
         val filesToCheck = mapOf(
             "Dockerfile" to """
                FROM yolo AS builder
@@ -31,7 +31,7 @@ class CopyDotDotCheckTest {
     }
 
     @Test
-    fun `Copy dot dot with slashes should be flagged`() {
+    fun `Copy dot dot with slashes in the runtime image should be flagged`() {
         val filesToCheck = mapOf(
             "Dockerfile" to """
                FROM yolo AS builder
@@ -42,6 +42,21 @@ class CopyDotDotCheckTest {
         val results = check.run("bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
+    }
+
+    @Test
+    fun `Copy dot dot in an intermediary image should be tolerated`() {
+        val filesToCheck = mapOf(
+            "Dockerfile" to """
+               FROM yolo AS builder
+               COPY ./ ./
+               FROM whatever
+               RUN stuff
+            """.trimIndent()
+        )
+        val check = CopyDotDotCheck()
+        val results = check.run("bogusrepo", filesToCheck)
+        assertTrue(results is CheckResult.AllGood)
     }
 
     @Test
