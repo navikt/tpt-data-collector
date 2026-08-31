@@ -16,7 +16,7 @@ class GithubWebhookHandler(val checks: Checks, val kafka: KafkaSenderInterface, 
         val repo = webhookPayload.repository.name
         logger.info("'$repo' had a push to push to '${webhookPayload.ref}'")
         if (!isRelevant(webhookPayload)) {
-            logger.warn("Skipping checks for '$repo, it is not relevant'")
+            logger.info("Skipping checks for '$repo, it is not relevant'")
             return
         }
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
