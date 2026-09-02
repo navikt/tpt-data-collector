@@ -9,7 +9,6 @@ import io.ktor.http.HttpStatusCode.Companion.InternalServerError
 import io.ktor.http.HttpStatusCode.Companion.OK
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
-import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -83,7 +82,7 @@ fun main() {
         val whodis = RealWhodis(httpClient, config.whodisUrl)
 
         businessModule(gitHub, dataStore, kafka, whodis, config)
-        naisModule(gitHub, dataStore)
+        naisModule()
     }.start(wait = true)
 }
 
@@ -127,8 +126,6 @@ fun Application.businessModule(gitHub: GitHub,
             call.respondText(text = "500: Well that didn't work..." , status = InternalServerError)
         }
     }
-
-    install(createGitHubCircuitBreaker(gitHub))
 
     routing {
         route("/webhook/github") {
@@ -184,7 +181,7 @@ fun Application.businessModule(gitHub: GitHub,
     }
 }
 
-fun Application.naisModule(gitHub: GitHub, datastore: Datastore) {
+fun Application.naisModule() {
     install(MicrometerMetrics) {
         registry = TPTMetrics.registry
         meterBinders = listOf(
@@ -233,18 +230,6 @@ private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlug
         }
     }
 }
-
-private fun createGitHubCircuitBreaker(gitHub: GitHub) = createApplicationPlugin("GitHubCircuitBreaker") {
-    onCall { call ->
-        val gitHubIsUp = gitHub.ping()
-        if (!gitHubIsUp) {
-            call.respond(HttpStatusCode.ServiceUnavailable, "GitHub is down 😱")
-            return@onCall
-        }
-    }
-}
-
-
 
 
 

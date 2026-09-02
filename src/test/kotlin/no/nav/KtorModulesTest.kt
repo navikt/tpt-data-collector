@@ -19,14 +19,20 @@ import org.junit.jupiter.api.Test
 
 class KtorModulesTest {
     @Test
-    fun `server starts and responds to liveness probe`() = testApplication {
+    fun `operational endpoints remain available independently of GitHub`() = testApplication {
         application {
             businessModule(FakeGitHub(), FakeDatastore(),
                 DummyKafkaSender(), FakeWhodis(), ApplikasjonsConfig())
-            naisModule(FakeGitHub(), FakeDatastore())
+            naisModule()
         }
-        val response = client.get("/internal/isAlive")
-        assertEquals(HttpStatusCode.OK, response.status)
+
+        listOf(
+            "/internal/isAlive",
+            "/internal/isReady",
+            "/internal/metrics",
+        ).forEach { path ->
+            assertEquals(HttpStatusCode.OK, client.get(path).status)
+        }
     }
 
     @Test

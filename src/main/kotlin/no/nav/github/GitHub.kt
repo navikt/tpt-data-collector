@@ -41,7 +41,6 @@ interface GitHub {
     suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String>
     suspend fun allFilePathsIn(repoName: String): List<String>
     suspend fun allReposForTeam(teamName: String): List<String>
-    suspend fun ping(): Boolean
     suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
     suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode>
 }
@@ -68,8 +67,6 @@ open class FakeGitHub: GitHub {
     override suspend fun allFilePathsIn(repoName: String): List<String> = emptyList()
 
     override suspend fun allReposForTeam(teamName: String): List<String> = emptyList()
-
-    override suspend fun ping() = true
 
     override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> = emptyList()
 }
@@ -128,17 +125,6 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         val authToken = retrieveAccessToken()
         val reposResponse: List<ReposForTeamResponse> = makeHttpRequest(Get, url, authToken)
         return reposResponse.filter { !it.archived }.map { it.name }
-    }
-
-    override suspend fun ping(): Boolean {
-        try {
-            val authToken = retrieveAccessToken()
-            val response: String = makeHttpRequest(Get, apiBaseUrl, authToken)
-            return response.isNotEmpty()
-        } catch (ex: Exception) {
-            logger.error("Unable to reach GitHub", ex)
-            return false;
-        }
     }
 
     override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> {
@@ -245,4 +231,3 @@ internal fun needsRefresh(now: Instant = Clock.System.now(), expiresAt: Instant)
     val diff = in10Mins.toEpochMilliseconds() - expiresAt.toEpochMilliseconds()
     return diff > 0
 }
-
