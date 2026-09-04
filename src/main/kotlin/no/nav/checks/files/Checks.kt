@@ -200,3 +200,40 @@ class CurlPipeShellCheck : FileBasedCheck {
         }
     }
 }
+
+class BaseImageIsNotPinnedCheck : FileBasedCheck {
+    private val name = this.javaClass.simpleName
+    private val desc = "Base images should be pinned to a SHA for immutability"
+    private val severity = MEDIUM
+    private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
+
+    private val chainguardImages = listOf(
+        "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no",
+        "cgr.dev/chainguard",
+        "chainguard/"
+    )
+
+    override fun filesICareAbout(allAvailableFiles: Set<String>) =
+        allAvailableFiles.filter { dockerfilePattern.find(it) != null }
+
+    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val nonPinnedNonChainguardImagesUsed = filesToCheck.flatMap { (_, fileContents) ->
+            fileContents.lines()
+                .map { it.lowercase() }
+                .filter { it.startsWith("from") }
+                .map { it.substringAfter("from ").substringBeforeLast("as ").trim() }
+                .filterNot(::isChainguard)
+        }.filterNot { it.contains("@sha") }
+
+        val now = Clock.System.now()
+        return if (nonPinnedNonChainguardImagesUsed.isEmpty()) {
+            CheckResult.AllGood(name, desc, severity, now)
+        } else {
+            CheckResult.NeedsWork(name, desc, severity, now,
+                nonPinnedNonChainguardImagesUsed.map { "'$it' is not pinned to a SHA" })
+        }
+    }
+
+    private fun isChainguard(image: String) =
+        chainguardImages.any { image.startsWith(it) }
+}
