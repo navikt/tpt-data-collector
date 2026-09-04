@@ -11,7 +11,7 @@ interface FileBasedCheck {
     fun run(repo: String, filesToCheck: Map<String, String>): CheckResult
 }
 
-class BaseImageCheck : FileBasedCheck {
+class DistrolessCheck : FileBasedCheck {
     private val name = this.javaClass.simpleName
     private val desc = "Distroless base images reduces the attack surface significantly."
     private val severity = MEDIUM

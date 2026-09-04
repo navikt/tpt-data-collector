@@ -5,12 +5,12 @@ import no.nav.checks.CheckResult
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-class BaseImageCheckTest {
+class DistrolessCheckTest {
 
     @Test
     fun `This check should only care about Dockerfiles`() {
         val allAvailableFiles = setOf("Dockerfile", "Dockerfile.test", "prod.dockerfile", "whatever")
-        val check = BaseImageCheck()
+        val check = DistrolessCheck()
         val expected = listOf("Dockerfile", "Dockerfile.test", "prod.dockerfile")
         val actual = check.filesICareAbout(allAvailableFiles)
         assertEquals(expected, actual)
@@ -26,7 +26,7 @@ class BaseImageCheckTest {
                RUN echo "hello"
             """.trimIndent()
         )
-        val check = BaseImageCheck()
+        val check = DistrolessCheck()
         val results = check.run("bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
@@ -41,7 +41,7 @@ class BaseImageCheckTest {
                RUN echo "hello"
             """.trimIndent()
         )
-        val check = BaseImageCheck()
+        val check = DistrolessCheck()
         val results = check.run("bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
     }

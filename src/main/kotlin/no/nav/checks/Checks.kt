@@ -8,7 +8,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import no.nav.checks.datastore.OldDeploymentsCheck
 import no.nav.checks.files.CopyDotDotCheck
-import no.nav.checks.files.BaseImageCheck
+import no.nav.checks.files.DistrolessCheck
 import no.nav.checks.files.CurlPipeShellCheck
 import no.nav.checks.files.NpxUsageCheck
 import no.nav.checks.files.PwnRequestCheck
@@ -23,7 +23,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
     private val fileBasedChecks = listOf(
-        BaseImageCheck(), UnpinnedActionVersionsCheck(),
+        DistrolessCheck(), UnpinnedActionVersionsCheck(),
         CopyDotDotCheck(), PwnRequestCheck(), NpxUsageCheck(),
         CurlPipeShellCheck()
     )
