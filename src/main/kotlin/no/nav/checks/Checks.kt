@@ -79,7 +79,6 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
             fileBasedChecks.filter { it.filesICareAbout(allFilesWeNeed.keys).toSet().isNotEmpty() }
                 .map { check ->
                     val  filesNeededForThisCheck = check.filesICareAbout(allFilesWeNeed.keys).toSet()
-                    logger.info("$check cares about $filesNeededForThisCheck")
                     async {
                         runCatching {
                             check.run(
