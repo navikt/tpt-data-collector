@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 class CopyDotDotCheckTest {
 
     @Test
-    fun `This check should only care about Dockerfiles`() {
+    fun `This check should care about Dockerfiles`() {
         val allAvailableFiles = setOf("Dockerfile", "Dockerfile.test", "prod.dockerfile", "whatever")
         val check = CopyDotDotCheck()
         val expected = listOf("Dockerfile", "Dockerfile.test", "prod.dockerfile")
@@ -17,7 +17,16 @@ class CopyDotDotCheckTest {
     }
 
     @Test
-    fun `Copy dot dot in the runtime image should be flagged`() {
+    fun `This check should care about dockerignore files`() {
+        val allAvailableFiles = setOf("yolo", "Dockerfile", "prod.dockerfile", ".dockerignore")
+        val check = CopyDotDotCheck()
+        val expected = listOf("Dockerfile", "prod.dockerfile", ".dockerignore")
+        val actual = check.filesICareAbout(allAvailableFiles)
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun `Copy dot dot in the runtime image should be flagged unless dockerignore is present`() {
         val filesToCheck = mapOf(
             "Dockerfile" to """
                FROM yolo AS builder
@@ -31,7 +40,7 @@ class CopyDotDotCheckTest {
     }
 
     @Test
-    fun `Copy dot dot with slashes in the runtime image should be flagged`() {
+    fun `Copy dot dot with slashes in the runtime image should be flagged unless dockerignore is present`() {
         val filesToCheck = mapOf(
             "Dockerfile" to """
                FROM yolo AS builder
@@ -42,6 +51,20 @@ class CopyDotDotCheckTest {
         val results = check.run("bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
+    }
+
+    @Test
+    fun `Copy dot dot in the runtime image is ok if dockerignore is present`() {
+        val filesToCheck = mapOf(
+            "Dockerfile" to """
+               FROM yolo AS builder
+               COPY . .
+            """.trimIndent(),
+            ".dockerignore" to """whatever"""
+        )
+        val check = CopyDotDotCheck()
+        val results = check.run("bogusrepo", filesToCheck)
+        assertTrue(results is CheckResult.AllGood)
     }
 
     @Test

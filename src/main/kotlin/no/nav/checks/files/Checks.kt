@@ -53,9 +53,17 @@ class CopyDotDotCheck : FileBasedCheck {
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { dockerfilePattern.find(it) != null }
+        allAvailableFiles.filter {
+            dockerfilePattern.find(it) != null || it == ".dockerignore"
+        }
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val now = Clock.System.now()
+
+        if (filesToCheck.containsKey(".dockerignore")) {
+            return CheckResult.AllGood(name, desc, severity, now)
+        }
+
         var idxOfLastFromLine = 0
         var idxOfLastCopyLine = 0
         filesToCheck.flatMap { (filename, fileContents) ->
@@ -65,7 +73,6 @@ class CopyDotDotCheck : FileBasedCheck {
             if (line.startsWith("copy . .") || line.startsWith("copy ./ ./")) idxOfLastCopyLine = index
         }
 
-        val now = Clock.System.now()
         return if (idxOfLastCopyLine > idxOfLastFromLine) {
             CheckResult.NeedsWork(name, desc, severity, now, listOf("'COPY . .' instructions in the runtime image are present in $repo"))
         } else {
