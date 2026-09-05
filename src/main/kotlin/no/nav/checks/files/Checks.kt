@@ -33,7 +33,7 @@ class DistrolessCheck : FileBasedCheck {
                 .map { it.lowercase() }
                 .filter { it.startsWith("from") }
         }.last().substringAfter("from ").substringBeforeLast("as ")
-        val nonApprovedImageUsed = approvedImages.filter { lastBaseImageUsed.startsWith(it) }.isEmpty()
+        val nonApprovedImageUsed = approvedImages.none { lastBaseImageUsed.startsWith(it) }
 
         val now = Clock.System.now()
         return if (nonApprovedImageUsed) {
