@@ -224,7 +224,9 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
-        val nonPinnedNonChainguardImagesUsed = filesToCheck.flatMap { (_, fileContents) ->
+        val nonPinnedNonChainguardImagesUsed = filesToCheck
+            .filterNot { it.key.endsWith(".py") } // dirty trick to avoid the cartography repo
+            .flatMap { (_, fileContents) ->
             fileContents.lines()
                 .map { it.lowercase() }
                 .filter { it.startsWith("from") }
