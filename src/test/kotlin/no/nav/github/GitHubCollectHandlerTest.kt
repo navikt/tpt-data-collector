@@ -1,7 +1,7 @@
 package no.nav.github
 
 import kotlinx.coroutines.runBlocking
-import no.nav.FakeWhodis
+import no.nav.whodis.FakeWhodis
 import no.nav.kafka.DummyKafkaSender
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue

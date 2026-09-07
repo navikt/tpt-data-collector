@@ -3,7 +3,7 @@ package no.nav.github
 import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import no.nav.Whodis
+import no.nav.whodis.Whodis
 import no.nav.kafka.KafkaSenderInterface
 import java.time.Instant
 

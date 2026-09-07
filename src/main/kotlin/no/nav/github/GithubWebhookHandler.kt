@@ -2,7 +2,7 @@ package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.serialization.json.Json
-import no.nav.Whodis
+import no.nav.whodis.Whodis
 import no.nav.checks.CheckResultsForRepo
 import no.nav.checks.Checks
 import no.nav.kafka.KafkaSenderInterface

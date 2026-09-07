@@ -57,6 +57,8 @@ import no.nav.kafka.KafkaSender
 import no.nav.kafka.KafkaSenderInterface
 import no.nav.metrics.TPTMetrics
 import no.nav.tpt.TptRequestHandler
+import no.nav.whodis.RealWhodis
+import no.nav.whodis.Whodis
 import org.neo4j.driver.AuthTokens
 import org.neo4j.driver.GraphDatabase
 import org.slf4j.event.Level

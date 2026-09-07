@@ -1,13 +1,12 @@
 package no.nav.github
 
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
-import no.nav.FakeWhodis
+import no.nav.whodis.FakeWhodis
 import no.nav.config.ApplikasjonsConfig
 import no.nav.datastore.FakeDatastore
 import no.nav.businessModule

@@ -1,4 +1,4 @@
-package no.nav
+package no.nav.whodis
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body

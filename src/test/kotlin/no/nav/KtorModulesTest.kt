@@ -14,6 +14,7 @@ import no.nav.config.ApplikasjonsConfig
 import no.nav.datastore.FakeDatastore
 import no.nav.github.FakeGitHub
 import no.nav.kafka.DummyKafkaSender
+import no.nav.whodis.FakeWhodis
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
