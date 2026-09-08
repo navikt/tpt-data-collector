@@ -1,6 +1,7 @@
 package no.nav.checks.githubapi
 
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import no.nav.checks.CheckResult
 import no.nav.checks.Severity
 import no.nav.checks.Severity.HIGH
@@ -50,5 +51,23 @@ class GithubToolingStatusCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
         else {
             return CheckResult.AllGood(name, desc, severity, now)
         }
+    }
+}
+
+class NewestCommitCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
+    private val name = this.javaClass.simpleName
+    private val desc = "Commit security updates for dependencies regularly even if there are no changes in your own code"
+    private val severity = Severity.MEDIUM
+
+    override suspend fun run(repo: String): CheckResult {
+        val now = Clock.System.now()
+        val newestCommitTime = gitHub.latestCommitTimeFor(repo)
+
+        if (newestCommitTime < (now - 30.days)) {
+            return CheckResult.NeedsWork(name, desc, severity,now,
+                listOf("'$repo' hasn't seen a commit during the last 30 days"))
+        }
+
+        return CheckResult.AllGood(name, desc, severity, now)
     }
 }

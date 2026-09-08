@@ -26,6 +26,7 @@ import java.util.Date
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.serialization.encodeToString
@@ -43,6 +44,7 @@ interface GitHub {
     suspend fun allReposForTeam(teamName: String): List<String>
     suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
     suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode>
+    suspend fun latestCommitTimeFor(repoName: String): Instant
 }
 
 open class FakeGitHub: GitHub {
@@ -69,6 +71,8 @@ open class FakeGitHub: GitHub {
     override suspend fun allReposForTeam(teamName: String): List<String> = emptyList()
 
     override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> = emptyList()
+    override suspend fun latestCommitTimeFor(repoName: String) =
+        if (repoName == "goodOne") Clock.System.now() - 29.days else Clock.System.now() - 31.days
 }
 
 @OptIn(ExperimentalAtomicApi::class)
@@ -180,6 +184,13 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         } while (cursor != null)
 
         return allAlerts
+    }
+
+    override suspend fun latestCommitTimeFor(repoName: String): Instant {
+        val url = "$apiBaseUrl/repos/navikt/$repoName/commits"
+        val authToken = retrieveAccessToken()
+        val commitsResponse: List<CommitResponse> = makeHttpRequest(Get, url, authToken)
+        return commitsResponse.maxOf { it.commit.author.date }
     }
 
     private suspend inline fun <reified T> makeHttpRequest(httpMethod: HttpMethod, url: String, authToken: String): T =

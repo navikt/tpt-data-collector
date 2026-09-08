@@ -163,3 +163,12 @@ data class GraphQLPackage(
     @SerialName("ecosystem") val ecosystem: String,
     @SerialName("name") val name: String
 )
+
+@Serializable
+data class Author(val date: Instant)
+
+@Serializable
+data class SingleCommit(val author: Author)
+
+@Serializable
+data class CommitResponse(val commit: SingleCommit)
