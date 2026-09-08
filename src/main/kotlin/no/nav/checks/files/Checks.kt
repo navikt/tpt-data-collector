@@ -179,7 +179,7 @@ class CurlPipeShellCheck : FileBasedCheck {
     private val severity = MEDIUM
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
     private val workflowFilePattern = Regex("""^\.github/workflows/[A-Za-z0-9_-]+\.ya?ml$""")
-    private val pipeToShellPattern = Regex("""curl .*\s+|\s+(ba | z)+sh""")
+    private val pipeToShellPattern = Regex("""(?i)\bcurl\b[^\n|]*\|\s*(?:/[^ \t|]+/)?z?(?:ba)?sh\b""")
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { dockerfilePattern.find(it) != null ||

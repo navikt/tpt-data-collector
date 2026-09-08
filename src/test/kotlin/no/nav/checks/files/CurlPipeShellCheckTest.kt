@@ -86,11 +86,29 @@ class CurlPipeShellCheckTest {
     }
 
     @Test
-    fun `no piping are good`() {
+    fun `no piping is good`() {
         val filesToCheck = mapOf(
             ".github/workflows/yolo.yaml" to """
                    steps:
                      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+            """.trimIndent()
+        )
+        val check = CurlPipeShellCheck()
+        val results = check.run("bogusrepo", filesToCheck)
+        assertTrue(results is CheckResult.AllGood)
+    }
+
+    @Test
+    fun `curl without pipe to shell is ok`() {
+        val filesToCheck = mapOf(
+            ".github/workflows/yolo.yaml" to """
+                   curl -L \
+             -X POST \
+             -H "Accept: application/vnd.github+json" \
+             -H "Authorization: Bearer ${'$'}{GITHUB_TOKEN}" \
+             -H "X-GitHub-Api-Version: 2026-03-10" \
+             https://api.github.com/repos/${'$'}{GITHUB_REPOSITORY}/releases \
+             -d "{\"tag_name\":\"v${'$'}{VERSION}\",\"target_commitish\":\"main\",\"name\":\"v${'$'}{VERSION}\",\"body\":\"Version ${'$'}{VERSION}\",\"draft\":false,\"prerelease\":false,\"generate_release_notes\":false}"
             """.trimIndent()
         )
         val check = CurlPipeShellCheck()
