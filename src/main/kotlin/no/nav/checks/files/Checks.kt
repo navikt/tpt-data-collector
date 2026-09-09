@@ -230,7 +230,7 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
             .filterNot { it.key.endsWith(".py") } // dirty trick to avoid the cartography repo
             .flatMap { (_, fileContents) ->
                 fileContents.lines()
-                    .map { it.lowercase() }
+                    .map { it.lowercase().trim() }
                     .filter { it.startsWith("from") }
                     .filter { it.contains(" as ") }
                     .map { it.substringAfter(" as ").trim() }
@@ -240,7 +240,7 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
             .filterNot { it.key.endsWith(".py") } // dirty trick to avoid the cartography repo
             .flatMap { (_, fileContents) ->
             fileContents.lines()
-                .map { it.lowercase() }
+                .map { it.lowercase().trim() }
                 .filter { it.startsWith("from") }
                 .map { it.substringAfter("from ").substringBeforeLast("as ").trim() }
                 .filterNot(::isChainguard)

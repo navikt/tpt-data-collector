@@ -65,7 +65,6 @@ class CurlPipeShellCheckTest {
         val results = check.run("bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
-        println(results)
     }
 
     @Test

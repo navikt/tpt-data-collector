@@ -59,7 +59,6 @@ class BaseImageIsNotPinnedCheckTest {
         val check = BaseImageIsNotPinnedCheck()
         val results = check.run("bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
-        println(results)
     }
 
     @Test
