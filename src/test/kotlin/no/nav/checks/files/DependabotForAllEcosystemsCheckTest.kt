@@ -30,7 +30,6 @@ class DependabotForAllEcosystemsCheckTest {
         val results = check.run("tullerepo", allAvailableFiles)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(3, results.reasons.size)
-        println(results.reasons)
     }
 
     @Test
