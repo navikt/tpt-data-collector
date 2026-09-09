@@ -62,4 +62,19 @@ class BaseImageIsNotPinnedCheckTest {
         println(results)
     }
 
+    @Test
+    fun `Intermediate images doesn't have to be pinned`() {
+        val filesToCheck = mapOf(
+            "Dockerfile" to """
+               FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/thing:1.0 AS builder
+               COPY . .
+               FROM builder
+               RUN echo "hello"
+            """.trimIndent()
+        )
+        val check = BaseImageIsNotPinnedCheck()
+        val results = check.run("bogusrepo", filesToCheck)
+        assertTrue(results is CheckResult.AllGood)
+    }
+
 }

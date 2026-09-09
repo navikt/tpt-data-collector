@@ -226,7 +226,17 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
-        val nonPinnedNonChainguardImagesUsed = filesToCheck
+        val namedIntermediaries = filesToCheck
+            .filterNot { it.key.endsWith(".py") } // dirty trick to avoid the cartography repo
+            .flatMap { (_, fileContents) ->
+                fileContents.lines()
+                    .map { it.lowercase() }
+                    .filter { it.startsWith("from") }
+                    .filter { it.contains(" as ") }
+                    .map { it.substringAfter(" as ").trim() }
+            }
+
+        val nonPinnedNonChainguardImages = filesToCheck
             .filterNot { it.key.endsWith(".py") } // dirty trick to avoid the cartography repo
             .flatMap { (_, fileContents) ->
             fileContents.lines()
@@ -234,14 +244,15 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
                 .filter { it.startsWith("from") }
                 .map { it.substringAfter("from ").substringBeforeLast("as ").trim() }
                 .filterNot(::isChainguard)
+                .filterNot { namedIntermediaries.contains(it) }
         }.filterNot { it.contains("@sha") }
 
         val now = Clock.System.now()
-        return if (nonPinnedNonChainguardImagesUsed.isEmpty()) {
+        return if (nonPinnedNonChainguardImages.isEmpty()) {
             CheckResult.AllGood(name, desc, severity, now)
         } else {
             CheckResult.NeedsWork(name, desc, severity, now,
-                nonPinnedNonChainguardImagesUsed.map { "'$it' is not pinned to a SHA" })
+                nonPinnedNonChainguardImages.map { "'$it' is not pinned to a SHA" })
         }
     }
 
