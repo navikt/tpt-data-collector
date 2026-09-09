@@ -1,5 +1,7 @@
 package no.nav.checks.files
 
+import java.io.File
+import kotlin.text.RegexOption.MULTILINE
 import kotlin.time.Clock
 import no.nav.checks.CheckResult
 import no.nav.checks.Severity.HIGH
@@ -245,4 +247,50 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
 
     private fun isChainguard(image: String) =
         chainguardImages.any { image.startsWith(it) }
+}
+
+class DependabotForAllEcosystemsCheck : FileBasedCheck {
+    private val name = this.javaClass.simpleName
+    private val desc = "Dependabot updates should be enabled for all ecosystems"
+    private val severity = MEDIUM
+    private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
+    val dependabotEcosystemsPattern = "package-ecosystem:\\s+.*$".toRegex(MULTILINE)
+    private val dependencyEcosystems =
+        mapOf("go.mod" to "gomod",
+            "pom.xml" to "maven",
+            "build.gradle.kts" to "gradle",
+            "package.json" to "npm",
+            "dockerfile" to "docker")
+
+    override fun filesICareAbout(allAvailableFiles: Set<String>) =
+        allAvailableFiles.map { File(it) }
+            .filter { it.name in dependencyEcosystems.keys || dockerfilePattern.find(it.name) != null }
+            .map { it.toString() } +
+                "./github/dependabot.yml"
+
+    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val ecosystemsPresentInProject = filesToCheck.keys
+            .map { File(it).name }
+            .filter { it != "dependabot.yml" }
+            .map { if (dockerfilePattern.find(it) != null) "dockerfile" else it }
+            .mapNotNull { dependencyEcosystems[it] }
+
+        val ecosystemsPresentInDependabotConfig =
+            filesToCheck["./github/dependabot.yml"]?.let { dependabotConfig ->
+                dependabotEcosystemsPattern.findAll(dependabotConfig)
+                    .map { it.value }
+                    .map { it.substringAfter("package-ecosystem:").trim() }
+                    .toSet()
+            } ?: emptyList()
+
+        val ecosystemsMissingUpdates = ecosystemsPresentInProject - ecosystemsPresentInDependabotConfig.toSet()
+
+        val now = Clock.System.now()
+        if (ecosystemsMissingUpdates.isNotEmpty()) {
+            return CheckResult.NeedsWork(name, desc, severity, now,
+                ecosystemsMissingUpdates.map { "The '$it' ecosystem is used, but Dependabot hasn't been configured to update it's dependencies." })
+        }
+
+        return CheckResult.AllGood(name, desc, severity, now)
+    }
 }
