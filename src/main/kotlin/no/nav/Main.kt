@@ -47,11 +47,11 @@ import no.nav.checks.Checks
 import no.nav.config.ApplikasjonsConfig
 import no.nav.datastore.Datastore
 import no.nav.datastore.Neo4jDatastore
-import no.nav.github.FakeGitHub
 import no.nav.github.GitHub
 import no.nav.github.GitHubCollectHandler
 import no.nav.github.GitHubCollectRequest
 import no.nav.github.GithubWebhookHandler
+import no.nav.github.RealGitHub
 import no.nav.github.WebhookPayload
 import no.nav.kafka.KafkaSender
 import no.nav.kafka.KafkaSenderInterface
@@ -73,7 +73,7 @@ fun main() {
             expectSuccess = true
         }
         val gitHub =
-            FakeGitHub()
+            RealGitHub(httpClient, config.githubAppId, config.githubAppInstallationId, config.githubAppPrivateKey)
 
         val neoDriver = GraphDatabase.driver(config.neo4jUri, AuthTokens.basic(config.neo4jUser, config.neo4Password))
         neoDriver.verifyConnectivity()
