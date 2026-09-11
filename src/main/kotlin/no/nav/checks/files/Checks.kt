@@ -286,8 +286,11 @@ class DependabotForAllEcosystemsCheck : FileBasedCheck {
             .map { if (dockerfilePattern.find(it) != null) "dockerfile" else it }
             .mapNotNull { dependencyEcosystems[it] }
 
+        val dependabotConfig = filesToCheck["./github/dependabot.yml"].let {
+            if (it.isNullOrBlank()) null else it
+        }
         val ecosystemsPresentInDependabotConfig =
-            filesToCheck["./github/dependabot.yml"]?.let { dependabotConfig ->
+            dependabotConfig?.let { dependabotConfig ->
                 dependabotEcosystemsPattern.findAll(dependabotConfig)
                     .map { it.value }
                     .map { it.substringAfter("package-ecosystem:").trim() }

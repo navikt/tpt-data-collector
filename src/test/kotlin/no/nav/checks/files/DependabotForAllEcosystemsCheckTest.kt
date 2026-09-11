@@ -43,4 +43,15 @@ class DependabotForAllEcosystemsCheckTest {
         assertTrue(results is CheckResult.AllGood)
     }
 
+    @Test
+    fun `some repos may not have dependabot configured`() {
+        val allAvailableFiles = mapOf(
+            "/folder/go.mod" to "whatever",
+            "pom.xml" to "whatever")
+        val check = DependabotForAllEcosystemsCheck()
+        val results = check.run("tullerepo", allAvailableFiles)
+        assertTrue(results is CheckResult.NeedsWork)
+        assertEquals(2, results.reasons.size)
+    }
+
 }
