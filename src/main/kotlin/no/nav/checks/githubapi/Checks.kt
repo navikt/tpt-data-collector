@@ -63,9 +63,10 @@ class NewestCommitCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
         val now = Clock.System.now()
         val newestCommitTime = gitHub.latestCommitTimeFor(repo)
 
-        if (newestCommitTime < (now - 30.days)) {
+        val daysSinceLastCommit =  now - newestCommitTime
+        if (daysSinceLastCommit > 30.days) {
             return CheckResult.NeedsWork(name, desc, severity,now,
-                listOf("'$repo' hasn't seen a commit during the last 30 days"))
+                listOf("'$repo' hasn't seen a commit in ${daysSinceLastCommit.inWholeDays} days"))
         }
 
         return CheckResult.AllGood(name, desc, severity, now)
