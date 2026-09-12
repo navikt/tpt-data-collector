@@ -277,7 +277,7 @@ class DependabotForAllEcosystemsCheck : FileBasedCheck {
         allAvailableFiles.map { File(it) }
             .filter { it.name in dependencyEcosystems.keys || dockerfilePattern.find(it.name) != null }
             .map { it.toString() } +
-                "./github/dependabot.yml"
+                ".github/dependabot.yml"
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
         val ecosystemsPresentInProject = filesToCheck.keys
@@ -286,7 +286,7 @@ class DependabotForAllEcosystemsCheck : FileBasedCheck {
             .map { if (dockerfilePattern.find(it) != null) "dockerfile" else it }
             .mapNotNull { dependencyEcosystems[it] }
 
-        val dependabotConfig = filesToCheck["./github/dependabot.yml"].let {
+        val dependabotConfig = filesToCheck[".github/dependabot.yml"].let {
             if (it.isNullOrBlank()) null else it
         }
         val ecosystemsPresentInDependabotConfig =

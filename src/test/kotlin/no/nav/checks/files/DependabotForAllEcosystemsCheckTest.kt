@@ -13,7 +13,7 @@ class DependabotForAllEcosystemsCheckTest {
             "build.gradle.kts", "whatever", "irrelevant")
         val check = DependabotForAllEcosystemsCheck()
         val expected = listOf("Dockerfile", "/folder/go.mod", "pom.xml",
-            "build.gradle.kts", "./github/dependabot.yml")
+            "build.gradle.kts", ".github/dependabot.yml")
         val actual = check.filesICareAbout(allAvailableFiles)
         assertEquals(expected, actual)
     }
@@ -25,7 +25,7 @@ class DependabotForAllEcosystemsCheckTest {
             "/folder/go.mod" to "whatever",
             "pom.xml" to "whatever",
             "build.gradle.kts" to "whatever",
-            "./github/dependabot.yml" to "package-ecosystem: docker\npackage-ecosystem: npm")
+            ".github/dependabot.yml" to "package-ecosystem: docker\npackage-ecosystem: npm")
         val check = DependabotForAllEcosystemsCheck()
         val results = check.run("tullerepo", allAvailableFiles)
         assertTrue(results is CheckResult.NeedsWork)
@@ -37,7 +37,7 @@ class DependabotForAllEcosystemsCheckTest {
         val allAvailableFiles = mapOf(
             "/folder/go.mod" to "whatever",
             "pom.xml" to "whatever",
-            "./github/dependabot.yml" to "package-ecosystem: gomod\npackage-ecosystem: maven")
+            ".github/dependabot.yml" to "package-ecosystem: gomod\npackage-ecosystem: maven")
         val check = DependabotForAllEcosystemsCheck()
         val results = check.run("tullerepo", allAvailableFiles)
         assertTrue(results is CheckResult.AllGood)
