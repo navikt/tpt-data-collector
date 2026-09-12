@@ -295,9 +295,9 @@ class DependabotForAllEcosystemsCheck : FileBasedCheck {
                     .map { it.value }
                     .map { it.substringAfter("package-ecosystem:").trim() }
                     .toSet()
-            } ?: emptyList()
+            } ?: emptySet()
 
-        val ecosystemsMissingUpdates = ecosystemsPresentInProject - ecosystemsPresentInDependabotConfig.toSet()
+        val ecosystemsMissingUpdates = (ecosystemsPresentInProject - ecosystemsPresentInDependabotConfig).toSet()
 
         val now = Clock.System.now()
         if (ecosystemsMissingUpdates.isNotEmpty()) {
