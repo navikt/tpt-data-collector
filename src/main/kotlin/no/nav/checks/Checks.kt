@@ -73,9 +73,12 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 return@coroutineScope emptyList()
             }
 
-            val allFilesWeNeed = filesNeededByChecks.associateWith {
-                runCatching { async { gitHub.readFileContents(repoName, it) }
-                    .await() }.getOrDefault("")
+            val allFilesWeNeed = filesNeededByChecks.associateWith { filePath ->
+                async {
+                    runCatching { gitHub.readFileContents(repoName, filePath) }
+                        .onFailure{ ex -> logger.error("Failed to read file $filePath: $ex") }
+                        .getOrElse { "" }
+                }.await()
             }
             logger.info("Read the contents of ${allFilesWeNeed.size} file(s)")
 
