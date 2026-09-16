@@ -18,7 +18,7 @@ class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
 
     override suspend fun run(repo: String): CheckResult {
         val now = Clock.System.now()
-        val nrOfCriticalVulns = gitHub.dependabotSecurityAlertsFor(repo)
+        val nrOfCriticalVulns = gitHub.dependabotOpenSecurityAlertsFor(repo)
             .count { (_, severity) -> severity == "critical" }
         return if (nrOfCriticalVulns > 0) {
             CheckResult.NeedsWork(name,desc, severity, now,

@@ -18,7 +18,7 @@ class CriticalVulnerabilitiesCheckTest {
     @Test
     fun `No vulns should pass`() = runTest {
         val fakeGitHub = object : FakeGitHub() {
-            override suspend fun dependabotSecurityAlertsFor(repoName: String) = emptyMap<String, String>()
+            override suspend fun dependabotOpenSecurityAlertsFor(repoName: String) = emptyMap<String, String>()
         }
         val result = CriticalVulnerabilitiesCheck(fakeGitHub).run("bogusrepo")
         assertTrue(result is CheckResult.AllGood)

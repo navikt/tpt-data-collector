@@ -29,17 +29,15 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
-    suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String>
+    suspend fun dependabotOpenSecurityAlertsFor(repoName: String): Map<String, String>
     suspend fun allFilePathsIn(repoName: String): List<String>
     suspend fun allReposForTeam(teamName: String): List<String>
     suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
@@ -52,7 +50,7 @@ open class FakeGitHub: GitHub {
         return ""
     }
 
-    override suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String> {
+    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String): Map<String, String> {
         return mapOf("yololib" to "medium", "boguslib" to "critical")
     }
 
@@ -91,8 +89,8 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         return response.decode()
     }
 
-    override suspend fun dependabotSecurityAlertsFor(repoName: String): Map<String, String> {
-        val url = "$apiBaseUrl/repos/navikt/$repoName/dependabot/alerts"
+    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String): Map<String, String> {
+        val url = "$apiBaseUrl/repos/navikt/$repoName/dependabot/alerts?state=open"
         val authToken = retrieveAccessToken()
         return try {
             val response: List<DependabotAlert> = makeHttpRequest(Get, url, authToken)
