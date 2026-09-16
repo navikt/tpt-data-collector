@@ -22,7 +22,7 @@ class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
             .count { (_, severity) -> severity == "critical" }
         return if (nrOfCriticalVulns > 0) {
             CheckResult.NeedsWork(name,desc, severity, now,
-                listOf("$repo has $nrOfCriticalVulns critical vulnerabilities")
+                listOf("GitHub reports $nrOfCriticalVulns critical vulnerabilities in $repo")
             )
         } else {
             CheckResult.AllGood(name, desc, severity, now)
