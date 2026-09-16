@@ -15,7 +15,7 @@ interface FileBasedCheck {
 
 class DistrolessCheck : FileBasedCheck {
     private val name = this.javaClass.simpleName
-    private val desc = "Distroless base images reduces the attack surface significantly."
+    private val desc = "Distroless base images reduce the attack surface significantly."
     private val severity = MEDIUM
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
 
@@ -50,7 +50,7 @@ class DistrolessCheck : FileBasedCheck {
 
 class CopyDotDotCheck : FileBasedCheck {
     private val name = "CopyDotDot"
-    private val desc = "Distroless base images reduces the attack surface significantly."
+    private val desc = "'COPY . .' instructions risk copying sensitive info such as env files"
     private val severity = MEDIUM
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
 
