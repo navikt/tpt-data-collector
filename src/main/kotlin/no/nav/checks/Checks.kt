@@ -11,6 +11,7 @@ import no.nav.checks.files.BaseImageIsNotPinnedCheck
 import no.nav.checks.files.CopyDotDotCheck
 import no.nav.checks.files.DistrolessCheck
 import no.nav.checks.files.CurlPipeShellCheck
+import no.nav.checks.files.HasGitignoreCheck
 import no.nav.checks.files.NpxUsageCheck
 import no.nav.checks.files.PwnRequestCheck
 import no.nav.checks.files.UnpinnedActionVersionsCheck
@@ -27,7 +28,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
     private val fileBasedChecks = listOf(
         DistrolessCheck(), UnpinnedActionVersionsCheck(),
         CopyDotDotCheck(), PwnRequestCheck(), NpxUsageCheck(),
-        CurlPipeShellCheck(), BaseImageIsNotPinnedCheck()
+        CurlPipeShellCheck(), BaseImageIsNotPinnedCheck(), HasGitignoreCheck()
     )
     private val datastoreBasedChecks = listOf(OldDeploymentsCheck(datastore))
     private val gitHubAPIBasedChecks = listOf(

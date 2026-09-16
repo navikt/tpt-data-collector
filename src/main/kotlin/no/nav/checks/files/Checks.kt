@@ -259,3 +259,22 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
     private fun isChainguard(image: String) =
         chainguardImages.any { image.startsWith(it) }
 }
+
+class HasGitignoreCheck : FileBasedCheck {
+    private val name = this.javaClass.simpleName
+    private val desc = "Gitignore provides a safety net so that sensitive files are not committed."
+    private val severity = MEDIUM
+
+    override fun filesICareAbout(allAvailableFiles: Set<String>) = listOf(".gitignore")
+
+    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val hasGitignore = filesToCheck.keys.contains(".gitignore")
+        val now = Clock.System.now()
+        return if (hasGitignore) {
+            CheckResult.AllGood(name, desc, severity, now)
+        } else {
+            CheckResult.NeedsWork(name, desc, severity, now,
+                listOf("$repo does not contain a .gitignore file"))
+        }
+    }
+}
