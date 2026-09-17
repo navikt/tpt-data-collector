@@ -1,7 +1,5 @@
 package no.nav.checks.files
 
-import java.io.File
-import kotlin.text.RegexOption.MULTILINE
 import kotlin.time.Clock
 import no.nav.checks.CheckResult
 import no.nav.checks.Severity.HIGH
