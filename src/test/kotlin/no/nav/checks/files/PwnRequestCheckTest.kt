@@ -45,4 +45,18 @@ class PwnRequestCheckTest {
         assertTrue(results is CheckResult.AllGood)
     }
 
+    @Test
+    fun `pull_request_target in comments is fine`() {
+        val filesToCheck = mapOf(
+            ".github/workflows/yolo.yaml" to """
+                   on:
+                      pull_request: # pull_request_target in a comment 
+                        types: [assigned, opened, synchronize, reopened]
+            """.trimIndent()
+        )
+        val check = PwnRequestCheck()
+        val results = check.run("bogusrepo", filesToCheck)
+        assertTrue(results is CheckResult.AllGood)
+    }
+
 }

@@ -122,6 +122,7 @@ class PwnRequestCheck : FileBasedCheck {
         val filesToFix = filesToCheck.flatMap { (filename, fileContents) ->
             fileContents.lines()
                 .filter { it.contains("pull_request_target") }
+                .filterNot{ it.substringBefore("pull_request_target").contains("#") }
                 .map { filename }
                 .distinct()
         }
