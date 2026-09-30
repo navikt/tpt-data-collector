@@ -138,7 +138,7 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
                 vulnerabilityAlerts(first: 100, after: ${"$"}vulnEndCursor, states: OPEN) {
                   nodes {
                     dependencyScope
-                    dependabotUpdate { pullRequest { permalink } }
+                    dependabotUpdate { pullRequest { permalink state } }
                     securityAdvisory {
                       publishedAt
                       cvss { score }

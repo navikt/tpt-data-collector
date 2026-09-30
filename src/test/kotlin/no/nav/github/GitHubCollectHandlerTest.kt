@@ -10,11 +10,26 @@ import kotlinx.serialization.json.Json
 
 class GitHubCollectHandlerTest {
 
+    private fun alert(pullRequest: PullRequestInfo?) = VulnerabilityAlertNode(
+        dependencyScope = "RUNTIME",
+        dependabotUpdate = DependabotUpdateInfo(pullRequest),
+        securityAdvisory = GraphQLSecurityAdvisory(
+            publishedAt = null,
+            cvss = CvssInfo(9.8),
+            summary = "Critical vuln",
+            identifiers = listOf(VulnerabilityIdentifier("CVE-2024-1234", "CVE"))
+        ),
+        securityVulnerability = GraphQLSecurityVulnerability(
+            severity = "CRITICAL",
+            pkg = GraphQLPackage("npm", "some-package")
+        )
+    )
+
     private val fakeGitHub = object : FakeGitHub() {
         override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> = listOf(
             VulnerabilityAlertNode(
                 dependencyScope = "RUNTIME",
-                dependabotUpdate = DependabotUpdateInfo(PullRequestInfo("https://github.com/navikt/fake-repo/pull/1")),
+                dependabotUpdate = DependabotUpdateInfo(PullRequestInfo("https://github.com/navikt/fake-repo/pull/1", "OPEN")),
                 securityAdvisory = GraphQLSecurityAdvisory(
                     publishedAt = null,
                     cvss = CvssInfo(9.8),
@@ -44,6 +59,30 @@ class GitHubCollectHandlerTest {
         assertEquals(listOf("my-team"), message.naisTeams)
         assertEquals(1, message.vulnerabilities.size)
         assertEquals("CRITICAL", message.vulnerabilities.first().severity)
+        assertEquals("https://github.com/navikt/fake-repo/pull/1", message.vulnerabilities.first().dependabotUpdatePullRequestUrl)
+    }
+
+    @Test
+    fun `only includes dependabot pull request url when the pull request is open`() = runBlocking {
+        val kafka = DummyKafkaSender()
+        val gitHub = object : FakeGitHub() {
+            override suspend fun vulnerabilityAlertsFor(owner: String, repo: String) = listOf(
+                alert(PullRequestInfo("https://github.com/navikt/some-repo/pull/1", "OPEN")),
+                alert(PullRequestInfo("https://github.com/navikt/some-repo/pull/2", "CLOSED")),
+                alert(PullRequestInfo("https://github.com/navikt/some-repo/pull/3", "MERGED")),
+                alert(null)
+            )
+        }
+        val handler = GitHubCollectHandler(gitHub, FakeWhodis(), kafka)
+        handler.collect(GitHubCollectRequest(repositories = listOf("navikt/some-repo")))
+
+        val message = Json.decodeFromString<GitHubRepositoryMessage>(
+            kafka.sentMessages.first { it.first == "github_vulnerability_data" }.second
+        )
+        assertEquals(
+            listOf("https://github.com/navikt/some-repo/pull/1", null, null, null),
+            message.vulnerabilities.map { it.dependabotUpdatePullRequestUrl }
+        )
     }
 
     @Test

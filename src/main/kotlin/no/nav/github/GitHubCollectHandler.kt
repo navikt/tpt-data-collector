@@ -75,7 +75,10 @@ class GitHubCollectHandler(
                     severity = vuln.severity,
                     identifiers = alert.securityAdvisory?.identifiers ?: emptyList(),
                     dependencyScope = alert.dependencyScope,
-                    dependabotUpdatePullRequestUrl = alert.dependabotUpdate?.pullRequest?.permalink,
+                    // GitHub keeps the last Dependabot PR on an alert even after it is closed/merged
+                    dependabotUpdatePullRequestUrl = alert.dependabotUpdate?.pullRequest
+                        ?.takeIf { it.state == "OPEN" }
+                        ?.permalink,
                     publishedAt = alert.securityAdvisory?.publishedAt,
                     cvssScore = alert.securityAdvisory?.cvss?.score,
                     summary = alert.securityAdvisory?.summary,
