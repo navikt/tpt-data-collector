@@ -130,7 +130,8 @@ data class DependabotUpdateInfo(
 
 @Serializable
 data class PullRequestInfo(
-    @SerialName("permalink") val permalink: String
+    @SerialName("permalink") val permalink: String,
+    @SerialName("state") val state: String? = null
 )
 
 @Serializable
