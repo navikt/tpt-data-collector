@@ -11,6 +11,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.application.install
+import io.ktor.server.application.log
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
@@ -39,6 +40,7 @@ import java.net.URI
 import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
@@ -53,9 +55,10 @@ import no.nav.github.GitHubCollectRequest
 import no.nav.github.GithubWebhookHandler
 import no.nav.github.RealGitHub
 import no.nav.github.WebhookPayload
-import no.nav.kafka.KafkaSender
-import no.nav.kafka.KafkaSenderInterface
 import no.nav.metrics.TPTMetrics
+import no.nav.tpt.TexasTokenProvider
+import no.nav.tpt.TptBackend
+import no.nav.tpt.TptBackendClient
 import no.nav.tpt.TptRequestHandler
 import no.nav.whodis.RealWhodis
 import no.nav.whodis.Whodis
@@ -79,24 +82,28 @@ fun main() {
         neoDriver.verifyConnectivity()
         val dataStore = Neo4jDatastore(neoDriver)
 
-        val kafka = KafkaSender()
+        val tptBackend = TptBackendClient(
+            httpClient,
+            config.tptBackendUrl,
+            TexasTokenProvider(httpClient, config.naisTokenEndpoint, config.tptBackendTarget),
+        )
 
         val whodis = RealWhodis(httpClient, config.whodisUrl)
 
-        businessModule(gitHub, dataStore, kafka, whodis, config)
+        businessModule(gitHub, dataStore, tptBackend, whodis, config)
         naisModule()
     }.start(wait = true)
 }
 
 fun Application.businessModule(gitHub: GitHub,
                                datastore: Datastore,
-                               kafka: KafkaSenderInterface,
+                               tptBackend: TptBackend,
                                whodis: Whodis,
                                config: ApplikasjonsConfig) {
     val checks = Checks(gitHub, datastore)
-    val githubWebhookHandler = GithubWebhookHandler(checks, kafka, whodis)
-    val tptRequestHandler = TptRequestHandler(gitHub, checks, kafka)
-    val gitHubCollectHandler = GitHubCollectHandler(gitHub, whodis, kafka)
+    val githubWebhookHandler = GithubWebhookHandler(checks, tptBackend, whodis)
+    val tptRequestHandler = TptRequestHandler(gitHub, checks, tptBackend)
+    val gitHubCollectHandler = GitHubCollectHandler(gitHub, whodis, tptBackend)
     val teamSlugPattern = Regex("^[a-z0-9][a-z0-9-]*$")
 
     install(Authentication) {
@@ -142,10 +149,10 @@ fun Application.businessModule(gitHub: GitHub,
                     return@post
                 }
 
-                launch(Dispatchers.IO) {
+                runInBackground("GitHub webhook for ${payload.repository.name}") {
                     githubWebhookHandler.handle(payload)
                 }
-                call.respond(OK)
+                call.respond(HttpStatusCode.Accepted)
             }
         }
 
@@ -156,10 +163,10 @@ fun Application.businessModule(gitHub: GitHub,
                     call.respond(HttpStatusCode.BadRequest)
                     return@post
                 }
-                launch(Dispatchers.IO) {
+                runInBackground("checks for team $teamSlug") {
                     tptRequestHandler.runAllChecksFor(teamSlug)
                 }
-                call.respond(OK)
+                call.respond(HttpStatusCode.Accepted)
             }
 
             post("/collect/github") {
@@ -174,11 +181,23 @@ fun Application.businessModule(gitHub: GitHub,
                     call.respond(HttpStatusCode.BadRequest)
                     return@post
                 }
-                launch(Dispatchers.IO) {
+                runInBackground("GitHub collection for $body") {
                     gitHubCollectHandler.collect(body)
                 }
                 call.respond(HttpStatusCode.Accepted)
             }
+        }
+    }
+}
+
+private fun Application.runInBackground(description: String, work: suspend () -> Unit) {
+    launch(Dispatchers.IO) {
+        try {
+            work()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.error("Background job failed: $description", e)
         }
     }
 }

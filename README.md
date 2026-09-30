@@ -16,9 +16,9 @@ Receives GitHub webhook events (push events). Protected by HMAC-SHA256 signature
 
 **Request body:** GitHub webhook payload
 
-**Response:** `200 OK`
+**Response:** `202 Accepted` — checks run asynchronously; `400 Bad Request` if the payload cannot be parsed
 
-**What it does:** Runs all golden path checks (file checks, GitHub API checks, datastore checks) for the repository that triggered the push, and publishes results to Kafka.
+**What it does:** Runs all golden path checks (file checks, GitHub API checks, datastore checks) for the repository that triggered the push, and sends the results to tpt-backend (`POST /callbacks/checks`).
 
 ---
 
@@ -30,9 +30,9 @@ Triggers a full golden path check run for all repositories owned by the given NA
 
 **Path parameter:** `slug` — NAIS team slug (lowercase alphanumeric and hyphens)
 
-**Response:** `200 OK` — collection runs asynchronously
+**Response:** `202 Accepted` — checks run asynchronously; `400 Bad Request` for an invalid slug
 
-**What it does:** Fetches all repositories for the team from the GitHub API, runs all golden path checks on each repository, and publishes results to Kafka.
+**What it does:** Fetches all repositories for the team from the GitHub API, runs all golden path checks on each repository, and sends one result per repository to tpt-backend (`POST /callbacks/checks`). All pages of the team's repositories are fetched.
 
 ---
 
@@ -57,9 +57,9 @@ Triggers collection of GitHub vulnerability alert data for a given set of teams 
 
 **Response:** `202 Accepted` — collection runs asynchronously
 
-**What it does:** Resolves repositories for each team via whodis, merges with any directly specified repos, deduplicates, then for each unique repository fetches all open vulnerability alerts from the GitHub GraphQL API (paginated) and publishes one message per repository to Kafka. Repositories with no open alerts still produce a message with an empty `vulnerabilities` list so tpt-backend can clear stale data.
+**What it does:** Resolves repositories for each team via whodis, merges with any directly specified repos, deduplicates, then for each unique repository fetches all open vulnerability alerts from the GitHub GraphQL API (paginated) and sends them to tpt-backend, one callback per repository. Repositories with no open alerts still produce a callback with an empty `vulnerabilities` list so tpt-backend can clear stale data.
 
-**Kafka message format** (key: `github_vulnerability_data`):
+**Callback payload** (`POST /callbacks/github/vulnerabilities`):
 
 ```json
 {
@@ -94,6 +94,19 @@ Readiness probe. Returns `200 OK` when the application is ready to serve traffic
 ### `GET /internal/metrics`
 
 Prometheus metrics scrape endpoint.
+
+## Results sent to tpt-backend
+
+All results are delivered as callbacks to [tpt-backend](https://github.com/navikt/tpt-backend) (`TPT_BACKEND_URL`), authenticated with an Entra ID machine-to-machine token for `TPT_BACKEND_TARGET`, fetched from the Nais token endpoint.
+
+| Callback | When |
+|---|---|
+| `POST /callbacks/github/sync/started` | Before a `/collect/github` run starts. Body: `{"teams": [...], "timestamp": "..."}` |
+| `POST /callbacks/github/vulnerabilities` | Once per repository during a `/collect/github` run |
+| `POST /callbacks/github/sync/complete` | After a `/collect/github` run. Always sent, also when the run fails |
+| `POST /callbacks/checks` | Once per repository for `/team/{slug}` and GitHub webhooks |
+
+Failed callbacks (network errors, `5xx`, `408`, `429`) are retried with exponential backoff. Callbacks that still fail are logged and counted in the `tpt_backend_callbacks_failed` metric, tagged with `callback`.
 
 ## License
 [MIT](LICENSE).

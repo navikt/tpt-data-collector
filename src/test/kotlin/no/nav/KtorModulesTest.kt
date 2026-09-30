@@ -13,7 +13,7 @@ import java.nio.file.Paths
 import no.nav.config.ApplikasjonsConfig
 import no.nav.datastore.FakeDatastore
 import no.nav.github.FakeGitHub
-import no.nav.kafka.DummyKafkaSender
+import no.nav.tpt.FakeTptBackend
 import no.nav.whodis.FakeWhodis
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -23,7 +23,7 @@ class KtorModulesTest {
     fun `operational endpoints remain available independently of GitHub`() = testApplication {
         application {
             businessModule(FakeGitHub(), FakeDatastore(),
-                DummyKafkaSender(), FakeWhodis(), ApplikasjonsConfig())
+                FakeTptBackend(), FakeWhodis(), ApplikasjonsConfig())
             naisModule()
         }
 
@@ -40,7 +40,7 @@ class KtorModulesTest {
     fun `GH webhooks must have mac auth present in header`() = testApplication {
         application {
             businessModule(FakeGitHub(), FakeDatastore(),
-                DummyKafkaSender(), FakeWhodis(), ApplikasjonsConfig())
+                FakeTptBackend(), FakeWhodis(), ApplikasjonsConfig())
         }
         val response = client.post("/webhook/github")
         assertEquals(HttpStatusCode.Unauthorized, response.status)
@@ -50,7 +50,7 @@ class KtorModulesTest {
     fun `Correct signature grants access to webhook endpoint`() = testApplication {
         application {
             businessModule(FakeGitHub(), FakeDatastore(),
-                DummyKafkaSender(), FakeWhodis(), ApplikasjonsConfig())
+                FakeTptBackend(), FakeWhodis(), ApplikasjonsConfig())
         }
         val path = Paths.get("src/test/resources/github_push_webhook.json")
         val requestBody = Files.readString(path)
@@ -60,13 +60,13 @@ class KtorModulesTest {
             // Signature calculated using the default dummy secret from ApplikasjonsConfig
             header("X-Hub-Signature-256", "sha256=468d95ef1e0ef6b498a78f0b46a3485c65bcc115c136f18a045aa6433bcf313e")
         }
-        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpStatusCode.Accepted, response.status)
     }
 
     @Test
     fun `Incorrect signature is denied by webhook endpoint`() = testApplication {
         application {
-            businessModule(FakeGitHub(), FakeDatastore(), DummyKafkaSender(), FakeWhodis(), ApplikasjonsConfig())
+            businessModule(FakeGitHub(), FakeDatastore(), FakeTptBackend(), FakeWhodis(), ApplikasjonsConfig())
         }
         val path = Paths.get("src/test/resources/github_push_webhook.json")
         val requestBody = Files.readString(path)

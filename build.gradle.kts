@@ -16,9 +16,6 @@ dependencies {
     implementation(libs.bouncycastle.pkix)
     implementation(libs.nimbus.jose)
 
-    // Kafka
-    implementation(libs.kafka)
-
     // Metrics
     implementation(libs.metrics.ktor)
     implementation(libs.metrics.prometheus)
@@ -32,6 +29,7 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.ktor.server.test.host)
+    testImplementation(libs.ktor.client.mock)
 }
 
 tasks {

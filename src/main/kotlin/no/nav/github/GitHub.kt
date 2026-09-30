@@ -13,6 +13,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.http.HttpHeaders.Accept
 import io.ktor.http.HttpHeaders.Authorization
+import io.ktor.http.HttpHeaders.Link
 import io.ktor.http.HttpHeaders.UserAgent
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -123,10 +124,19 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     }
 
     override suspend fun allReposForTeam(teamName: String): List<String> {
-        val url = "$apiBaseUrl/orgs/navikt/teams/$teamName/repos"
-        val authToken = retrieveAccessToken()
-        val reposResponse: List<ReposForTeamResponse> = makeHttpRequest(Get, url, authToken)
-        return reposResponse.filter { !it.archived }.map { it.name }
+        val repos = mutableListOf<ReposForTeamResponse>()
+        var url: String? = "$apiBaseUrl/orgs/navikt/teams/$teamName/repos?per_page=100"
+        while (url != null) {
+            val response = httpClient.request(url) {
+                method = Get
+                header(Authorization, "Bearer ${retrieveAccessToken()}")
+                header(Accept, "application/json")
+                header(UserAgent, "Nav IT McBotface")
+            }
+            repos += response.body<List<ReposForTeamResponse>>()
+            url = nextPageUrl(response.headers[Link])
+        }
+        return repos.filter { !it.archived }.map { it.name }
     }
 
     override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> {
@@ -234,6 +244,14 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         return AccessToken(response.token, response.expiresAt)
     }
 }
+
+// GitHub paginates REST responses via the Link header: <https://...&page=2>; rel="next", <...>; rel="last"
+internal fun nextPageUrl(linkHeader: String?): String? =
+    linkHeader?.split(",")
+        ?.map { it.trim() }
+        ?.firstOrNull { link -> link.split(";").drop(1).any { it.trim() == "rel=\"next\"" } }
+        ?.substringAfter("<")
+        ?.substringBefore(">")
 
 internal fun needsRefresh(now: Instant = Clock.System.now(), expiresAt: Instant): Boolean {
     val in10Mins = now.plus(10.minutes)

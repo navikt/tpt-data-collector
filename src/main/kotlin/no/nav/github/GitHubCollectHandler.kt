@@ -1,10 +1,11 @@
 package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import no.nav.tpt.TptBackend
 import no.nav.whodis.Whodis
-import no.nav.kafka.KafkaSenderInterface
 import java.time.Instant
 
 @Serializable
@@ -22,17 +23,25 @@ data class GitHubSyncEvent(
 class GitHubCollectHandler(
     private val gitHub: GitHub,
     private val whodis: Whodis,
-    private val kafka: KafkaSenderInterface
+    private val backend: TptBackend
 ) {
     private val logger = KtorSimpleLogger(this::class.java.name)
 
     suspend fun collect(request: GitHubCollectRequest) {
-        val startedEvent = GitHubSyncEvent(teams = request.teams, timestamp = Instant.now().toString())
-        // Keys must match KafkaKey constants in tpt-backend (lowercase snake_case).
-        // SseFanoutConsumer in tpt-backend forwards these to the frontend over SSE.
-        kafka.sendToKafka("github_vuln_sync_started", Json.encodeToString(startedEvent))
-        logger.info("Published GITHUB_VULN_SYNC_STARTED for teams ${request.teams}")
+        try {
+            backend.sendSyncStarted(GitHubSyncEvent(teams = request.teams, timestamp = Instant.now().toString()))
+            logger.info("Sent GitHub sync started for teams ${request.teams}")
+            collectVulnerabilityData(request)
+        } finally {
+            // The frontend waits for this signal, so it must be sent exactly once, even if collection fails or is cancelled.
+            withContext(NonCancellable) {
+                backend.sendSyncComplete(GitHubSyncEvent(teams = request.teams, timestamp = Instant.now().toString()))
+                logger.info("Sent GitHub sync complete for teams ${request.teams}")
+            }
+        }
+    }
 
+    private suspend fun collectVulnerabilityData(request: GitHubCollectRequest) {
         // 1. Resolve repos for each team via whodis
         val repoToTeams = mutableMapOf<String, MutableSet<String>>()
 
@@ -53,7 +62,7 @@ class GitHubCollectHandler(
             repoToTeams.getOrPut(repo) { mutableSetOf() }
         }
 
-        // 3. For each unique repo, fetch vulnerability alerts and publish
+        // 3. For each unique repo, fetch vulnerability alerts and send them to the backend
         for ((nameWithOwner, owningTeams) in repoToTeams) {
             val parts = nameWithOwner.split("/")
             if (parts.size != 2) {
@@ -93,15 +102,9 @@ class GitHubCollectHandler(
                 vulnerabilities = vulnerabilities
             )
 
-            kafka.sendToKafka("github_vulnerability_data", Json.encodeToString(message))
-            logger.info("Published vulnerability data for $nameWithOwner (${vulnerabilities.size} alerts)")
+            if (backend.sendVulnerabilityData(message)) {
+                logger.info("Sent vulnerability data for $nameWithOwner (${vulnerabilities.size} alerts)")
+            }
         }
-
-        val completedEvent = GitHubSyncEvent(teams = request.teams, timestamp = Instant.now().toString())
-        // Key must match KafkaKey.GITHUB_VULN_SYNC_COMPLETE in tpt-backend (lowercase snake_case).
-        // SseFanoutConsumer in tpt-backend forwards this to the frontend over SSE to signal completion.
-        // Must be sent only once, after ALL repos for all teams in this request have been processed.
-        kafka.sendToKafka("github_vuln_sync_complete", Json.encodeToString(completedEvent))
-        logger.info("Published GITHUB_VULN_SYNC_COMPLETE for teams ${request.teams}")
     }
 }

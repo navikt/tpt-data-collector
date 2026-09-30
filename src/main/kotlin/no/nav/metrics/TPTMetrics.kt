@@ -55,6 +55,16 @@ object TPTMetrics {
 
     fun whodisLookups(n: Int = 1) = whodisLookupCounter.increment(n.toDouble())
 
+    fun callbackFailed(callback: String) =
+        Counter.builder("tpt_backend_callbacks_failed")
+            .description("Callbacks to tpt-backend that still failed after all retries")
+            .tag("callback", callback)
+            .register(registry)
+            .increment()
+
+    fun callbacksFailed(callback: String): Double =
+        registry.find("tpt_backend_callbacks_failed").tag("callback", callback).counter()?.count() ?: 0.0
+
     fun checksRanIn(type: String, duration: Duration) =
         Timer.builder("checks_runtime")
             .tag("type", type)

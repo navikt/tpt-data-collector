@@ -1,47 +1,5 @@
 package no.nav.config
 
-import org.apache.kafka.clients.CommonClientConfigs
-import org.apache.kafka.clients.producer.ProducerConfig
-import org.apache.kafka.common.config.SslConfigs
-import org.apache.kafka.common.serialization.StringSerializer
-
-class KafkaConfig(
-    val brokers: String = getEnvVar("KAFKA_BROKERS", "brokers"),
-    val truststoreLocation: String = getEnvVar("KAFKA_TRUSTSTORE_PATH", ""),
-    val keystoreLocation: String = getEnvVar("KAFKA_KEYSTORE_PATH", ""),
-    val credstorePassword: String = getEnvVar("KAFKA_CREDSTORE_PASSWORD", ""),
-    val clientId: String = getEnvVar("KAFKA_CLIENT_ID", "clientId"),
-    val tptTopic: String = getEnvVar("TPT_TOPIC"),
-) {
-    fun producerProperties(): Map<String, Any> {
-        val producerConfigs = mutableMapOf(
-            ProducerConfig.BOOTSTRAP_SERVERS_CONFIG to brokers,
-            ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java,
-            ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java,
-            ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG to true, // Safe order
-            ProducerConfig.ACKS_CONFIG to "all", // Safe data
-            ProducerConfig.CLIENT_ID_CONFIG to clientId,
-        )
-        if (truststoreLocation.isNotEmpty()) {
-            producerConfigs.putAll(securityConfigs())
-        }
-        return producerConfigs.toMap()
-    }
-
-    fun securityConfigs() =
-        mapOf(
-            CommonClientConfigs.SECURITY_PROTOCOL_CONFIG to "SSL",
-            SslConfigs.SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_CONFIG to "",
-            SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG to "JKS",
-            SslConfigs.SSL_KEYSTORE_TYPE_CONFIG to "PKCS12",
-            SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG to truststoreLocation,
-            SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG to credstorePassword,
-            SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG to keystoreLocation,
-            SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG to credstorePassword,
-            SslConfigs.SSL_KEY_PASSWORD_CONFIG to credstorePassword,
-        )
-}
-
 class ApplikasjonsConfig(
     val githubAppId: String = getEnvVar("GITHUB_APP_ID", "dummy"),
     val githubAppInstallationId: String = getEnvVar("GITHUB_APP_INSTALLATION_ID", "dummy"),
@@ -54,6 +12,9 @@ class ApplikasjonsConfig(
     val openIdAudience: String = getEnvVar("AZURE_APP_CLIENT_ID", "dummy"),
     val openIdJwksUri: String = getEnvVar("AZURE_OPENID_CONFIG_JWKS_URI", "https://localhost"),
     val whodisUrl: String = getEnvVar("WHODIS_URL", "http://whodis"),
+    val tptBackendUrl: String = getEnvVar("TPT_BACKEND_URL", "http://tpt-backend"),
+    val tptBackendTarget: String = getEnvVar("TPT_BACKEND_TARGET", "api://prod-gcp.appsec.tpt-backend/.default"),
+    val naisTokenEndpoint: String = getEnvVar("NAIS_TOKEN_ENDPOINT", "http://localhost/token"),
 ) {
     init {
         val configuredGithubAppValues = listOf(githubAppId, githubAppInstallationId, githubAppPrivateKey)
