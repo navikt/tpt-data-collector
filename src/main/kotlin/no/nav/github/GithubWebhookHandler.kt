@@ -1,14 +1,13 @@
 package no.nav.github
 
 import io.ktor.util.logging.KtorSimpleLogger
-import kotlinx.serialization.json.Json
 import no.nav.whodis.Whodis
 import no.nav.checks.CheckResultsForRepo
 import no.nav.checks.Checks
-import no.nav.kafka.KafkaSenderInterface
 import no.nav.metrics.TPTMetrics
+import no.nav.tpt.TptBackend
 
-class GithubWebhookHandler(val checks: Checks, val kafka: KafkaSenderInterface, val whodis: Whodis) {
+class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whodis: Whodis) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
     suspend fun handle(webhookPayload: WebhookPayload) {
@@ -29,8 +28,9 @@ class GithubWebhookHandler(val checks: Checks, val kafka: KafkaSenderInterface, 
         }
         val results = checks.runAll(webhookPayload.repository.name, changedFiles)
         val resultsForRepo = CheckResultsForRepo(repo, repoOwners, results)
-        kafka.sendToKafka("CheckResult", Json.encodeToString(resultsForRepo))
-        TPTMetrics.msgsSentToTpt(1)
+        if (backend.sendCheckResults(resultsForRepo)) {
+            TPTMetrics.msgsSentToTpt(1)
+        }
     }
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
