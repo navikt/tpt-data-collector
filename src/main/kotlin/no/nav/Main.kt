@@ -124,6 +124,7 @@ fun Application.businessModule(gitHub: GitHub,
 
     install(CallLogging) {
         level = Level.INFO
+        disableDefaultColors()
         filter { call ->
             !call.request.path().startsWith("/internal")
         }
@@ -251,6 +252,5 @@ private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlug
         }
     }
 }
-
 
 
