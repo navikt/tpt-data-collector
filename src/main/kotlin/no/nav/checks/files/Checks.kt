@@ -3,6 +3,7 @@ package no.nav.checks.files
 import kotlin.time.Clock
 import no.nav.checks.CheckResult
 import no.nav.checks.Severity.HIGH
+import no.nav.checks.Severity.LOW
 import no.nav.checks.Severity.MEDIUM
 
 
@@ -276,4 +277,30 @@ class HasGitignoreCheck : FileBasedCheck {
                 listOf("$repo does not contain a .gitignore file"))
         }
     }
+}
+
+class ReadmeCheck : FileBasedCheck {
+    private val name = this.javaClass.simpleName
+    private val desc = "All GitHub repos should have a descriptive Readme."
+    private val severity = LOW
+    private val readmePattern = "readme".toRegex(RegexOption.IGNORE_CASE)
+
+    override fun filesICareAbout(allAvailableFiles: Set<String>) =
+        allAvailableFiles.filter { it.contains(readmePattern) }
+
+    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val now = Clock.System.now()
+        if (filesToCheck.isEmpty()) return CheckResult.NeedsWork(name, desc, severity, now,
+            listOf("$repo does not appear to have a Readme"))
+
+        val containsEmptyOrOneLiners =
+            filesToCheck.filter{ it.value.trim().isEmpty() || it.value.indexOf('\n') == -1 }
+        return if (containsEmptyOrOneLiners.isNotEmpty()) {
+            CheckResult.NeedsWork(name, desc, severity, now,
+                listOf("${containsEmptyOrOneLiners.keys.joinToString { " and " }} is empty or contains only one line"))
+        } else {
+            CheckResult.AllGood(name, desc, severity, now)
+        }
+    }
+
 }

@@ -14,6 +14,7 @@ import no.nav.checks.files.CurlPipeShellCheck
 import no.nav.checks.files.HasGitignoreCheck
 import no.nav.checks.files.NpxUsageCheck
 import no.nav.checks.files.PwnRequestCheck
+import no.nav.checks.files.ReadmeCheck
 import no.nav.checks.files.UnpinnedActionVersionsCheck
 import no.nav.checks.githubapi.CriticalVulnerabilitiesCheck
 import no.nav.checks.githubapi.GithubToolingStatusCheck
@@ -26,9 +27,9 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
     private val fileBasedChecks = listOf(
-        DistrolessCheck(), UnpinnedActionVersionsCheck(),
-        CopyDotDotCheck(), PwnRequestCheck(), NpxUsageCheck(),
-        CurlPipeShellCheck(), BaseImageIsNotPinnedCheck(), HasGitignoreCheck()
+        DistrolessCheck(), UnpinnedActionVersionsCheck(), CopyDotDotCheck(),
+        PwnRequestCheck(), NpxUsageCheck(), CurlPipeShellCheck(), BaseImageIsNotPinnedCheck(),
+        HasGitignoreCheck(), ReadmeCheck()
     )
     private val datastoreBasedChecks = listOf(OldDeploymentsCheck(datastore))
     private val gitHubAPIBasedChecks = listOf(
