@@ -3,6 +3,7 @@
 # Docs: https://gh.io/actions-lockfile
 version: 'v0.0.3'
 workflows:
+    '.github/workflows/actions.lock': []
     '.github/workflows/codeql.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-java@v6.0.1'
