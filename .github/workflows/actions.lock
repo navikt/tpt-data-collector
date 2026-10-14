@@ -3,7 +3,6 @@
 # Docs: https://gh.io/actions-lockfile
 version: 'v0.0.3'
 workflows:
-    '.github/workflows/actions.lock': []
     '.github/workflows/codeql.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-java@v6.0.1'
@@ -68,6 +67,14 @@ dependencies:
         uses:
             - 'actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb'
             - 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
+    'aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25':
+        ref: 'v0.36.0'
+        commit: 'sha1-ed142fd0673e97e23eac54620cfb913e5ce36c25'
+        owner_id: 12783832
+        repo_id: 268833180
+        uses:
+            - 'actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae'
+            - 'aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514'
     'aquasecurity/trivy-action@v0.36.0':
         ref: 'v0.36.0'
         commit: 'sha1-ed142fd0673e97e23eac54620cfb913e5ce36c25'
@@ -76,11 +83,6 @@ dependencies:
         uses:
             - 'actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae'
             - 'aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514'
-    'docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a':
-        ref: 'v7.3.0'
-        commit: 'sha1-53b7df96c91f9c12dcc8a07bcb9ccacbed38856a'
-        owner_id: 5429470
-        repo_id: 241092383
     'docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc':
         ref: 'v7.4.0'
         commit: 'sha1-c3c9e263c25d99ce0380d002d59b67737d91b0dc'
@@ -123,17 +125,8 @@ dependencies:
         repo_id: 617411776
         uses:
             - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
+            - 'aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25'
             - 'oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4'
-            - 'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6'
-    'nais/attest-sign@c778867caf15ed06f2893afd5723898560b2dcc9':
-        ref: 'v2.0.18'
-        commit: 'sha1-c778867caf15ed06f2893afd5723898560b2dcc9'
-        owner_id: 29488289
-        repo_id: 617411776
-        uses:
-            - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
-            - 'aquasecurity/trivy-action@v0.36.0'
-            - 'oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d'
             - 'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6'
     'nais/deploy@master':
         ref: 'master'
@@ -146,11 +139,9 @@ dependencies:
         owner_id: 29488289
         repo_id: 590934741
         uses:
-            - 'docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a'
             - 'docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc'
             - 'docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302'
             - 'nais/attest-sign@c02a0aedb111660e9fcf79e505753d6a7af4dcd5'
-            - 'nais/attest-sign@c778867caf15ed06f2893afd5723898560b2dcc9'
             - 'nais/login@40b72a35a18ddf2ad74b632461139ab838cc2a2f'
     'nais/login@40b72a35a18ddf2ad74b632461139ab838cc2a2f':
         ref: 'v0'
@@ -169,11 +160,6 @@ dependencies:
     'oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4':
         ref: 'v2.0.2'
         commit: 'sha1-005458ad77f1c8facd38a094e4af2e69e5607ff4'
-        owner_id: 81890686
-        repo_id: 590286646
-    'oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d':
-        ref: 'v2.0.1'
-        commit: 'sha1-1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d'
         owner_id: 81890686
         repo_id: 590286646
     'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6':
