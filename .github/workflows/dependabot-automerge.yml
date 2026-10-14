@@ -19,7 +19,7 @@ jobs:
       contents: write # muse be able to apply dependency changes
     steps:
       - name: Automerge Dependabot PRs
-        uses: navikt/automerge-dependabot@v1.5
+        uses: navikt/automerge-dependabot@v1.6.0
         with:
           token: ${{ github.token }}
           blackout-periods: '2025-07-01/2025-07-31,2025-12-20/2026-01-02'
