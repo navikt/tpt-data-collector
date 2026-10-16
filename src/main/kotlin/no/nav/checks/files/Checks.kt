@@ -33,6 +33,7 @@ class DistrolessCheck : FileBasedCheck {
             fileContents.lines()
                 .map { it.lowercase() }
                 .filter { it.startsWith("from") }
+                .filterNot{ it.contains("{") } // templated image name, we can't verify these
         }.last().substringAfter("from ").substringBeforeLast("as ")
         val nonApprovedImageUsed = approvedImages.none { lastBaseImageUsed.startsWith(it) }
 
@@ -242,6 +243,7 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
             fileContents.lines()
                 .map { it.lowercase().trim() }
                 .filter { it.startsWith("from") }
+                .filterNot{ it.contains("{") } // templated image name, we can't verify these
                 .map { it.substringAfter("from ").substringBeforeLast("as ").trim() }
                 .filterNot(::isChainguard)
                 .filterNot { namedIntermediaries.contains(it) }

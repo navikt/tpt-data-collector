@@ -46,4 +46,19 @@ class DistrolessCheckTest {
         assertTrue(results is CheckResult.NeedsWork)
     }
 
+    @Test
+    fun `We are unable to check if the image name is templated `() {
+        val filesToCheck = mapOf(
+            "Dockerfile" to """
+               FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/thing:1.0 AS builder
+               COPY . .
+               FROM { templated }
+               RUN echo "hello"
+            """.trimIndent()
+        )
+        val check = DistrolessCheck()
+        val results = check.run("bogusrepo", filesToCheck)
+        assertTrue(results is CheckResult.AllGood)
+    }
+
 }
