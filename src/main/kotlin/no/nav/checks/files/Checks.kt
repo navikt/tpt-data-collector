@@ -89,18 +89,21 @@ class UnpinnedActionVersionsCheck : FileBasedCheck {
     private val severity = MEDIUM
     private val workflowFilePattern = Regex("""^\.github/workflows/[A-Za-z0-9_-]+\.ya?ml$""")
     private val unpinnedPattern = Regex("""^\s*-\s*uses:\s*[A-Za-z0-9_\-/]+@v.*$""")
+    private val lockfile = ".github/workflows/actions.lock"
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { workflowFilePattern.matches(it) }
+        allAvailableFiles.filter { workflowFilePattern.matches(it) } + lockfile
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+        val now = Clock.System.now()
+        if (filesToCheck.containsKey(lockfile)) return CheckResult.AllGood(name, desc, severity, now)
+
         val filesToFix = filesToCheck.flatMap { (filename, fileContents) ->
             fileContents.lines()
                 .filter { unpinnedPattern.matches(it) }
                 .map { filename }
                 .distinct()
         }
-        val now = Clock.System.now()
         return if (filesToFix.isEmpty()) {
             CheckResult.AllGood(name, desc, severity, now)
         } else {

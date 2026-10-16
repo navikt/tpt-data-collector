@@ -8,16 +8,16 @@ import org.junit.jupiter.api.Test
 class UnpinnedActionVersionsCheckTest {
 
     @Test
-    fun `This check should only care about workflow files`() {
+    fun `This check should only care about workflow and lock files`() {
         val allAvailableFiles = setOf(".github/workflows/yolo.yaml", ".github/workflows/yolo2.yml", "README.md", "Dockerfile")
         val check = UnpinnedActionVersionsCheck()
-        val expected = listOf(".github/workflows/yolo.yaml", ".github/workflows/yolo2.yml")
+        val expected = listOf(".github/workflows/yolo.yaml", ".github/workflows/yolo2.yml", ".github/workflows/actions.lock")
         val actual = check.filesICareAbout(allAvailableFiles)
         assertEquals(expected, actual)
     }
 
     @Test
-    fun `Unpinned versions are bad`() {
+    fun `Unpinned versions without a lockfile is bad`() {
         val filesToCheck = mapOf(
             ".github/workflows/yolo.yaml" to """
                    steps:
@@ -40,6 +40,23 @@ class UnpinnedActionVersionsCheckTest {
                    steps:
                      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
             """.trimIndent()
+        )
+        val check = UnpinnedActionVersionsCheck()
+        val results = check.run("bogusrepo", filesToCheck)
+        assertTrue(results is CheckResult.AllGood)
+    }
+
+    @Test
+    fun `Unpinned versions accompanied by a lockfile is good`() {
+        val filesToCheck = mapOf(
+            ".github/workflows/yolo.yaml" to """
+                   steps:
+                     - uses: actions/checkout@v7.0.0
+                       with:
+                         persist-credentials: false
+                     - uses: actions/whatever@v3
+            """.trimIndent(),
+            ".github/workflows/actions.lock" to """whatever""".trimIndent()
         )
         val check = UnpinnedActionVersionsCheck()
         val results = check.run("bogusrepo", filesToCheck)
