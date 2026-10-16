@@ -299,7 +299,7 @@ class ReadmeCheck : FileBasedCheck {
             filesToCheck.filter{ it.value.trim().isEmpty() || it.value.indexOf('\n') == -1 }
         return if (containsEmptyOrOneLiners.isNotEmpty()) {
             CheckResult.NeedsWork(name, desc, severity, now,
-                listOf("${containsEmptyOrOneLiners.keys.joinToString { " and " }} is empty or contains only one line"))
+                listOf("${containsEmptyOrOneLiners.keys.joinToString( " and ")} is empty or contains only one line"))
         } else {
             CheckResult.AllGood(name, desc, severity, now)
         }
