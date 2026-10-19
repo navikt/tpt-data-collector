@@ -26,6 +26,6 @@ jobs:
           java-version: 25
           distribution: temurin
           cache: gradle
-      - uses: gradle/actions/setup-gradle@v6.3.0
+      - uses: gradle/actions/setup-gradle@v6.4.0
       - name: Test & build
         run: ./gradlew test build
