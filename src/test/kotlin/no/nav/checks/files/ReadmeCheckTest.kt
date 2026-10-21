@@ -8,14 +8,13 @@ import org.junit.jupiter.api.Test
 class ReadmeCheckTest {
 
     @Test
-    fun `This check should only care about readme files`() {
+    fun `This check should only care about readme files at the repo root`() {
         val allAvailableFiles = setOf("README.md", "Readme.md", "readme.md",
             "README.txt", "Readme.txt", "readme.txt",
-            "README", "Readme", "readme",
+            "README", "Readme", "readme", "folder/README.md",
             "whatever", "./subdir/yolo", "IRRELEVANT")
         val check = ReadmeCheck()
         val expected = listOf("README.md", "Readme.md", "readme.md",
-            "README.txt", "Readme.txt", "readme.txt",
             "README", "Readme", "readme")
         val actual = check.filesICareAbout(allAvailableFiles)
         assertEquals(expected, actual)

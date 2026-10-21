@@ -288,10 +288,10 @@ class ReadmeCheck : FileBasedCheck {
     private val name = this.javaClass.simpleName
     private val desc = "All GitHub repos should have a descriptive Readme."
     private val severity = LOW
-    private val readmePattern = "readme".toRegex(RegexOption.IGNORE_CASE)
+    private val readmePattern = "^readme(\\.md)?$".toRegex()
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { it.contains(readmePattern) }
+        allAvailableFiles.filter { readmePattern.matches(it.lowercase()) }
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
         val now = Clock.System.now()
