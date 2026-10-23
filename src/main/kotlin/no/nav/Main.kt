@@ -37,6 +37,7 @@ import io.micrometer.core.instrument.binder.logging.Log4j2Metrics
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics
 import io.micrometer.core.instrument.binder.system.UptimeMetrics
 import java.net.URI
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -238,15 +239,15 @@ private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlug
     onCall { call ->
         val bodyAsText = call.receiveText()
         call.attributes[AttributeKey<String>("body")] = bodyAsText
-        val signature = call.request.headers["X-Hub-Signature-256"] ?: ""
-        if (signature.isEmpty()) {
+        val theirs = call.request.headers["X-Hub-Signature-256"] ?: ""
+        if (theirs.isEmpty()) {
             call.respond(HttpStatusCode.Unauthorized, "Signature is missing")
             return@onCall
         }
         val digest = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
             .doFinal(bodyAsText.toByteArray())
-        val hmac = "sha256=${digest.fold("") { str, byte -> str + "%02x".format(byte) }}"
-        if (signature != hmac) {
+        val ours = "sha256=${digest.fold("") { str, byte -> str + "%02x".format(byte) }}"
+        if (!MessageDigest.isEqual(theirs.toByteArray(), ours.toByteArray())) {
             call.respond(HttpStatusCode.Unauthorized, "Signature is invalid")
             return@onCall
         }
