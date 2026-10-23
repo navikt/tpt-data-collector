@@ -18,17 +18,26 @@ open class FakeWhodis: Whodis {
 }
 
 class RealWhodis(val httpClient: HttpClient, val baseUrl: String): Whodis {
-
     override suspend fun ownerTeamsFor(repo: String): List<String> =
-        httpClient.request("$baseUrl/repository/$repo/owners") {
-            method = Get
-            header(Accept, "application/json")
-        }.body()
+        if (isValid(repo)) {
+            httpClient.request("$baseUrl/repository/$repo/owners") {
+                method = Get
+                header(Accept, "application/json")
+            }.body()
+        } else {
+            emptyList()
+        }
 
     override suspend fun repositoriesForTeam(teamSlug: String): List<String> =
-        httpClient.request("$baseUrl/nais/$teamSlug/repositories") {
-            method = Get
-            header(Accept, "application/json")
-        }.body()
+        if (isValid(teamSlug)) {
+            httpClient.request("$baseUrl/nais/$teamSlug/repositories") {
+                method = Get
+                header(Accept, "application/json")
+            }.body()
+        } else {
+            emptyList()
+        }
+
+    internal fun isValid(arg: String) = arg.isNotBlank() && !arg.contains("..")
 
 }
