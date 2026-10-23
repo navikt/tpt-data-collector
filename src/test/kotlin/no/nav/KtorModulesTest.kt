@@ -16,9 +16,16 @@ import no.nav.github.FakeGitHub
 import no.nav.tpt.FakeTptBackend
 import no.nav.whodis.FakeWhodis
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class KtorModulesTest {
+
+    @BeforeEach
+    fun setup() {
+        System.setProperty("GITHUB_WEBHOOK_SECRET", "dummy")
+    }
+
     @Test
     fun `operational endpoints remain available independently of GitHub`() = testApplication {
         application {

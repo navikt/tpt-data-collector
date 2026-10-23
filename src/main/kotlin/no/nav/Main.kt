@@ -235,7 +235,6 @@ fun Application.naisModule() {
 
 private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlugin("GitHubWebhookReceiver") {
     val secretKey = SecretKeySpec(macSecret.toByteArray(), "HmacSHA256")
-    val mac = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
     onCall { call ->
         val bodyAsText = call.receiveText()
         call.attributes[AttributeKey<String>("body")] = bodyAsText
@@ -244,7 +243,8 @@ private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlug
             call.respond(HttpStatusCode.Unauthorized, "Signature is missing")
             return@onCall
         }
-        val digest = mac.doFinal(bodyAsText.toByteArray())
+        val digest = Mac.getInstance("HmacSHA256").also { it.init(secretKey) }
+            .doFinal(bodyAsText.toByteArray())
         val hmac = "sha256=${digest.fold("") { str, byte -> str + "%02x".format(byte) }}"
         if (signature != hmac) {
             call.respond(HttpStatusCode.Unauthorized, "Signature is invalid")

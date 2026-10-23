@@ -1,20 +1,20 @@
 package no.nav.config
 
 class ApplikasjonsConfig(
-    val githubAppId: String = getEnvVar("GITHUB_APP_ID", "dummy"),
-    val githubAppInstallationId: String = getEnvVar("GITHUB_APP_INSTALLATION_ID", "dummy"),
-    val githubAppPrivateKey: String = getEnvVar("GITHUB_APP_PRIVATE_KEY", "dummy"),
-    val githubWebhookSecret: String = getEnvVar("GITHUB_WEBHOOK_SECRET", "dummy"),
-    val neo4jUri: String = getEnvVar("NEO4J_URI", "dummy"),
-    val neo4jUser: String = getEnvVar("NEO4J_USER", "dummy"),
-    val neo4Password: String = getEnvVar("NEO4J_PASSWORD", "dummy"),
-    val openIdIssuer: String = getEnvVar("AZURE_OPENID_CONFIG_ISSUER", "dummy"),
-    val openIdAudience: String = getEnvVar("AZURE_APP_CLIENT_ID", "dummy"),
-    val openIdJwksUri: String = getEnvVar("AZURE_OPENID_CONFIG_JWKS_URI", "https://localhost"),
-    val whodisUrl: String = getEnvVar("WHODIS_URL", "http://whodis"),
-    val tptBackendUrl: String = getEnvVar("TPT_BACKEND_URL", "http://tpt-backend"),
-    val tptBackendTarget: String = getEnvVar("TPT_BACKEND_TARGET", "api://prod-gcp.appsec.tpt-backend/.default"),
-    val naisTokenEndpoint: String = getEnvVar("NAIS_TOKEN_ENDPOINT", "http://localhost/token"),
+    val githubAppId: String = fromEnv("GITHUB_APP_ID", "dummy"),
+    val githubAppInstallationId: String = fromEnv("GITHUB_APP_INSTALLATION_ID", "dummy"),
+    val githubAppPrivateKey: String = fromEnv("GITHUB_APP_PRIVATE_KEY", "dummy"),
+    val githubWebhookSecret: String = fromEnv("GITHUB_WEBHOOK_SECRET"),
+    val neo4jUri: String = fromEnv("NEO4J_URI", "dummy"),
+    val neo4jUser: String = fromEnv("NEO4J_USER", "dummy"),
+    val neo4Password: String = fromEnv("NEO4J_PASSWORD", "dummy"),
+    val openIdIssuer: String = fromEnv("AZURE_OPENID_CONFIG_ISSUER", "dummy"),
+    val openIdAudience: String = fromEnv("AZURE_APP_CLIENT_ID", "dummy"),
+    val openIdJwksUri: String = fromEnv("AZURE_OPENID_CONFIG_JWKS_URI", "https://localhost"),
+    val whodisUrl: String = fromEnv("WHODIS_URL", "http://whodis"),
+    val tptBackendUrl: String = fromEnv("TPT_BACKEND_URL", "http://tpt-backend"),
+    val tptBackendTarget: String = fromEnv("TPT_BACKEND_TARGET", "api://prod-gcp.appsec.tpt-backend/.default"),
+    val naisTokenEndpoint: String = fromEnv("NAIS_TOKEN_ENDPOINT", "http://localhost/token"),
 ) {
     init {
         val configuredGithubAppValues = listOf(githubAppId, githubAppInstallationId, githubAppPrivateKey)
@@ -27,9 +27,11 @@ class ApplikasjonsConfig(
     }
 }
 
-fun getEnvVar(
+fun fromEnv(
     varName: String,
     defaultValue: String? = null,
-) = System.getenv(varName) ?: defaultValue ?: throw RuntimeException("Missing required variable $varName")
+) = System.getenv(varName) ?:
+    System.getProperty(varName) ?:
+    defaultValue ?:
+    throw RuntimeException("Missing required variable $varName")
 
-fun getOptionalEnvVar(varName: String): String? = System.getenv(varName)
