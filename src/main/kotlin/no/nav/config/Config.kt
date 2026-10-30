@@ -17,6 +17,9 @@ class ApplikasjonsConfig(
     val naisTokenEndpoint: String = fromEnv("NAIS_TOKEN_ENDPOINT", "http://localhost/token"),
 ) {
     init {
+        require(githubWebhookSecret.isNotBlank()) {
+            "GITHUB_WEBHOOK_SECRET must not be blank"
+        }
         val configuredGithubAppValues = listOf(githubAppId, githubAppInstallationId, githubAppPrivateKey)
             .count { !it.isNullOrBlank() }
         if (configuredGithubAppValues in 1..2) {
@@ -34,4 +37,3 @@ fun fromEnv(
     System.getProperty(varName) ?:
     defaultValue ?:
     throw RuntimeException("Missing required variable $varName")
-
