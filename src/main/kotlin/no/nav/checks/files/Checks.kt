@@ -92,7 +92,7 @@ class UnpinnedActionVersionsCheck : FileBasedCheck {
     private val lockfile = ".github/workflows/actions.lock"
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { workflowFilePattern.matches(it) } + lockfile
+        allAvailableFiles.filter { workflowFilePattern.matches(it) || it == lockfile }
 
     override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
         val now = Clock.System.now()

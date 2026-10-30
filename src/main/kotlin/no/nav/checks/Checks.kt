@@ -2,6 +2,7 @@ package no.nav.checks
 
 import io.ktor.util.logging.KtorSimpleLogger
 import kotlin.time.measureTimedValue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -68,33 +69,40 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         relevantFiles: Set<String>
     ): List<Deferred<Result<CheckResult>>> =
         coroutineScope {
-            val filesNeededByChecks = fileBasedChecks.flatMap { it.filesICareAbout(relevantFiles) }.toSet()
+            val filesNeededByChecks = fileBasedChecks
+                .associateWith { it.filesICareAbout(relevantFiles).toSet() }
+                .filterValues { it.isNotEmpty() }
             if (filesNeededByChecks.isEmpty()) {
                 logger.info("No file based checks to run for '$repoName'")
                 return@coroutineScope emptyList()
             }
 
-            val allFilesWeNeed = filesNeededByChecks.associateWith { filePath ->
-                async {
-                    runCatching { gitHub.readFileContents(repoName, filePath) }
-                        .onFailure{ ex -> logger.error("Failed to read file $filePath: $ex") }
-                        .getOrElse { "" }
-                }.await()
-            }
-            logger.info("Read the contents of ${allFilesWeNeed.size} file(s)")
-
-            fileBasedChecks.filter { it.filesICareAbout(allFilesWeNeed.keys).toSet().isNotEmpty() }
-                .map { check ->
-                    val  filesNeededForThisCheck = check.filesICareAbout(allFilesWeNeed.keys).toSet()
+            val allFilesWeNeed = filesNeededByChecks.values.flatten().toSet()
+                .intersect(relevantFiles)
+                .associateWith { filePath ->
                     async {
-                        runCatching {
-                            check.run(
-                                repoName,
-                                allFilesWeNeed.filterKeys { filesNeededForThisCheck.contains(it) })
-                        }
+                        runCatching { gitHub.readFileContents(repoName, filePath) }
+                            .onFailure { ex ->
+                                if (ex is CancellationException) throw ex
+                                logger.error("Failed to read file $filePath in repo $repoName: $ex")
+                            }
+                    }.await()
+                }
+            logger.info("Read the contents of ${allFilesWeNeed.values.count { it.isSuccess }} file(s)")
+
+            filesNeededByChecks.map { (check, filesNeededForThisCheck) ->
+                async {
+                    runCatching {
+                        check.run(
+                            repoName,
+                            allFilesWeNeed
+                                .filterKeys { it in filesNeededForThisCheck }
+                                .mapValues { (_, contents) -> contents.getOrThrow() })
+                    }.onFailure { ex ->
+                        if (ex is CancellationException) throw ex
                     }
                 }
-
+            }
         }
 
     private suspend fun runDatastoreBasedChecks(repoName: String): List<Deferred<Result<CheckResult>>> =
