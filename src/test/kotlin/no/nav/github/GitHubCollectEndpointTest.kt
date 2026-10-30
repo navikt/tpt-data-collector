@@ -19,7 +19,13 @@ class GitHubCollectEndpointTest {
     @Test
     fun `POST collect-github without auth returns 401`() = testApplication {
         application {
-            businessModule(FakeGitHub(), FakeDatastore(), FakeTptBackend(), FakeWhodis(), ApplikasjonsConfig())
+            businessModule(
+                FakeGitHub(),
+                FakeDatastore(),
+                FakeTptBackend(),
+                FakeWhodis(),
+                ApplikasjonsConfig(githubWebhookSecret = "dummy"),
+            )
         }
         val response = client.post("/collect/github") {
             contentType(ContentType.Application.Json)
