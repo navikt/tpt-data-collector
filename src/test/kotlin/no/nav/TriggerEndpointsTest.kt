@@ -44,7 +44,12 @@ class TriggerEndpointsTest {
     private fun config(): ApplikasjonsConfig {
         val jwks = tempDir.resolve("jwks.json")
         Files.writeString(jwks, JWKSet(signingKey.toPublicJWK()).toString())
-        return ApplikasjonsConfig(openIdIssuer = issuer, openIdAudience = audience, openIdJwksUri = jwks.toUri().toString())
+        return ApplikasjonsConfig(
+            githubWebhookSecret = "dummy",
+            openIdIssuer = issuer,
+            openIdAudience = audience,
+            openIdJwksUri = jwks.toUri().toString(),
+        )
     }
 
     private fun token(): String {
@@ -134,12 +139,14 @@ class TriggerEndpointsTest {
                 return super.sendCheckResults(results)
             }
         }
-        application { businessModule(FakeGitHub(), FakeDatastore(), backend, FakeWhodis(), ApplikasjonsConfig()) }
+        application {
+            businessModule(FakeGitHub(), FakeDatastore(), backend, FakeWhodis(), ApplikasjonsConfig(githubWebhookSecret = "dummy"))
+        }
 
         val response = client.post("/webhook/github") {
             contentType(ContentType.Application.Json)
             setBody(Files.readString(Paths.get("src/test/resources/github_push_webhook.json")))
-            // Signature calculated using the default dummy secret from ApplikasjonsConfig
+            // Signature calculated using the explicitly configured test secret.
             header("X-Hub-Signature-256", "sha256=468d95ef1e0ef6b498a78f0b46a3485c65bcc115c136f18a045aa6433bcf313e")
         }
 
