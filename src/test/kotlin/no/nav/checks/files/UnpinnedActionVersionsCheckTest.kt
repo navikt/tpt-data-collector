@@ -11,9 +11,17 @@ class UnpinnedActionVersionsCheckTest {
     fun `This check should only care about workflow and lock files`() {
         val allAvailableFiles = setOf(".github/workflows/yolo.yaml", ".github/workflows/yolo2.yml", "README.md", "Dockerfile")
         val check = UnpinnedActionVersionsCheck()
-        val expected = listOf(".github/workflows/yolo.yaml", ".github/workflows/yolo2.yml", ".github/workflows/actions.lock")
+        val expected = listOf(".github/workflows/yolo.yaml", ".github/workflows/yolo2.yml")
         val actual = check.filesICareAbout(allAvailableFiles)
         assertEquals(expected, actual)
+    }
+
+    @Test
+    fun `An existing lockfile is selected`() {
+        val lockfile = ".github/workflows/actions.lock"
+        val check = UnpinnedActionVersionsCheck()
+
+        assertEquals(listOf(lockfile), check.filesICareAbout(setOf(lockfile, "README.md")))
     }
 
     @Test
