@@ -11,6 +11,7 @@ dependencies {
     implementation(libs.bundles.ktor)
 
     implementation(libs.bundles.logging)
+    runtimeOnly(libs.log4j.jpl)
 
     implementation(libs.kotlinx.serialization)
     implementation(libs.bouncycastle.pkix)
@@ -63,4 +64,3 @@ tasks {
         gradleVersion = "9.8.1"
     }
 }
-
