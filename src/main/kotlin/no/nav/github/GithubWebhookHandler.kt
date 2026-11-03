@@ -15,7 +15,7 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
         val repo = webhookPayload.repository.name
         logger.info("'$repo' had a push to push to '${webhookPayload.ref}'")
         if (!isRelevant(webhookPayload)) {
-            logger.info("Skipping checks for '$repo, it is not relevant'")
+            logger.debug("Skipping checks for '$repo, it is not relevant'")
             return
         }
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
