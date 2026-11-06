@@ -3,6 +3,7 @@ package no.nav
 import com.auth0.jwk.JwkProviderBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.HttpStatusCode.Companion.InternalServerError
@@ -42,6 +43,7 @@ import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
@@ -73,6 +75,10 @@ fun main() {
         val httpClient = HttpClient(CIO) {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
+            }
+            install(HttpTimeout) {
+                connectTimeoutMillis = 2.seconds.inWholeMilliseconds
+                requestTimeoutMillis = 5.seconds.inWholeMilliseconds
             }
             expectSuccess = true
         }
