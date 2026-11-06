@@ -202,12 +202,14 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     }
 
     private suspend inline fun <reified T> makeHttpRequest(httpMethod: HttpMethod, url: String, authToken: String): T =
-        httpClient.request(url) {
-            method = httpMethod
-            header(Authorization, "Bearer $authToken")
-            header(Accept, "application/json")
-            header(UserAgent, "Nav IT McBotface")
-        }.body()
+        retryWithBackoff {
+            httpClient.request(url) {
+                method = httpMethod
+                header(Authorization, "Bearer $authToken")
+                header(Accept, "application/json")
+                header(UserAgent, "Nav IT McBotface")
+            }.body()
+        }
 
     private suspend fun retrieveAccessToken(): String {
         if (!tokenNeedsRefresh()) {
