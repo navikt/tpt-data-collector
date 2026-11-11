@@ -114,7 +114,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         }
 
 
-    private suspend fun runGitHubAPIBasedChecks(repoName: String): List<Deferred<Result<CheckResult>>> =
+    private suspend fun runGitHubAPIBasedChecks(repoName: String): List<Deferred<Result<CheckResult?>>> =
         coroutineScope {
             gitHubAPIBasedChecks.map { check ->
                 async { runCatching { check.run(repoName) } }

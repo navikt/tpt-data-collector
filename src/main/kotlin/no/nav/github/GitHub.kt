@@ -16,6 +16,7 @@ import io.ktor.http.HttpHeaders.Authorization
 import io.ktor.http.HttpHeaders.Link
 import io.ktor.http.HttpHeaders.UserAgent
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpMethod.Companion.Get
@@ -39,7 +40,7 @@ import kotlinx.serialization.json.put
 
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
-    suspend fun dependabotOpenSecurityAlertsFor(repoName: String): Map<String, String>
+    suspend fun dependabotOpenSecurityAlertsFor(repoName: String): DependabotAlertsResult
     suspend fun allFilePathsIn(repoName: String): List<String>
     suspend fun allReposForTeam(teamName: String): List<String>
     suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
@@ -52,9 +53,8 @@ open class FakeGitHub: GitHub {
         return ""
     }
 
-    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String): Map<String, String> {
-        return mapOf("yololib" to "medium", "boguslib" to "critical")
-    }
+    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String): DependabotAlertsResult =
+        DependabotAlertsResult.Available(mapOf("yololib" to "medium", "boguslib" to "critical"))
 
     override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
         return listOf(GithubCodeScanningAnalysis(
@@ -91,16 +91,32 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         return response.decode()
     }
 
-    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String): Map<String, String> {
+    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String): DependabotAlertsResult {
         val url = "$apiBaseUrl/repos/navikt/$repoName/dependabot/alerts?state=open"
         val authToken = retrieveAccessToken()
         return try {
-            val response: List<DependabotAlert> = makeHttpRequest(Get, url, authToken)
-            response.flatMap { it.advisory.vulnerabilities }.associate { it.pkg.name to it.severity }
+            retryWithBackoff {
+                try {
+                    val response = githubRequest(Get, url, authToken).body<List<DependabotAlert>>()
+                    DependabotAlertsResult.Available(
+                        response.flatMap { it.advisory.vulnerabilities }.associate { it.pkg.name to it.severity }
+                    )
+                } catch (e: ClientRequestException) {
+                    if (e.isDependabotDisabled()) DependabotAlertsResult.Disabled else throw e
+                }
+            }
         } catch (e: ClientRequestException) {
-            if (e.response.status == HttpStatusCode.NotFound) emptyMap() else throw e
+            if (e.response.status == HttpStatusCode.NotFound) {
+                DependabotAlertsResult.Available(emptyMap())
+            } else throw e
         }
     }
+
+    private suspend fun ClientRequestException.isDependabotDisabled(): Boolean =
+        response.status == HttpStatusCode.Forbidden &&
+            response.headers["Retry-After"] == null &&
+            response.headers["X-RateLimit-Remaining"]?.trim()?.toLongOrNull() != 0L &&
+            response.gitHubErrorMessage() == "Dependabot alerts are disabled for this repository."
 
     override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
         val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100"
@@ -228,13 +244,16 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
 
     private suspend inline fun <reified T> makeHttpRequest(httpMethod: HttpMethod, url: String, authToken: String): T =
         retryWithBackoff {
+            githubRequest(httpMethod, url, authToken).body()
+        }
+
+    private suspend fun githubRequest(httpMethod: HttpMethod, url: String, authToken: String): HttpResponse =
             httpClient.request(url) {
                 method = httpMethod
                 header(Authorization, "Bearer $authToken")
                 header(Accept, "application/json")
                 header(UserAgent, "Nav IT McBotface")
-            }.body()
-        }
+            }
 
     private suspend fun retrieveAccessToken(): String {
         if (!tokenNeedsRefresh()) {

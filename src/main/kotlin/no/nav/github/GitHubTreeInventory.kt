@@ -1,16 +1,10 @@
 package no.nav.github
 
 import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.yield
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
-
-private val treeErrorJson = Json { ignoreUnknownKeys = true }
 
 internal data class TreeInventoryLimits(
     val maxTreeFetches: Int = 250,
@@ -102,12 +96,7 @@ internal class GitHubTreeInventory(
 
     private suspend fun ClientRequestException.isEmptyRepository(): Boolean {
         if (response.status != HttpStatusCode.Conflict) return false
-        val error = try {
-            treeErrorJson.decodeFromString<GitHubTreeError>(response.bodyAsText())
-        } catch (_: SerializationException) {
-            return false
-        }
-        return error.message == "Git Repository is empty."
+        return response.gitHubErrorMessage() == "Git Repository is empty."
     }
 
     private fun fail(reason: String): Nothing = throw GitHubFileInventoryException(repoName, reason)
@@ -118,9 +107,6 @@ internal class GitHubTreeInventory(
         val entries: Iterator<TreeEntry>
     )
 }
-
-@Serializable
-private data class GitHubTreeError(val message: String)
 
 internal class GitHubFileInventoryException(repoName: String, reason: String) :
     IllegalStateException("Incomplete GitHub file inventory for navikt/$repoName: $reason")

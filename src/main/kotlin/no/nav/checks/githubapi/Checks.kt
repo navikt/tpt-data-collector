@@ -1,25 +1,35 @@
 package no.nav.checks.githubapi
 
+import io.ktor.util.logging.KtorSimpleLogger
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import no.nav.checks.CheckResult
 import no.nav.checks.Severity
 import no.nav.checks.Severity.HIGH
+import no.nav.github.DependabotAlertsResult
 import no.nav.github.GitHub
 
 interface GitHubApiBasedCheck {
-    suspend fun run(repo: String): CheckResult
+    /** Returns null when an expected unavailable capability prevents assessment. */
+    suspend fun run(repo: String): CheckResult?
 }
 
 class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
     private val name = "HasCriticalVulns"
     private val desc = "Crtitical vulnerabilities should be handled asap."
     private val severity = HIGH
+    private val logger = KtorSimpleLogger(this::class.java.name)
 
-    override suspend fun run(repo: String): CheckResult {
+    override suspend fun run(repo: String): CheckResult? {
+        val alerts = when (val result = gitHub.dependabotOpenSecurityAlertsFor(repo)) {
+            is DependabotAlertsResult.Available -> result.alerts
+            DependabotAlertsResult.Disabled -> {
+                logger.info("Skipping $name for navikt/$repo: Dependabot alerts are disabled")
+                return null
+            }
+        }
         val now = Clock.System.now()
-        val nrOfCriticalVulns = gitHub.dependabotOpenSecurityAlertsFor(repo)
-            .count { (_, severity) -> severity == "critical" }
+        val nrOfCriticalVulns = alerts.count { (_, severity) -> severity == "critical" }
         return if (nrOfCriticalVulns > 0) {
             CheckResult.NeedsWork(name,desc, severity, now,
                 listOf("GitHub reports $nrOfCriticalVulns critical vulnerabilities in $repo")
