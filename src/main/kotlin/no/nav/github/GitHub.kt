@@ -30,6 +30,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -114,14 +115,19 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         }
     }
 
-    override suspend fun allFilePathsIn(repoName: String): List<String> {
-        val rootRepoUrl = "$apiBaseUrl/repos/navikt/$repoName"
-        val authToken = retrieveAccessToken()
-        val rootRepoResponse: RepoRootResponse = makeHttpRequest(Get, rootRepoUrl, authToken)
-        val treeUrl = "$apiBaseUrl/repos/navikt/$repoName/git/trees/${rootRepoResponse.defaultBranch}?recursive=true"
-        val treeResponse: TreeResponse = makeHttpRequest(Get, treeUrl, authToken)
-        return treeResponse.tree.map { it.path }
-    }
+    override suspend fun allFilePathsIn(repoName: String): List<String> =
+        allFilePathsIn(repoName, TreeInventoryLimits())
+
+    internal suspend fun allFilePathsIn(repoName: String, limits: TreeInventoryLimits): List<String> =
+        withTimeoutOrNull(limits.timeout) {
+            val rootRepoUrl = "$apiBaseUrl/repos/navikt/$repoName"
+            val authToken = retrieveAccessToken()
+            val rootRepoResponse: RepoRootResponse = makeHttpRequest(Get, rootRepoUrl, authToken)
+            GitHubTreeInventory(repoName, limits) { ref, recursive ->
+                val treeUrl = "$rootRepoUrl/git/trees/$ref" + if (recursive) "?recursive=true" else ""
+                makeHttpRequest<TreeResponse>(Get, treeUrl, authToken)
+            }.paths(rootRepoResponse.defaultBranch)
+        } ?: throw GitHubFileInventoryException(repoName, "inventory time budget exceeded")
 
     override suspend fun allReposForTeam(teamName: String): List<String> {
         val repos = mutableListOf<ReposForTeamResponse>()

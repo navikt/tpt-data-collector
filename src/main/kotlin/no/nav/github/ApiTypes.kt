@@ -73,6 +73,10 @@ internal data class RepoRootResponse(
 
 @Serializable
 internal data class TreeResponse(
+    @SerialName("sha")
+    val sha: String,
+    @SerialName("truncated")
+    val truncated: Boolean,
     @SerialName("tree")
     val tree: List<TreeEntry>
 )
@@ -81,7 +85,18 @@ internal data class TreeResponse(
 internal data class TreeEntry(
     @SerialName("path")
     val path: String,
+    @SerialName("sha")
+    val sha: String,
+    @SerialName("type")
+    val type: TreeEntryType
 )
+
+@Serializable
+internal enum class TreeEntryType {
+    @SerialName("blob") BLOB,
+    @SerialName("tree") TREE,
+    @SerialName("commit") COMMIT
+}
 
 @Serializable
 internal data class ReposForTeamResponse(val name: String, val archived: Boolean = false)
