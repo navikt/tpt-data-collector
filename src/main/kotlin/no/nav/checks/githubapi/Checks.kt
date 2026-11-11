@@ -21,18 +21,17 @@ class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
     private val logger = KtorSimpleLogger(this::class.java.name)
 
     override suspend fun run(repo: String): CheckResult? {
-        val alerts = when (val result = gitHub.dependabotOpenSecurityAlertsFor(repo)) {
-            is DependabotAlertsResult.Available -> result.alerts
+        val hasCriticalAlerts = when (val result = gitHub.hasOpenCriticalDependabotAlerts(repo)) {
+            is DependabotAlertsResult.Available -> result.hasOpenCriticalAlerts
             DependabotAlertsResult.Disabled -> {
                 logger.info("Skipping $name for navikt/$repo: Dependabot alerts are disabled")
                 return null
             }
         }
         val now = Clock.System.now()
-        val nrOfCriticalVulns = alerts.count { (_, severity) -> severity == "critical" }
-        return if (nrOfCriticalVulns > 0) {
+        return if (hasCriticalAlerts) {
             CheckResult.NeedsWork(name,desc, severity, now,
-                listOf("GitHub reports $nrOfCriticalVulns critical vulnerabilities in $repo")
+                listOf("GitHub reports open critical vulnerabilities in $repo")
             )
         } else {
             CheckResult.AllGood(name, desc, severity, now)

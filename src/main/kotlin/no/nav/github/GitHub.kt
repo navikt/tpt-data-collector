@@ -31,9 +31,10 @@ import kotlinx.serialization.json.put
 
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
-    suspend fun dependabotOpenSecurityAlertsFor(repoName: String): DependabotAlertsResult
+    suspend fun hasOpenCriticalDependabotAlerts(repoName: String): DependabotAlertsResult
     suspend fun allFilePathsIn(repoName: String): List<String>
     suspend fun allReposForTeam(teamName: String): List<String>
+    /** Newest analysis per category within the 100 most recent analyses; older categories are excluded. */
     suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
     suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode>
     suspend fun latestCommitTimeFor(repoName: String): Instant
@@ -44,8 +45,8 @@ open class FakeGitHub: GitHub {
         return ""
     }
 
-    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String): DependabotAlertsResult =
-        DependabotAlertsResult.Available(mapOf("yololib" to "medium", "boguslib" to "critical"))
+    override suspend fun hasOpenCriticalDependabotAlerts(repoName: String): DependabotAlertsResult =
+        DependabotAlertsResult.Available(true)
 
     override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
         return listOf(GithubCodeScanningAnalysis(
@@ -90,19 +91,17 @@ class RealGitHub internal constructor(
         return response.decode()
     }
 
-    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String): DependabotAlertsResult {
-        val url = "$apiBaseUrl/repos/navikt/$repoName/dependabot/alerts?state=open"
+    override suspend fun hasOpenCriticalDependabotAlerts(repoName: String): DependabotAlertsResult {
+        val url = "$apiBaseUrl/repos/navikt/$repoName/dependabot/alerts?state=open&severity=critical&per_page=1"
         val authToken = retrieveAccessToken()
         return transport.execute(GitHubOperation.DEPENDABOT_ALERTS, repoName) {
             try {
                 val response = request(Get, url, authToken).body<List<DependabotAlert>>()
-                DependabotAlertsResult.Available(
-                    response.flatMap { it.advisory.vulnerabilities }.associate { it.pkg.name to it.severity }
-                )
+                DependabotAlertsResult.Available(response.isNotEmpty())
             } catch (e: ClientRequestException) {
                 when {
                     e.isDependabotDisabled() -> DependabotAlertsResult.Disabled
-                    e.response.status == HttpStatusCode.NotFound -> DependabotAlertsResult.Available(emptyMap())
+                    e.response.status == HttpStatusCode.NotFound -> DependabotAlertsResult.Available(false)
                     else -> throw e
                 }
             }
@@ -116,7 +115,7 @@ class RealGitHub internal constructor(
             response.gitHubErrorMessage() == "Dependabot alerts are disabled for this repository."
 
     override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
-        val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100"
+        val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100&sort=created&direction=desc"
         val authToken = retrieveAccessToken()
         return transport.execute(GitHubOperation.CODE_SCANNING, repoName) {
             try {

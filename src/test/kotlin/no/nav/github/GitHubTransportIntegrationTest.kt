@@ -136,7 +136,7 @@ internal class GitHubTransportIntegrationTest {
             when (operation) {
                 GitHubOperation.FILE_CONTENTS -> assertEquals("hello", gitHub.readFileContents("repo", "file"))
                 GitHubOperation.DEPENDABOT_ALERTS ->
-                    assertEquals(DependabotAlertsResult.Available(emptyMap()), gitHub.dependabotOpenSecurityAlertsFor("repo"))
+                    assertEquals(DependabotAlertsResult.Available(false), gitHub.hasOpenCriticalDependabotAlerts("repo"))
                 GitHubOperation.CODE_SCANNING -> assertTrue(gitHub.latestCodeScanningAnalysesFor("repo").isEmpty())
                 GitHubOperation.REPOSITORY, GitHubOperation.TREE -> assertTrue(gitHub.allFilePathsIn("repo").isEmpty())
                 GitHubOperation.TEAM_REPOSITORIES, GitHubOperation.INSTALLATION_TOKEN ->

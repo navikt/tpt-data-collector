@@ -107,8 +107,16 @@ class GitHubExpectedResponsesTest {
                     tokenResponse
                 } else {
                     when {
-                        path.endsWith("/dependabot/alerts") -> assertEquals("open", request.url.parameters["state"])
-                        path.endsWith("/code-scanning/analyses") -> assertEquals("100", request.url.parameters["per_page"])
+                        path.endsWith("/dependabot/alerts") -> {
+                            assertEquals("open", request.url.parameters["state"])
+                            assertEquals("critical", request.url.parameters["severity"])
+                            assertEquals("1", request.url.parameters["per_page"])
+                        }
+                        path.endsWith("/code-scanning/analyses") -> {
+                            assertEquals("100", request.url.parameters["per_page"])
+                            assertEquals("created", request.url.parameters["sort"])
+                            assertEquals("desc", request.url.parameters["direction"])
+                        }
                         else -> error("Unexpected GitHub request path: $path")
                     }
                     responses[minOf(apiRequest++, responses.lastIndex)]
@@ -156,7 +164,7 @@ class GitHubExpectedResponsesTest {
     }
 
     @Test
-    fun `successful code scanning responses retain the newest analysis per category`() = runTest {
+    fun `code scanning retains newest per category within the first page without following history`() = runTest {
         val old = GithubCodeScanningAnalysis(
             "workflow-a", CodeScanningTool("CodeQL"), "", Instant.parse("2026-11-01T00:00:00Z"),
             "https://api.github.com/repos/navikt/repo/code-scanning/analyses/1"
@@ -169,7 +177,11 @@ class GitHubExpectedResponsesTest {
             category = "workflow-b",
             url = "https://api.github.com/repos/navikt/repo/code-scanning/analyses/3"
         )
-        withGitHub(listOf(Response(Json.encodeToString(listOf(old, newest, anotherCategory))))) { gitHub, paths ->
+        withGitHub(listOf(Response(
+            Json.encodeToString(listOf(old, newest, anotherCategory)),
+            headers = mapOf(HttpHeaders.Link to
+                """<https://api.github.com/repos/navikt/repo/code-scanning/analyses?page=2>; rel="next"""")
+        ))) { gitHub, paths ->
             assertEquals(listOf(newest, anotherCategory), gitHub.latestCodeScanningAnalysesFor("repo"))
             assertEquals(1, analysisRequests(paths))
         }
@@ -242,7 +254,7 @@ class GitHubExpectedResponsesTest {
     fun `disabled alerts are explicit and are not retried`() = runTest {
         withCapturedLogs { events ->
             withGitHub(listOf(Response(disabledResponse, HttpStatusCode.Forbidden))) { gitHub, paths ->
-                assertEquals(DependabotAlertsResult.Disabled, gitHub.dependabotOpenSecurityAlertsFor("repo"))
+                assertEquals(DependabotAlertsResult.Disabled, gitHub.hasOpenCriticalDependabotAlerts("repo"))
                 assertEquals(1, alertRequests(paths))
                 assertEquals(0L, currentTime)
                 assertTrue(events.none { it.level.isMoreSpecificThan(Level.WARN) })
@@ -253,18 +265,22 @@ class GitHubExpectedResponsesTest {
     @Test
     fun `successful empty alert collections remain available`() = runTest {
         withGitHub(listOf(Response("[]"))) { gitHub, paths ->
-            assertEquals(DependabotAlertsResult.Available(emptyMap()), gitHub.dependabotOpenSecurityAlertsFor("repo"))
+            assertEquals(DependabotAlertsResult.Available(false), gitHub.hasOpenCriticalDependabotAlerts("repo"))
             assertEquals(1, alertRequests(paths))
             assertEquals(0L, currentTime)
         }
     }
 
     @Test
-    fun `available alerts retain package severities`() = runTest {
-        withGitHub(listOf(Response(criticalAlerts))) { gitHub, paths ->
+    fun `a matching alert establishes critical alert existence without following more alerts`() = runTest {
+        withGitHub(listOf(Response(
+            criticalAlerts,
+            headers = mapOf(HttpHeaders.Link to
+                """<https://api.github.com/repos/navikt/repo/dependabot/alerts?after=1>; rel="next"""")
+        ))) { gitHub, paths ->
             assertEquals(
-                DependabotAlertsResult.Available(mapOf("example" to "critical")),
-                gitHub.dependabotOpenSecurityAlertsFor("repo")
+                DependabotAlertsResult.Available(true),
+                gitHub.hasOpenCriticalDependabotAlerts("repo")
             )
             assertEquals(1, alertRequests(paths))
         }
@@ -274,7 +290,7 @@ class GitHubExpectedResponsesTest {
     @MethodSource("otherForbiddenResponses")
     fun `other forbidden responses fail without blind retries`(body: String) = runTest {
         withGitHub(listOf(Response(body, HttpStatusCode.Forbidden))) { gitHub, paths ->
-            val failure = assertThrows<GitHubTransportException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
+            val failure = assertThrows<GitHubTransportException> { gitHub.hasOpenCriticalDependabotAlerts("repo") }
             assertEquals(HttpStatusCode.Forbidden, failure.response?.status)
             assertEquals(1, alertRequests(paths))
             assertEquals(0L, currentTime)
@@ -286,7 +302,7 @@ class GitHubExpectedResponsesTest {
     fun `rate limit headers take precedence over a disabled message`(header: String) = runTest {
         val value = if (header == "Retry-After") "60" else "0"
         withGitHub(listOf(Response(disabledResponse, HttpStatusCode.Forbidden, mapOf(header to value)))) { gitHub, paths ->
-            val failure = assertThrows<GitHubTransportException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
+            val failure = assertThrows<GitHubTransportException> { gitHub.hasOpenCriticalDependabotAlerts("repo") }
             assertEquals(HttpStatusCode.Forbidden, failure.response?.status)
             assertEquals(1, alertRequests(paths))
         }
@@ -296,7 +312,7 @@ class GitHubExpectedResponsesTest {
     @ValueSource(ints = [401, 429, 500])
     fun `a disabled message on another status is not a disabled result`(status: Int) = runTest {
         withGitHub(listOf(Response(disabledResponse, HttpStatusCode.fromValue(status)))) { gitHub, paths ->
-            val failure = assertThrows<GitHubTransportException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
+            val failure = assertThrows<GitHubTransportException> { gitHub.hasOpenCriticalDependabotAlerts("repo") }
             assertEquals(HttpStatusCode.fromValue(status), failure.response?.status)
             assertEquals(if (status == 500) 3 else 1, alertRequests(paths))
         }
@@ -305,7 +321,7 @@ class GitHubExpectedResponsesTest {
     @Test
     fun `Dependabot not found remains an empty success without retrying`() = runTest {
         withGitHub(listOf(Response("""{"message":"Not Found"}""", HttpStatusCode.NotFound))) { gitHub, paths ->
-            assertEquals(DependabotAlertsResult.Available(emptyMap()), gitHub.dependabotOpenSecurityAlertsFor("repo"))
+            assertEquals(DependabotAlertsResult.Available(false), gitHub.hasOpenCriticalDependabotAlerts("repo"))
             assertEquals(1, alertRequests(paths))
             assertEquals(0L, currentTime)
         }
@@ -317,7 +333,7 @@ class GitHubExpectedResponsesTest {
             Response("""{"message":"Unavailable"}""", HttpStatusCode.ServiceUnavailable),
             Response(disabledResponse, HttpStatusCode.Forbidden)
         )) { gitHub, paths ->
-            assertEquals(DependabotAlertsResult.Disabled, gitHub.dependabotOpenSecurityAlertsFor("repo"))
+            assertEquals(DependabotAlertsResult.Disabled, gitHub.hasOpenCriticalDependabotAlerts("repo"))
             assertEquals(2, alertRequests(paths))
             assertEquals(1000L, currentTime)
         }
@@ -329,7 +345,7 @@ class GitHubExpectedResponsesTest {
             responses = emptyList(),
             tokenResponse = Response(disabledResponse, HttpStatusCode.Forbidden)
         ) { gitHub, paths ->
-            assertThrows<GitHubTransportException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
+            assertThrows<GitHubTransportException> { gitHub.hasOpenCriticalDependabotAlerts("repo") }
             assertEquals(0, alertRequests(paths))
             assertEquals(1, paths.size)
         }
@@ -346,8 +362,8 @@ class GitHubExpectedResponsesTest {
                 val backend = FakeTptBackend()
                 val gitHub = object : FakeGitHub() {
                     override suspend fun allReposForTeam(teamName: String) = listOf("disabled", "empty", "critical")
-                    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String) =
-                        realGitHub.dependabotOpenSecurityAlertsFor(repoName)
+                    override suspend fun hasOpenCriticalDependabotAlerts(repoName: String) =
+                        realGitHub.hasOpenCriticalDependabotAlerts(repoName)
                 }
                 val before = failedChecks()
 
@@ -381,8 +397,8 @@ class GitHubExpectedResponsesTest {
                 HttpStatusCode.Forbidden
             ))) { realGitHub, _ ->
                 val gitHub = object : FakeGitHub() {
-                    override suspend fun dependabotOpenSecurityAlertsFor(repoName: String) =
-                        realGitHub.dependabotOpenSecurityAlertsFor(repoName)
+                    override suspend fun hasOpenCriticalDependabotAlerts(repoName: String) =
+                        realGitHub.hasOpenCriticalDependabotAlerts(repoName)
                 }
                 val before = failedChecks()
 
