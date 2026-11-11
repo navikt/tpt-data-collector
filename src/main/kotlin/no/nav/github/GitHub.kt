@@ -21,8 +21,10 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -33,6 +35,7 @@ interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
     suspend fun hasOpenCriticalDependabotAlerts(repoName: String): DependabotAlertsResult
     suspend fun allFilePathsIn(repoName: String): List<String>
+    /** Complete non-archived repository list, or failure; collection has a 60-second overall deadline. */
     suspend fun allReposForTeam(teamName: String): List<String>
     /** Newest analysis per category within the 100 most recent analyses; older categories are excluded. */
     suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
@@ -151,21 +154,25 @@ class RealGitHub internal constructor(
             }.paths(rootRepoResponse.defaultBranch)
         } ?: throw GitHubFileInventoryException(repoName, "inventory time budget exceeded")
 
-    override suspend fun allReposForTeam(teamName: String): List<String> {
-        val repos = mutableListOf<ReposForTeamResponse>()
-        var url: String? = "$apiBaseUrl/orgs/navikt/teams/$teamName/repos?per_page=100"
-        while (url != null) {
-            val authToken = retrieveAccessToken()
-            val pageUrl = url
-            val (page, next) = transport.execute(GitHubOperation.TEAM_REPOSITORIES, teamName) {
-                val response = request(Get, pageUrl, authToken)
-                response.body<List<ReposForTeamResponse>>() to nextPageUrl(response.headers[Link])
+    override suspend fun allReposForTeam(teamName: String): List<String> =
+        withTimeoutOrNull(60.seconds) {
+            val repos = mutableListOf<ReposForTeamResponse>()
+            val pagination = GitHubPagination()
+            var url: String? = "$apiBaseUrl/orgs/navikt/teams/$teamName/repos?per_page=100"
+            while (url != null) {
+                yield()
+                val pageUrl = pagination.visit(url)
+                val authToken = retrieveAccessToken()
+                val (page, next) = transport.execute(GitHubOperation.TEAM_REPOSITORIES, teamName) {
+                    val response = request(Get, pageUrl, authToken)
+                    response.body<List<ReposForTeamResponse>>() to
+                        nextPageUrl(response.headers.getAll(Link)?.joinToString(","))
+                }
+                repos += page
+                url = next
             }
-            repos += page
-            url = next
-        }
-        return repos.filter { !it.archived }.map { it.name }
-    }
+            repos.filter { !it.archived }.map { it.name }
+        } ?: throw GitHubPaginationException("team repository collection time budget exceeded")
 
     override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> {
         val graphqlUrl = "$apiBaseUrl/graphql"
@@ -299,14 +306,6 @@ class RealGitHub internal constructor(
 
 internal class GitHubVulnerabilityCollectionException(owner: String, repo: String, reason: String) :
     IllegalStateException("Incomplete GitHub vulnerability collection for $owner/$repo: $reason")
-
-// GitHub paginates REST responses via the Link header: <https://...&page=2>; rel="next", <...>; rel="last"
-internal fun nextPageUrl(linkHeader: String?): String? =
-    linkHeader?.split(",")
-        ?.map { it.trim() }
-        ?.firstOrNull { link -> link.split(";").drop(1).any { it.trim() == "rel=\"next\"" } }
-        ?.substringAfter("<")
-        ?.substringBefore(">")
 
 internal fun needsRefresh(now: Instant = Clock.System.now(), expiresAt: Instant): Boolean {
     val in10Mins = now.plus(10.minutes)
