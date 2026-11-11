@@ -9,19 +9,10 @@ import com.nimbusds.jwt.SignedJWT
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.call.body
-import io.ktor.client.request.header
-import io.ktor.client.request.request
-import io.ktor.http.HttpHeaders.Accept
-import io.ktor.http.HttpHeaders.Authorization
 import io.ktor.http.HttpHeaders.Link
-import io.ktor.http.HttpHeaders.UserAgent
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
-import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpMethod.Companion.Get
 import io.ktor.http.HttpMethod.Companion.Post
-import io.ktor.http.contentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.util.logging.KtorSimpleLogger
 import java.util.Date
@@ -76,7 +67,15 @@ open class FakeGitHub: GitHub {
 }
 
 @OptIn(ExperimentalAtomicApi::class)
-class RealGitHub(val httpClient: HttpClient, val appId: String, val installationId: String, privateKeyPEM: String): GitHub {
+class RealGitHub internal constructor(
+    val httpClient: HttpClient,
+    val appId: String,
+    val installationId: String,
+    privateKeyPEM: String,
+    private val transport: GitHubTransport
+): GitHub {
+    constructor(httpClient: HttpClient, appId: String, installationId: String, privateKeyPEM: String) :
+        this(httpClient, appId, installationId, privateKeyPEM, GitHubTransport(httpClient))
     private val apiBaseUrl = "https://api.github.com"
     val logger = KtorSimpleLogger(this::class.java.name)
 
@@ -87,28 +86,26 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     override suspend fun readFileContents(repoName: String, filePath: String): String {
         val url = "$apiBaseUrl/repos/navikt/$repoName/contents/$filePath"
         val authToken = retrieveAccessToken()
-        val response: FileContentsResponse = makeHttpRequest(Get, url, authToken)
+        val response: FileContentsResponse = makeHttpRequest(GitHubOperation.FILE_CONTENTS, repoName, Get, url, authToken)
         return response.decode()
     }
 
     override suspend fun dependabotOpenSecurityAlertsFor(repoName: String): DependabotAlertsResult {
         val url = "$apiBaseUrl/repos/navikt/$repoName/dependabot/alerts?state=open"
         val authToken = retrieveAccessToken()
-        return try {
-            retryWithBackoff {
-                try {
-                    val response = githubRequest(Get, url, authToken).body<List<DependabotAlert>>()
-                    DependabotAlertsResult.Available(
-                        response.flatMap { it.advisory.vulnerabilities }.associate { it.pkg.name to it.severity }
-                    )
-                } catch (e: ClientRequestException) {
-                    if (e.isDependabotDisabled()) DependabotAlertsResult.Disabled else throw e
+        return transport.execute(GitHubOperation.DEPENDABOT_ALERTS, repoName) {
+            try {
+                val response = request(Get, url, authToken).body<List<DependabotAlert>>()
+                DependabotAlertsResult.Available(
+                    response.flatMap { it.advisory.vulnerabilities }.associate { it.pkg.name to it.severity }
+                )
+            } catch (e: ClientRequestException) {
+                when {
+                    e.isDependabotDisabled() -> DependabotAlertsResult.Disabled
+                    e.response.status == HttpStatusCode.NotFound -> DependabotAlertsResult.Available(emptyMap())
+                    else -> throw e
                 }
             }
-        } catch (e: ClientRequestException) {
-            if (e.response.status == HttpStatusCode.NotFound) {
-                DependabotAlertsResult.Available(emptyMap())
-            } else throw e
         }
     }
 
@@ -121,9 +118,9 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
         val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100"
         val authToken = retrieveAccessToken()
-        return retryWithBackoff {
+        return transport.execute(GitHubOperation.CODE_SCANNING, repoName) {
             try {
-                val response = githubRequest(Get, url, authToken).body<List<GithubCodeScanningAnalysis>>()
+                val response = request(Get, url, authToken).body<List<GithubCodeScanningAnalysis>>()
                 response
                     .groupBy { it.category }
                     .map { (_, analyses) -> analyses.maxBy { it.createdAt } }
@@ -140,10 +137,18 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         withTimeoutOrNull(limits.timeout) {
             val rootRepoUrl = "$apiBaseUrl/repos/navikt/$repoName"
             val authToken = retrieveAccessToken()
-            val rootRepoResponse: RepoRootResponse = makeHttpRequest(Get, rootRepoUrl, authToken)
+            val rootRepoResponse: RepoRootResponse =
+                makeHttpRequest(GitHubOperation.REPOSITORY, repoName, Get, rootRepoUrl, authToken)
             GitHubTreeInventory(repoName, limits) { ref, recursive ->
                 val treeUrl = "$rootRepoUrl/git/trees/$ref" + if (recursive) "?recursive=true" else ""
-                makeHttpRequest<TreeResponse>(Get, treeUrl, authToken)
+                transport.execute(GitHubOperation.TREE, repoName) {
+                    try {
+                        request(Get, treeUrl, authToken).body<TreeResponse>()
+                    } catch (ex: ClientRequestException) {
+                        if (recursive && ex.response.isEmptyGitHubRepository()) throw GitHubEmptyRepositoryException()
+                        throw ex
+                    }
+                }
             }.paths(rootRepoResponse.defaultBranch)
         } ?: throw GitHubFileInventoryException(repoName, "inventory time budget exceeded")
 
@@ -151,14 +156,14 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         val repos = mutableListOf<ReposForTeamResponse>()
         var url: String? = "$apiBaseUrl/orgs/navikt/teams/$teamName/repos?per_page=100"
         while (url != null) {
-            val response = httpClient.request(url) {
-                method = Get
-                header(Authorization, "Bearer ${retrieveAccessToken()}")
-                header(Accept, "application/json")
-                header(UserAgent, "Nav IT McBotface")
+            val authToken = retrieveAccessToken()
+            val pageUrl = url
+            val (page, next) = transport.execute(GitHubOperation.TEAM_REPOSITORIES, teamName) {
+                val response = request(Get, pageUrl, authToken)
+                response.body<List<ReposForTeamResponse>>() to nextPageUrl(response.headers[Link])
             }
-            repos += response.body<List<ReposForTeamResponse>>()
-            url = nextPageUrl(response.headers[Link])
+            repos += page
+            url = next
         }
         return repos.filter { !it.archived }.map { it.name }
     }
@@ -204,13 +209,12 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
                     })
                 }
             )
-            val response: VulnerabilityAlertsGraphQLResponse = httpClient.request(graphqlUrl) {
-                method = Post
-                header(Authorization, "Bearer $authToken")
-                header(UserAgent, "Nav IT McBotface")
-                contentType(ContentType.Application.Json)
-                setBody(requestBody)
-            }.body()
+            val response = transport.execute(GitHubOperation.VULNERABILITY_ALERTS, "$owner/$repo") {
+                val httpResponse = request(Post, graphqlUrl, authToken, requestBody)
+                httpResponse.body<VulnerabilityAlertsGraphQLResponse>().also {
+                    checkGraphQLRateLimit(httpResponse, it.errors)
+                }
+            }
             fun incomplete(reason: String): Nothing =
                 throw GitHubVulnerabilityCollectionException(owner, repo, reason)
 
@@ -240,22 +244,21 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     override suspend fun latestCommitTimeFor(repoName: String): Instant {
         val url = "$apiBaseUrl/repos/navikt/$repoName/commits"
         val authToken = retrieveAccessToken()
-        val commitsResponse: List<CommitResponse> = makeHttpRequest(Get, url, authToken)
+        val commitsResponse: List<CommitResponse> =
+            makeHttpRequest(GitHubOperation.COMMITS, repoName, Get, url, authToken)
         return commitsResponse.maxOf { it.commit.author.date }
     }
 
-    private suspend inline fun <reified T> makeHttpRequest(httpMethod: HttpMethod, url: String, authToken: String): T =
-        retryWithBackoff {
-            githubRequest(httpMethod, url, authToken).body()
+    private suspend inline fun <reified T> makeHttpRequest(
+        operation: GitHubOperation,
+        context: String?,
+        httpMethod: HttpMethod,
+        url: String,
+        authToken: String
+    ): T =
+        transport.execute(operation, context) {
+            request(httpMethod, url, authToken).body()
         }
-
-    private suspend fun githubRequest(httpMethod: HttpMethod, url: String, authToken: String): HttpResponse =
-            httpClient.request(url) {
-                method = httpMethod
-                header(Authorization, "Bearer $authToken")
-                header(Accept, "application/json")
-                header(UserAgent, "Nav IT McBotface")
-            }
 
     private suspend fun retrieveAccessToken(): String {
         if (!tokenNeedsRefresh()) {
@@ -288,7 +291,9 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
 
     private suspend fun SignedJWT.andExchangeForInstallationToken(): AccessToken {
         val uri = "$apiBaseUrl/app/installations/$installationId/access_tokens"
-        val response = makeHttpRequest<TokenExchangeResponse>(HttpMethod.Post, uri, this.serialize())
+        val response = makeHttpRequest<TokenExchangeResponse>(
+            GitHubOperation.INSTALLATION_TOKEN, null, Post, uri, this.serialize()
+        )
         return AccessToken(response.token, response.expiresAt)
     }
 }

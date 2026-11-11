@@ -1,7 +1,6 @@
 package no.nav.github
 
 import io.ktor.client.plugins.ClientRequestException
-import io.ktor.http.HttpStatusCode
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.yield
@@ -31,7 +30,9 @@ internal class GitHubTreeInventory(
         val recursiveTree = try {
             fetch(defaultBranch, recursive = true)
         } catch (ex: ClientRequestException) {
-            if (!ex.isEmptyRepository()) throw ex
+            if (!ex.response.isEmptyGitHubRepository()) throw ex
+            return emptyList()
+        } catch (_: GitHubEmptyRepositoryException) {
             return emptyList()
         }
         val initialEntries = validate(recursiveTree, recursive = true)
@@ -94,11 +95,6 @@ internal class GitHubTreeInventory(
         return entries.values.toList()
     }
 
-    private suspend fun ClientRequestException.isEmptyRepository(): Boolean {
-        if (response.status != HttpStatusCode.Conflict) return false
-        return response.gitHubErrorMessage() == "Git Repository is empty."
-    }
-
     private fun fail(reason: String): Nothing = throw GitHubFileInventoryException(repoName, reason)
 
     private data class PendingTree(
@@ -110,3 +106,5 @@ internal class GitHubTreeInventory(
 
 internal class GitHubFileInventoryException(repoName: String, reason: String) :
     IllegalStateException("Incomplete GitHub file inventory for navikt/$repoName: $reason")
+
+internal class GitHubEmptyRepositoryException : IllegalStateException("GitHub repository is empty")

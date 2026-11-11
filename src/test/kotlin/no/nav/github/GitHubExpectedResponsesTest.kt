@@ -2,8 +2,8 @@ package no.nav.github
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockEngineConfig
 import io.ktor.client.engine.mock.respond
-import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
@@ -12,12 +12,13 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import java.io.StringWriter
 import java.security.KeyPairGenerator
-import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertIs
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.serialization.json.Json
 import no.nav.checks.CheckResult
 import no.nav.checks.Checks
@@ -26,11 +27,6 @@ import no.nav.metrics.TPTMetrics
 import no.nav.tpt.FakeTptBackend
 import no.nav.tpt.TptRequestHandler
 import org.apache.logging.log4j.Level
-import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.core.LogEvent
-import org.apache.logging.log4j.core.LoggerContext
-import org.apache.logging.log4j.core.appender.AbstractAppender
-import org.apache.logging.log4j.core.config.Property
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -95,59 +91,42 @@ class GitHubExpectedResponsesTest {
         val headers: Map<String, String> = emptyMap()
     )
 
-    private suspend fun withGitHub(
+    private suspend fun TestScope.withGitHub(
         responses: List<Response>,
         tokenResponse: Response = Response("""{"token":"test-token","expires_at":"2099-01-01T00:00:00Z"}"""),
         block: suspend (RealGitHub, List<String>) -> Unit
     ) {
         val paths = mutableListOf<String>()
         var apiRequest = 0
-        val engine = MockEngine { request ->
-            val path = request.url.encodedPath
-            paths += path
-            val response = if (path == "/app/installations/456/access_tokens") {
-                tokenResponse
-            } else {
-                when {
-                    path.endsWith("/dependabot/alerts") -> assertEquals("open", request.url.parameters["state"])
-                    path.endsWith("/code-scanning/analyses") -> assertEquals("100", request.url.parameters["per_page"])
-                    else -> error("Unexpected GitHub request path: $path")
+        val engine = MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { request ->
+                val path = request.url.encodedPath
+                paths += path
+                val response = if (path == "/app/installations/456/access_tokens") {
+                    tokenResponse
+                } else {
+                    when {
+                        path.endsWith("/dependabot/alerts") -> assertEquals("open", request.url.parameters["state"])
+                        path.endsWith("/code-scanning/analyses") -> assertEquals("100", request.url.parameters["per_page"])
+                        else -> error("Unexpected GitHub request path: $path")
+                    }
+                    responses[minOf(apiRequest++, responses.lastIndex)]
                 }
-                responses[minOf(apiRequest++, responses.lastIndex)]
+                respond(response.body, response.status, Headers.build {
+                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    response.headers.forEach { (name, value) -> append(name, value) }
+                })
             }
-            respond(response.body, response.status, Headers.build {
-                append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                response.headers.forEach { (name, value) -> append(name, value) }
-            })
-        }
+        })
         HttpClient(engine) {
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
             expectSuccess = true
         }.use { client ->
-            block(RealGitHub(client, "123", "456", privateKeyPem), paths)
-        }
-    }
-
-    private suspend fun withCapturedLogs(block: suspend (List<LogEvent>) -> Unit) {
-        val context = assertIs<LoggerContext>(LogManager.getContext(false))
-        val events = CopyOnWriteArrayList<LogEvent>()
-        val appender = object : AbstractAppender("github-expected-response-capture", null, null, true, Property.EMPTY_ARRAY) {
-            override fun append(event: LogEvent) {
-                events += event.toImmutable()
-            }
-        }
-        val loggers = listOf(
-            "retryWithBackoff",
-            "no.nav.checks.Checks",
-            "no.nav.checks.githubapi.CriticalVulnerabilitiesCheck"
-        ).map { context.getLogger(it) }
-        appender.start()
-        loggers.forEach { it.addAppender(appender) }
-        try {
-            block(events)
-        } finally {
-            loggers.forEach { it.removeAppender(appender) }
-            appender.stop()
+            block(RealGitHub(
+                client, "123", "456", privateKeyPem,
+                GitHubTransport(client, timeSource = testScheduler.timeSource, jitter = { it })
+            ), paths)
         }
     }
 
@@ -198,12 +177,12 @@ class GitHubExpectedResponsesTest {
 
     @ParameterizedTest
     @ValueSource(ints = [401, 403, 429, 500])
-    fun `code scanning failures on other statuses retain the existing failure policy`(status: Int) = runTest {
+    fun `code scanning failures use selective retries`(status: Int) = runTest {
         withGitHub(listOf(Response(noAnalysesResponse, HttpStatusCode.fromValue(status)))) { gitHub, paths ->
-            val failure = assertThrows<ResponseException> { gitHub.latestCodeScanningAnalysesFor("repo") }
-            assertEquals(HttpStatusCode.fromValue(status), failure.response.status)
-            assertEquals(3, analysisRequests(paths))
-            assertEquals(3000L, currentTime)
+            val failure = assertThrows<GitHubTransportException> { gitHub.latestCodeScanningAnalysesFor("repo") }
+            assertEquals(HttpStatusCode.fromValue(status), failure.response?.status)
+            assertEquals(if (status == 500) 3 else 1, analysisRequests(paths))
+            assertEquals(if (status == 500) 3000L else 0L, currentTime)
         }
     }
 
@@ -225,9 +204,9 @@ class GitHubExpectedResponsesTest {
             responses = emptyList(),
             tokenResponse = Response(noAnalysesResponse, HttpStatusCode.NotFound)
         ) { gitHub, paths ->
-            assertThrows<ResponseException> { gitHub.latestCodeScanningAnalysesFor("repo") }
+            assertThrows<GitHubTransportException> { gitHub.latestCodeScanningAnalysesFor("repo") }
             assertEquals(0, analysisRequests(paths))
-            assertEquals(3, paths.size)
+            assertEquals(1, paths.size)
         }
     }
 
@@ -293,12 +272,12 @@ class GitHubExpectedResponsesTest {
 
     @ParameterizedTest
     @MethodSource("otherForbiddenResponses")
-    fun `other forbidden responses remain failures under the existing retry policy`(body: String) = runTest {
+    fun `other forbidden responses fail without blind retries`(body: String) = runTest {
         withGitHub(listOf(Response(body, HttpStatusCode.Forbidden))) { gitHub, paths ->
-            val failure = assertThrows<ResponseException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
-            assertEquals(HttpStatusCode.Forbidden, failure.response.status)
-            assertEquals(3, alertRequests(paths))
-            assertEquals(3000L, currentTime)
+            val failure = assertThrows<GitHubTransportException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
+            assertEquals(HttpStatusCode.Forbidden, failure.response?.status)
+            assertEquals(1, alertRequests(paths))
+            assertEquals(0L, currentTime)
         }
     }
 
@@ -307,9 +286,9 @@ class GitHubExpectedResponsesTest {
     fun `rate limit headers take precedence over a disabled message`(header: String) = runTest {
         val value = if (header == "Retry-After") "60" else "0"
         withGitHub(listOf(Response(disabledResponse, HttpStatusCode.Forbidden, mapOf(header to value)))) { gitHub, paths ->
-            val failure = assertThrows<ResponseException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
-            assertEquals(HttpStatusCode.Forbidden, failure.response.status)
-            assertEquals(3, alertRequests(paths))
+            val failure = assertThrows<GitHubTransportException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
+            assertEquals(HttpStatusCode.Forbidden, failure.response?.status)
+            assertEquals(1, alertRequests(paths))
         }
     }
 
@@ -317,18 +296,18 @@ class GitHubExpectedResponsesTest {
     @ValueSource(ints = [401, 429, 500])
     fun `a disabled message on another status is not a disabled result`(status: Int) = runTest {
         withGitHub(listOf(Response(disabledResponse, HttpStatusCode.fromValue(status)))) { gitHub, paths ->
-            val failure = assertThrows<ResponseException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
-            assertEquals(HttpStatusCode.fromValue(status), failure.response.status)
-            assertEquals(3, alertRequests(paths))
+            val failure = assertThrows<GitHubTransportException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
+            assertEquals(HttpStatusCode.fromValue(status), failure.response?.status)
+            assertEquals(if (status == 500) 3 else 1, alertRequests(paths))
         }
     }
 
     @Test
-    fun `existing not found empty-result and retry behavior is preserved`() = runTest {
+    fun `Dependabot not found remains an empty success without retrying`() = runTest {
         withGitHub(listOf(Response("""{"message":"Not Found"}""", HttpStatusCode.NotFound))) { gitHub, paths ->
             assertEquals(DependabotAlertsResult.Available(emptyMap()), gitHub.dependabotOpenSecurityAlertsFor("repo"))
-            assertEquals(3, alertRequests(paths))
-            assertEquals(3000L, currentTime)
+            assertEquals(1, alertRequests(paths))
+            assertEquals(0L, currentTime)
         }
     }
 
@@ -350,9 +329,9 @@ class GitHubExpectedResponsesTest {
             responses = emptyList(),
             tokenResponse = Response(disabledResponse, HttpStatusCode.Forbidden)
         ) { gitHub, paths ->
-            assertThrows<ResponseException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
+            assertThrows<GitHubTransportException> { gitHub.dependabotOpenSecurityAlertsFor("repo") }
             assertEquals(0, alertRequests(paths))
-            assertEquals(3, paths.size)
+            assertEquals(1, paths.size)
         }
     }
 

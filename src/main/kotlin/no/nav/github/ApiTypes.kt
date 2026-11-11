@@ -111,7 +111,8 @@ internal data class VulnerabilityAlertsGraphQLResponse(
 
 @Serializable
 internal data class GraphQLError(
-    @SerialName("message") val message: String
+    @SerialName("message") val message: String,
+    @SerialName("type") val type: String? = null
 )
 
 @Serializable
