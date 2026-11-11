@@ -121,13 +121,15 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
     override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
         val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100"
         val authToken = retrieveAccessToken()
-        return try {
-            val response: List<GithubCodeScanningAnalysis> = makeHttpRequest(Get, url, authToken)
-            response
-                .groupBy { it.category }
-                .map { (_, analyses) -> analyses.maxBy { it.createdAt } }
-        } catch (e: ClientRequestException) {
-            if (e.response.status == HttpStatusCode.NotFound) emptyList() else throw e
+        return retryWithBackoff {
+            try {
+                val response = githubRequest(Get, url, authToken).body<List<GithubCodeScanningAnalysis>>()
+                response
+                    .groupBy { it.category }
+                    .map { (_, analyses) -> analyses.maxBy { it.createdAt } }
+            } catch (e: ClientRequestException) {
+                if (e.response.status == HttpStatusCode.NotFound) emptyList() else throw e
+            }
         }
     }
 

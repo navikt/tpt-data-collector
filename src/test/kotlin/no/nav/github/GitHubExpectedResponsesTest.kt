@@ -14,6 +14,7 @@ import java.io.StringWriter
 import java.security.KeyPairGenerator
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertIs
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
@@ -41,7 +42,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class DependabotAlertsTest {
+class GitHubExpectedResponsesTest {
     companion object {
         private val privateKeyPem by lazy {
             val keyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
@@ -59,6 +60,13 @@ class DependabotAlertsTest {
               {"package":{"ecosystem":"npm","name":"example"},"severity":"critical"}
             ]}}]
         """
+        private const val noAnalysesResponse = """
+            {
+              "message":"no analysis found",
+              "documentation_url":"https://docs.github.com/rest/code-scanning/code-scanning#list-code-scanning-analyses-for-a-repository",
+              "status":"404"
+            }
+        """
 
         @JvmStatic
         fun otherForbiddenResponses(): List<String> = listOf(
@@ -68,6 +76,14 @@ class DependabotAlertsTest {
             """{"message":"Dependabot alerts are disabled for this repository. More details."}""",
             """{"message":null}""",
             """{"message":["Dependabot alerts are disabled for this repository."]}""",
+            "{}",
+            "not-json"
+        )
+
+        @JvmStatic
+        fun codeScanningNotFoundResponses(): List<String> = listOf(
+            noAnalysesResponse,
+            """{"message":"Not Found"}""",
             "{}",
             "not-json"
         )
@@ -85,16 +101,19 @@ class DependabotAlertsTest {
         block: suspend (RealGitHub, List<String>) -> Unit
     ) {
         val paths = mutableListOf<String>()
-        var alertRequest = 0
+        var apiRequest = 0
         val engine = MockEngine { request ->
             val path = request.url.encodedPath
             paths += path
             val response = if (path == "/app/installations/456/access_tokens") {
                 tokenResponse
             } else {
-                assertTrue(path.endsWith("/dependabot/alerts"))
-                assertEquals("open", request.url.parameters["state"])
-                responses[minOf(alertRequest++, responses.lastIndex)]
+                when {
+                    path.endsWith("/dependabot/alerts") -> assertEquals("open", request.url.parameters["state"])
+                    path.endsWith("/code-scanning/analyses") -> assertEquals("100", request.url.parameters["per_page"])
+                    else -> error("Unexpected GitHub request path: $path")
+                }
+                responses[minOf(apiRequest++, responses.lastIndex)]
             }
             respond(response.body, response.status, Headers.build {
                 append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
@@ -112,7 +131,7 @@ class DependabotAlertsTest {
     private suspend fun withCapturedLogs(block: suspend (List<LogEvent>) -> Unit) {
         val context = assertIs<LoggerContext>(LogManager.getContext(false))
         val events = CopyOnWriteArrayList<LogEvent>()
-        val appender = object : AbstractAppender("dependabot-log-capture", null, null, true, Property.EMPTY_ARRAY) {
+        val appender = object : AbstractAppender("github-expected-response-capture", null, null, true, Property.EMPTY_ARRAY) {
             override fun append(event: LogEvent) {
                 events += event.toImmutable()
             }
@@ -134,6 +153,111 @@ class DependabotAlertsTest {
 
     private fun failedChecks() = TPTMetrics.registry.find("webhooks_failed").counter()?.count() ?: 0.0
     private fun alertRequests(paths: List<String>) = paths.count { it.endsWith("/dependabot/alerts") }
+    private fun analysisRequests(paths: List<String>) = paths.count { it.endsWith("/code-scanning/analyses") }
+
+    @ParameterizedTest
+    @MethodSource("codeScanningNotFoundResponses")
+    fun `code scanning not found retains empty-result semantics without retries or warnings`(body: String) = runTest {
+        withCapturedLogs { events ->
+            withGitHub(listOf(Response(body, HttpStatusCode.NotFound))) { gitHub, paths ->
+                assertTrue(gitHub.latestCodeScanningAnalysesFor("repo").isEmpty())
+                assertEquals(1, analysisRequests(paths))
+                assertEquals(0L, currentTime)
+                assertTrue(events.none { it.level.isMoreSpecificThan(Level.WARN) })
+            }
+        }
+    }
+
+    @Test
+    fun `successful empty code scanning analyses remain empty`() = runTest {
+        withGitHub(listOf(Response("[]"))) { gitHub, paths ->
+            assertTrue(gitHub.latestCodeScanningAnalysesFor("repo").isEmpty())
+            assertEquals(1, analysisRequests(paths))
+        }
+    }
+
+    @Test
+    fun `successful code scanning responses retain the newest analysis per category`() = runTest {
+        val old = GithubCodeScanningAnalysis(
+            "workflow-a", CodeScanningTool("CodeQL"), "", Instant.parse("2026-11-01T00:00:00Z"),
+            "https://api.github.com/repos/navikt/repo/code-scanning/analyses/1"
+        )
+        val newest = old.copy(
+            createdAt = Instant.parse("2026-11-02T00:00:00Z"),
+            url = "https://api.github.com/repos/navikt/repo/code-scanning/analyses/2"
+        )
+        val anotherCategory = old.copy(
+            category = "workflow-b",
+            url = "https://api.github.com/repos/navikt/repo/code-scanning/analyses/3"
+        )
+        withGitHub(listOf(Response(Json.encodeToString(listOf(old, newest, anotherCategory))))) { gitHub, paths ->
+            assertEquals(listOf(newest, anotherCategory), gitHub.latestCodeScanningAnalysesFor("repo"))
+            assertEquals(1, analysisRequests(paths))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [401, 403, 429, 500])
+    fun `code scanning failures on other statuses retain the existing failure policy`(status: Int) = runTest {
+        withGitHub(listOf(Response(noAnalysesResponse, HttpStatusCode.fromValue(status)))) { gitHub, paths ->
+            val failure = assertThrows<ResponseException> { gitHub.latestCodeScanningAnalysesFor("repo") }
+            assertEquals(HttpStatusCode.fromValue(status), failure.response.status)
+            assertEquals(3, analysisRequests(paths))
+            assertEquals(3000L, currentTime)
+        }
+    }
+
+    @Test
+    fun `code scanning transient failure followed by not found stops at the expected response`() = runTest {
+        withGitHub(listOf(
+            Response("""{"message":"Unavailable"}""", HttpStatusCode.ServiceUnavailable),
+            Response(noAnalysesResponse, HttpStatusCode.NotFound)
+        )) { gitHub, paths ->
+            assertTrue(gitHub.latestCodeScanningAnalysesFor("repo").isEmpty())
+            assertEquals(2, analysisRequests(paths))
+            assertEquals(1000L, currentTime)
+        }
+    }
+
+    @Test
+    fun `token exchange not found is not converted into empty code scanning analyses`() = runTest {
+        withGitHub(
+            responses = emptyList(),
+            tokenResponse = Response(noAnalysesResponse, HttpStatusCode.NotFound)
+        ) { gitHub, paths ->
+            assertThrows<ResponseException> { gitHub.latestCodeScanningAnalysesFor("repo") }
+            assertEquals(0, analysisRequests(paths))
+            assertEquals(3, paths.size)
+        }
+    }
+
+    @Test
+    fun `missing code scanning analyses still publish the tooling finding without a failed check`() = runTest {
+        withCapturedLogs { events ->
+            withGitHub(listOf(Response(noAnalysesResponse, HttpStatusCode.NotFound))) { realGitHub, paths ->
+                val backend = FakeTptBackend()
+                val gitHub = object : FakeGitHub() {
+                    override suspend fun allReposForTeam(teamName: String) = listOf("repo")
+                    override suspend fun latestCodeScanningAnalysesFor(repoName: String) =
+                        realGitHub.latestCodeScanningAnalysesFor(repoName)
+                }
+                val before = failedChecks()
+
+                TptRequestHandler(gitHub, Checks(gitHub, FakeDatastore()), backend).runAllChecksFor("team")
+
+                assertEquals(before, failedChecks())
+                assertEquals(1, analysisRequests(paths))
+                val published = backend.sentCheckResults.single()
+                assertEquals("repo", published.repoName)
+                val finding = assertIs<CheckResult.NeedsWork>(
+                    published.results.single { it.name == "GitHubToolingStatus" }
+                )
+                assertEquals(listOf("repo has no code scanning analyses, possibly no tools configured"), finding.reasons)
+                assertTrue(published.results.any { it.name == "HasCriticalVulns" })
+                assertTrue(events.none { it.level.isMoreSpecificThan(Level.WARN) })
+            }
+        }
+    }
 
     @Test
     fun `disabled alerts are explicit and are not retried`() = runTest {
