@@ -90,7 +90,13 @@ internal data class ReposForTeamResponse(val name: String, val archived: Boolean
 
 @Serializable
 internal data class VulnerabilityAlertsGraphQLResponse(
-    @SerialName("data") val data: VulnerabilityAlertsData
+    @SerialName("data") val data: VulnerabilityAlertsData? = null,
+    @SerialName("errors") val errors: List<GraphQLError> = emptyList()
+)
+
+@Serializable
+internal data class GraphQLError(
+    @SerialName("message") val message: String
 )
 
 @Serializable
@@ -100,7 +106,7 @@ internal data class VulnerabilityAlertsData(
 
 @Serializable
 internal data class VulnerabilityAlertsRepository(
-    @SerialName("vulnerabilityAlerts") val vulnerabilityAlerts: VulnerabilityAlertsConnection
+    @SerialName("vulnerabilityAlerts") val vulnerabilityAlerts: VulnerabilityAlertsConnection?
 )
 
 @Serializable
@@ -112,7 +118,7 @@ internal data class VulnerabilityAlertsConnection(
 @Serializable
 internal data class PageInfo(
     @SerialName("hasNextPage") val hasNextPage: Boolean,
-    @SerialName("endCursor") val endCursor: String?
+    @SerialName("endCursor") val endCursor: String? = null
 )
 
 @Serializable

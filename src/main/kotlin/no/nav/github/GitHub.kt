@@ -167,6 +167,7 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         """.trimIndent()
 
         val allAlerts = mutableListOf<VulnerabilityAlertNode>()
+        val seenCursors = mutableSetOf<String>()
         var cursor: String? = null
         do {
             val requestBody = Json.encodeToString(
@@ -186,9 +187,27 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
                 contentType(ContentType.Application.Json)
                 setBody(requestBody)
             }.body()
-            val alerts = response.data.repository?.vulnerabilityAlerts ?: break
+            fun incomplete(reason: String): Nothing =
+                throw GitHubVulnerabilityCollectionException(owner, repo, reason)
+
+            if (response.errors.isNotEmpty()) {
+                // Upstream messages can contain request data; report the count, not the payload.
+                incomplete("GraphQL returned ${response.errors.size} error(s)")
+            }
+            val data = response.data ?: incomplete("GraphQL data is null or missing")
+            val repository = data.repository ?: incomplete("GraphQL repository is null")
+            val alerts = repository.vulnerabilityAlerts ?: incomplete("GraphQL vulnerabilityAlerts connection is null")
+            cursor = if (alerts.pageInfo.hasNextPage) {
+                val nextCursor = alerts.pageInfo.endCursor
+                if (nextCursor.isNullOrBlank()) {
+                    incomplete("GraphQL hasNextPage requires a non-blank endCursor")
+                }
+                if (!seenCursors.add(nextCursor)) {
+                    incomplete("GraphQL pagination cursor did not advance")
+                }
+                nextCursor
+            } else null
             allAlerts.addAll(alerts.nodes)
-            cursor = if (alerts.pageInfo.hasNextPage) alerts.pageInfo.endCursor else null
         } while (cursor != null)
 
         return allAlerts
@@ -246,6 +265,9 @@ class RealGitHub(val httpClient: HttpClient, val appId: String, val installation
         return AccessToken(response.token, response.expiresAt)
     }
 }
+
+internal class GitHubVulnerabilityCollectionException(owner: String, repo: String, reason: String) :
+    IllegalStateException("Incomplete GitHub vulnerability collection for $owner/$repo: $reason")
 
 // GitHub paginates REST responses via the Link header: <https://...&page=2>; rel="next", <...>; rel="last"
 internal fun nextPageUrl(linkHeader: String?): String? =
