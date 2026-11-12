@@ -43,6 +43,8 @@ spec:
     enabled: true
     path: /internal/metrics
   env:
+    - name: GITHUB_ORGANIZATION
+      value: navikt
     - name: WHODIS_URL
       value: http://whodis.appsec
     - name: TPT_BACKEND_URL

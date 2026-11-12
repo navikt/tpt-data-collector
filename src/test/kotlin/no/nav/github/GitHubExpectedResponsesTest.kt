@@ -132,7 +132,7 @@ class GitHubExpectedResponsesTest {
             expectSuccess = true
         }.use { client ->
             block(RealGitHub(
-                client, "123", "456", privateKeyPem,
+                client, "123", "456", privateKeyPem, "navikt",
                 GitHubTransport(client, timeSource = testScheduler.timeSource, jitter = { it })
             ), paths)
         }
@@ -381,7 +381,7 @@ class GitHubExpectedResponsesTest {
                 assertIs<CheckResult.NeedsWork>(byRepo.getValue("critical").results.single { it.name == "HasCriticalVulns" })
                 assertTrue(events.none { it.level.isMoreSpecificThan(Level.WARN) })
                 val skipped = events.single {
-                    it.message.formattedMessage == "Skipping HasCriticalVulns for navikt/disabled: Dependabot alerts are disabled"
+                    it.message.formattedMessage == "Skipping HasCriticalVulns for disabled: Dependabot alerts are disabled"
                 }
                 assertEquals(Level.INFO, skipped.level)
                 assertNull(skipped.thrown)

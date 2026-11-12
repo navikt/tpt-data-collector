@@ -6,6 +6,12 @@
 
 An application that collects data from GitHub and the Cartography database, runs "golden path" checks on it, and sends the results to [tpt-backend](https://github.com/navikt/tpt-backend).
 
+## Configuration
+
+`GITHUB_ORGANIZATION` is required and must not be blank. It selects the organization used for GitHub repository checks and team repository lookups. Push webhooks trigger checks only for repositories in this organization on their default branch. There is no implicit organization fallback; the Nais deployment explicitly sets `GITHUB_ORGANIZATION=navikt`.
+
+Each deployment supports one organization for these checks. The `/collect/github` endpoint continues to use explicit `owner/name` repository identities. Configuring another organization does not make Nav-specific infrastructure integrations portable.
+
 ## Endpoints
 
 ### `POST /webhook/github`

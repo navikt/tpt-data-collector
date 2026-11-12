@@ -17,7 +17,7 @@ class TptRequestHandler(private val gitHub: GitHub, private val checks: Checks, 
             } catch (ex: CancellationException) {
                 throw ex
             } catch (ex: Exception) {
-                logger.warn("Skipping checks for GitHub repo navikt/$repo: complete file inventory unavailable", ex)
+                logger.warn("Skipping checks for GitHub repo $repo: complete file inventory unavailable", ex)
                 return@forEach
             }
             val checkResults = checks.runAll(repo, allFilesInRepo.toSet())

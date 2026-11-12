@@ -7,7 +7,7 @@ import no.nav.checks.Checks
 import no.nav.metrics.TPTMetrics
 import no.nav.tpt.TptBackend
 
-class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whodis: Whodis) {
+class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whodis: Whodis, private val organization: String) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
     suspend fun handle(webhookPayload: WebhookPayload) {
@@ -35,6 +35,6 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
         val pushBranch = payload.ref.split("/").last()
-        return payload.repository.fullName.startsWith("navikt/") && pushBranch == payload.repository.masterBranch
+        return payload.repository.fullName.startsWith("$organization/", ignoreCase = true) && pushBranch == payload.repository.masterBranch
     }
 }

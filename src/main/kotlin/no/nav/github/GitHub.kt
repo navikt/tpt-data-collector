@@ -76,10 +76,11 @@ class RealGitHub internal constructor(
     val appId: String,
     val installationId: String,
     privateKeyPEM: String,
+    private val organization: String,
     private val transport: GitHubTransport
 ): GitHub {
-    constructor(httpClient: HttpClient, appId: String, installationId: String, privateKeyPEM: String) :
-        this(httpClient, appId, installationId, privateKeyPEM, GitHubTransport(httpClient))
+    constructor(httpClient: HttpClient, appId: String, installationId: String, privateKeyPEM: String, organization: String) :
+        this(httpClient, appId, installationId, privateKeyPEM, organization, GitHubTransport(httpClient))
     private val apiBaseUrl = "https://api.github.com"
     val logger = KtorSimpleLogger(this::class.java.name)
 
@@ -88,14 +89,14 @@ class RealGitHub internal constructor(
     private var installationAccessToken: AtomicReference<AccessToken?> = AtomicReference(null)
 
     override suspend fun readFileContents(repoName: String, filePath: String): String {
-        val url = "$apiBaseUrl/repos/navikt/$repoName/contents/$filePath"
+        val url = "$apiBaseUrl/repos/$organization/$repoName/contents/$filePath"
         val authToken = retrieveAccessToken()
         val response: FileContentsResponse = makeHttpRequest(GitHubOperation.FILE_CONTENTS, repoName, Get, url, authToken)
         return response.decode()
     }
 
     override suspend fun hasOpenCriticalDependabotAlerts(repoName: String): DependabotAlertsResult {
-        val url = "$apiBaseUrl/repos/navikt/$repoName/dependabot/alerts?state=open&severity=critical&per_page=1"
+        val url = "$apiBaseUrl/repos/$organization/$repoName/dependabot/alerts?state=open&severity=critical&per_page=1"
         val authToken = retrieveAccessToken()
         return transport.execute(GitHubOperation.DEPENDABOT_ALERTS, repoName) {
             try {
@@ -118,7 +119,7 @@ class RealGitHub internal constructor(
             response.gitHubErrorMessage() == "Dependabot alerts are disabled for this repository."
 
     override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
-        val url = "$apiBaseUrl/repos/navikt/$repoName/code-scanning/analyses?per_page=100&sort=created&direction=desc"
+        val url = "$apiBaseUrl/repos/$organization/$repoName/code-scanning/analyses?per_page=100&sort=created&direction=desc"
         val authToken = retrieveAccessToken()
         return transport.execute(GitHubOperation.CODE_SCANNING, repoName) {
             try {
@@ -137,7 +138,7 @@ class RealGitHub internal constructor(
 
     internal suspend fun allFilePathsIn(repoName: String, limits: TreeInventoryLimits): List<String> =
         withTimeoutOrNull(limits.timeout) {
-            val rootRepoUrl = "$apiBaseUrl/repos/navikt/$repoName"
+            val rootRepoUrl = "$apiBaseUrl/repos/$organization/$repoName"
             val authToken = retrieveAccessToken()
             val rootRepoResponse: RepoRootResponse =
                 makeHttpRequest(GitHubOperation.REPOSITORY, repoName, Get, rootRepoUrl, authToken)
@@ -158,7 +159,7 @@ class RealGitHub internal constructor(
         withTimeoutOrNull(60.seconds) {
             val repos = mutableListOf<ReposForTeamResponse>()
             val pagination = GitHubPagination()
-            var url: String? = "$apiBaseUrl/orgs/navikt/teams/$teamName/repos?per_page=100"
+            var url: String? = "$apiBaseUrl/orgs/$organization/teams/$teamName/repos?per_page=100"
             while (url != null) {
                 yield()
                 val pageUrl = pagination.visit(url)
@@ -248,7 +249,7 @@ class RealGitHub internal constructor(
     }
 
     override suspend fun latestCommitTimeFor(repoName: String): Instant {
-        val url = "$apiBaseUrl/repos/navikt/$repoName/commits"
+        val url = "$apiBaseUrl/repos/$organization/$repoName/commits"
         val authToken = retrieveAccessToken()
         val commitsResponse: List<CommitResponse> =
             makeHttpRequest(GitHubOperation.COMMITS, repoName, Get, url, authToken)

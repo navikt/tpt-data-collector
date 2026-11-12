@@ -15,8 +15,12 @@ class ApplikasjonsConfig(
     val tptBackendUrl: String = fromEnv("TPT_BACKEND_URL", "http://tpt-backend"),
     val tptBackendTarget: String = fromEnv("TPT_BACKEND_TARGET", "api://prod-gcp.appsec.tpt-backend/.default"),
     val naisTokenEndpoint: String = fromEnv("NAIS_TOKEN_ENDPOINT", "http://localhost/token"),
+    val githubOrganization: String = fromEnv("GITHUB_ORGANIZATION"),
 ) {
     init {
+        require(githubOrganization.isNotBlank()) {
+            "GITHUB_ORGANIZATION must not be blank"
+        }
         require(githubWebhookSecret.isNotBlank()) {
             "GITHUB_WEBHOOK_SECRET must not be blank"
         }

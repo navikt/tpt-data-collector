@@ -105,6 +105,6 @@ internal class GitHubTreeInventory(
 }
 
 internal class GitHubFileInventoryException(repoName: String, reason: String) :
-    IllegalStateException("Incomplete GitHub file inventory for navikt/$repoName: $reason")
+    IllegalStateException("Incomplete GitHub file inventory for $repoName: $reason")
 
 internal class GitHubEmptyRepositoryException : IllegalStateException("GitHub repository is empty")

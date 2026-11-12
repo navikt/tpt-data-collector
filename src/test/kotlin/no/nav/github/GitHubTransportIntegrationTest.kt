@@ -81,6 +81,7 @@ internal class GitHubTransportIntegrationTest {
 
     private suspend fun TestScope.withGitHub(
         responses: Map<String, List<Response>> = successfulResponses(),
+        organization: String = "navikt",
         block: suspend (RealGitHub, List<Request>) -> Unit
     ) {
         val requests = mutableListOf<Request>()
@@ -112,7 +113,36 @@ internal class GitHubTransportIntegrationTest {
                 now = { Instant.parse("2026-11-11T12:00:00Z") + currentTime.milliseconds },
                 jitter = { it }
             )
-            block(RealGitHub(client, "123", "456", privateKeyPem, transport), requests)
+            block(RealGitHub(client, "123", "456", privateKeyPem, organization, transport), requests)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["navikt", "another-org"])
+    fun `all organization scoped requests use the configured organization`(organization: String) = runTest {
+        val responses = successfulResponses().mapKeys { (path, _) ->
+            path.replace("/navikt/", "/$organization/")
+        }
+        withGitHub(responses, organization) { gitHub, requests ->
+            assertEquals("hello", gitHub.readFileContents("repo", "file"))
+            assertEquals(DependabotAlertsResult.Available(false), gitHub.hasOpenCriticalDependabotAlerts("repo"))
+            assertTrue(gitHub.latestCodeScanningAnalysesFor("repo").isEmpty())
+            assertTrue(gitHub.allFilePathsIn("repo").isEmpty())
+            assertEquals(listOf("repo"), gitHub.allReposForTeam("team"))
+            assertEquals(Instant.parse("2026-11-11T00:00:00Z"), gitHub.latestCommitTimeFor("repo"))
+            assertEquals(
+                listOf(
+                    tokenPath,
+                    "/repos/$organization/repo/contents/file",
+                    "/repos/$organization/repo/dependabot/alerts",
+                    "/repos/$organization/repo/code-scanning/analyses",
+                    "/repos/$organization/repo",
+                    "/repos/$organization/repo/git/trees/main",
+                    "/orgs/$organization/teams/team/repos",
+                    "/repos/$organization/repo/commits",
+                ),
+                requests.map { it.key },
+            )
         }
     }
 
