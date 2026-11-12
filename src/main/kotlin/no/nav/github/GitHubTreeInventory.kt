@@ -18,7 +18,7 @@ internal data class TreeInventoryLimits(
 }
 
 internal class GitHubTreeInventory(
-    private val repoName: String,
+    private val nameWithOwner: String,
     private val limits: TreeInventoryLimits,
     private val fetchTree: suspend (ref: String, recursive: Boolean) -> TreeResponse
 ) {
@@ -95,7 +95,7 @@ internal class GitHubTreeInventory(
         return entries.values.toList()
     }
 
-    private fun fail(reason: String): Nothing = throw GitHubFileInventoryException(repoName, reason)
+    private fun fail(reason: String): Nothing = throw GitHubFileInventoryException(nameWithOwner, reason)
 
     private data class PendingTree(
         val prefix: String,
@@ -104,7 +104,7 @@ internal class GitHubTreeInventory(
     )
 }
 
-internal class GitHubFileInventoryException(repoName: String, reason: String) :
-    IllegalStateException("Incomplete GitHub file inventory for $repoName: $reason")
+internal class GitHubFileInventoryException(nameWithOwner: String, reason: String) :
+    IllegalStateException("Incomplete GitHub file inventory for $nameWithOwner: $reason")
 
 internal class GitHubEmptyRepositoryException : IllegalStateException("GitHub repository is empty")

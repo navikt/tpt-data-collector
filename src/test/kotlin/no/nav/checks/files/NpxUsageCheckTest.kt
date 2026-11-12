@@ -30,7 +30,7 @@ class NpxUsageCheckTest {
             """.trimIndent()
         )
         val check = NpxUsageCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
@@ -49,7 +49,7 @@ class NpxUsageCheckTest {
             """.trimIndent()
         )
         val check = NpxUsageCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 

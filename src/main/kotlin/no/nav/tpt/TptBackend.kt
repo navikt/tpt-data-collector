@@ -104,7 +104,7 @@ class TptBackendClient(
             "repository" to message.nameWithOwner)
 
     override suspend fun sendCheckResults(results: CheckResultsForRepo) =
-        post(CHECK_RESULTS, "/callbacks/checks", Json.encodeToString(results), "repository" to results.repoName)
+        post(CHECK_RESULTS, "/callbacks/checks", Json.encodeToString(results), "repository" to results.nameWithOwner)
 
     override suspend fun sendSyncStarted(event: GitHubSyncEvent) =
         post(SYNC_STARTED, "/callbacks/github/sync/started", Json.encodeToString(event),

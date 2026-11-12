@@ -49,7 +49,9 @@ class GitHubTeamReposPaginationTest {
     }
 
     private fun reposJson(from: Int, to: Int, archived: Set<Int> = emptySet()) =
-        (from..to).joinToString(",", "[", "]") { """{"name":"repo-$it","archived":${it in archived}}""" }
+        (from..to).joinToString(",", "[", "]") {
+            """{"name":"repo-$it","full_name":"navikt/repo-$it","archived":${it in archived}}"""
+        }
 
     private data class Response(
         val body: String = "[]",
@@ -87,6 +89,23 @@ class GitHubTeamReposPaginationTest {
     }
 
     @Test
+    fun `team repository identities come from full name and preserve different owners`() = runTest {
+        withGitHub(responseFor = {
+            Response("""[
+                {"name":"same-repo","full_name":"another-owner/same-repo"},
+                {"name":"same-repo","full_name":"navikt/same-repo"},
+                {"name":"same-repo","full_name":"archived-owner/same-repo","archived":true}
+            ]""")
+        }) { gitHub, urls ->
+            assertEquals(
+                listOf("another-owner/same-repo", "navikt/same-repo"),
+                gitHub.allReposForTeam("big-team")
+            )
+            assertEquals(listOf("$base?per_page=100"), urls)
+        }
+    }
+
+    @Test
     fun `fetches every page of a team's repositories`() = runTest {
         withGitHub(responseFor = { request ->
             when (request.url.parameters["page"]) {
@@ -106,7 +125,7 @@ class GitHubTeamReposPaginationTest {
             }
         }) { gitHub, requestedUrls ->
             val repos = gitHub.allReposForTeam("big-team")
-            assertEquals((1..230).filter { it != 7 }.map { "repo-$it" }, repos)
+            assertEquals((1..230).filter { it != 7 }.map { "navikt/repo-$it" }, repos)
             assertEquals(
                 listOf("$base?per_page=100", "$base?per_page=100&page=2", "$base?per_page=100&page=3"),
                 requestedUrls
@@ -118,7 +137,7 @@ class GitHubTeamReposPaginationTest {
     @ValueSource(ints = [0, 3])
     fun `empty and single pages finish without another request`(count: Int) = runTest {
         withGitHub(responseFor = { Response(reposJson(1, count)) }) { gitHub, urls ->
-            assertEquals((1..count).map { "repo-$it" }, gitHub.allReposForTeam("big-team"))
+            assertEquals((1..count).map { "navikt/repo-$it" }, gitHub.allReposForTeam("big-team"))
             assertEquals(1, urls.size)
         }
     }
@@ -180,7 +199,7 @@ class GitHubTeamReposPaginationTest {
                 Response(reposJson(2, 2))
             }
         }) { gitHub, urls ->
-            assertEquals(listOf("repo-1", "repo-2"), gitHub.allReposForTeam("big-team"))
+            assertEquals(listOf("navikt/repo-1", "navikt/repo-2"), gitHub.allReposForTeam("big-team"))
             assertEquals(2, urls.size)
         }
     }

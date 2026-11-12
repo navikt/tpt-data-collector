@@ -27,7 +27,7 @@ class BaseImageIsNotPinnedCheckTest {
             """.trimIndent()
         )
         val check = BaseImageIsNotPinnedCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 
@@ -42,7 +42,7 @@ class BaseImageIsNotPinnedCheckTest {
             """.trimIndent()
         )
         val check = BaseImageIsNotPinnedCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
     }
 
@@ -57,7 +57,7 @@ class BaseImageIsNotPinnedCheckTest {
             """.trimIndent()
         )
         val check = BaseImageIsNotPinnedCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
     }
 
@@ -72,7 +72,7 @@ class BaseImageIsNotPinnedCheckTest {
             """.trimIndent()
         )
         val check = BaseImageIsNotPinnedCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 
@@ -87,7 +87,7 @@ class BaseImageIsNotPinnedCheckTest {
             """.trimIndent()
         )
         val check = BaseImageIsNotPinnedCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 

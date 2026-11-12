@@ -28,7 +28,7 @@ class CurlPipeShellCheckTest {
             """.trimIndent()
         )
         val check = CurlPipeShellCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
@@ -45,7 +45,7 @@ class CurlPipeShellCheckTest {
             """.trimIndent()
         )
         val check = CurlPipeShellCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
@@ -62,7 +62,7 @@ class CurlPipeShellCheckTest {
             """.trimIndent()
         )
         val check = CurlPipeShellCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
@@ -79,7 +79,7 @@ class CurlPipeShellCheckTest {
             """.trimIndent()
         )
         val check = CurlPipeShellCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
@@ -93,7 +93,7 @@ class CurlPipeShellCheckTest {
             """.trimIndent()
         )
         val check = CurlPipeShellCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 
@@ -111,7 +111,7 @@ class CurlPipeShellCheckTest {
             """.trimIndent()
         )
         val check = CurlPipeShellCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 

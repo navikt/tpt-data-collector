@@ -16,24 +16,24 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
 
     suspend fun handle(webhookPayload: WebhookPayload) {
         TPTMetrics.webhookReceived()
-        val repo = webhookPayload.repository.name
+        val nameWithOwner = webhookPayload.repository.nameWithOwner
         if (!isRelevant(webhookPayload)) {
             logger.logEvent(
                 Level.DEBUG, "Push ignored; not in the configured organization or default branch",
-                "repository" to webhookPayload.repository.fullName, "ref" to webhookPayload.ref
+                "repository" to nameWithOwner, "ref" to webhookPayload.ref
             )
             return
         }
         logger.logEvent(
             Level.DEBUG, "Processing default-branch push",
-            "repository" to webhookPayload.repository.fullName, "ref" to webhookPayload.ref
+            "repository" to nameWithOwner, "ref" to webhookPayload.ref
         )
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val repoOwners = try {
             TPTMetrics.whodisLookups(1)
-            whodis.ownerTeamsFor(repo).also { owners ->
+            whodis.ownerTeamsFor(nameWithOwner).also { owners ->
                 if (owners.isEmpty()) {
-                    logger.logEvent(Level.INFO, "No owning team found for repository", "repository" to repo)
+                    logger.logEvent(Level.INFO, "No owning team found for repository", "repository" to nameWithOwner)
                 }
             }
         } catch (ex: CancellationException) {
@@ -41,12 +41,12 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
         } catch (ex: Exception) {
             logger.logFailure(
                 "Repository owner lookup failed; publishing checks without owners", ex,
-                "operation" to "repository_owners", "dependency" to "whodis", "repository" to repo
+                "operation" to "repository_owners", "dependency" to "whodis", "repository" to nameWithOwner
             )
             emptyList()
         }
-        val results = checks.runAll(webhookPayload.repository.name, changedFiles)
-        val resultsForRepo = CheckResultsForRepo(repo, repoOwners, results)
+        val results = checks.runAll(nameWithOwner, changedFiles)
+        val resultsForRepo = CheckResultsForRepo(nameWithOwner, repoOwners, results)
         if (backend.sendCheckResults(resultsForRepo)) {
             TPTMetrics.msgsSentToTpt(1)
         }
@@ -54,6 +54,6 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
         val pushBranch = payload.ref.split("/").last()
-        return payload.repository.fullName.startsWith("$organization/", ignoreCase = true) && pushBranch == payload.repository.masterBranch
+        return payload.repository.nameWithOwner.startsWith("$organization/", ignoreCase = true) && pushBranch == payload.repository.masterBranch
     }
 }

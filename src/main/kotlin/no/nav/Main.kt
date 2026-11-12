@@ -163,7 +163,7 @@ fun Application.businessModule(gitHub: GitHub,
                     return@post
                 }
 
-                runInBackground("github_webhook", "repository" to payload.repository.fullName) {
+                runInBackground("github_webhook", "repository" to payload.repository.nameWithOwner) {
                     githubWebhookHandler.handle(payload)
                 }
                 call.respond(HttpStatusCode.Accepted)

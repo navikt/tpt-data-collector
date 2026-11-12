@@ -35,4 +35,4 @@ sealed class CheckResult {
 }
 
 @Serializable
-data class CheckResultsForRepo(val repoName: String, val repoOwners: List<String>, val results : List<CheckResult>)
+data class CheckResultsForRepo(val nameWithOwner: String, val repoOwners: List<String>, val results : List<CheckResult>)

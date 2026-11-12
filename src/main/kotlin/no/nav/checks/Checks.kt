@@ -22,6 +22,7 @@ import no.nav.checks.githubapi.GithubToolingStatusCheck
 import no.nav.checks.githubapi.NewestCommitCheck
 import no.nav.datastore.Datastore
 import no.nav.github.GitHub
+import no.nav.github.requireQualifiedRepositoryName
 import no.nav.metrics.TPTMetrics
 import no.nav.logging.logEvent
 import no.nav.logging.logFailure
@@ -41,11 +42,12 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         NewestCommitCheck(gitHub)
     )
 
-    suspend fun runAll(repoName: String, relevantFiles: Set<String>): List<CheckResult> {
+    suspend fun runAll(nameWithOwner: String, relevantFiles: Set<String>): List<CheckResult> {
+        requireQualifiedRepositoryName(nameWithOwner)
         val timedResults = mapOf(
-            "Files" to measureTimedValue { runFileBasedChecks(repoName, relevantFiles).awaitAll() },
-            "Datastore" to measureTimedValue { runDatastoreBasedChecks(repoName).awaitAll() },
-            "GitHubApi" to measureTimedValue { runGitHubAPIBasedChecks(repoName).awaitAll() }
+            "Files" to measureTimedValue { runFileBasedChecks(nameWithOwner, relevantFiles).awaitAll() },
+            "Datastore" to measureTimedValue { runDatastoreBasedChecks(nameWithOwner).awaitAll() },
+            "GitHubApi" to measureTimedValue { runGitHubAPIBasedChecks(nameWithOwner).awaitAll() }
         )
 
         val allResults = timedResults.values.flatMap { it.value }
@@ -54,7 +56,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         val nrOfIssuesFound = successfulResults.count { it is CheckResult.NeedsWork }
         logger.logEvent(
             Level.INFO, "Repository checks finished",
-            "repository" to repoName,
+            "repository" to nameWithOwner,
             "outcome" to if (failedResults.isEmpty()) "success" else "partial",
             "checks_attempted" to allResults.size, "checks_completed" to successfulResults.size,
             "checks_failed" to failedResults.size,
@@ -69,7 +71,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
     }
 
     private suspend fun runFileBasedChecks(
-        repoName: String,
+        nameWithOwner: String,
         relevantFiles: Set<String>
     ): List<Deferred<Result<CheckResult>>> =
         coroutineScope {
@@ -77,7 +79,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 .associateWith { it.filesICareAbout(relevantFiles).toSet() }
                 .filterValues { it.isNotEmpty() }
             if (filesNeededByChecks.isEmpty()) {
-                logger.logEvent(Level.DEBUG, "No file-based checks to run", "repository" to repoName)
+                logger.logEvent(Level.DEBUG, "No file-based checks to run", "repository" to nameWithOwner)
                 return@coroutineScope emptyList()
             }
 
@@ -85,12 +87,12 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 .intersect(relevantFiles)
                 .associateWith { filePath ->
                     async {
-                        runCatching { gitHub.readFileContents(repoName, filePath) }
+                        runCatching { gitHub.readFileContents(nameWithOwner, filePath) }
                             .onFailure { ex ->
                                 if (ex is CancellationException) throw ex
                                 logger.logFailure(
                                     "File read failed; dependent checks omitted", ex,
-                                    "operation" to "file_contents", "repository" to repoName, "file" to filePath,
+                                    "operation" to "file_contents", "repository" to nameWithOwner, "file" to filePath,
                                     "affected_checks" to filesNeededByChecks.filterValues { filePath in it }
                                         .keys.joinToString(",") { it.javaClass.simpleName }
                                 )
@@ -98,7 +100,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                     }.await()
                 }
             logger.logEvent(
-                Level.DEBUG, "Repository file reads finished", "repository" to repoName,
+                Level.DEBUG, "Repository file reads finished", "repository" to nameWithOwner,
                 "files_read" to allFilesWeNeed.values.count { it.isSuccess },
                 "files_failed" to allFilesWeNeed.values.count { it.isFailure }
             )
@@ -109,28 +111,28 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                     // A shared read failure is logged once above, with all affected checks.
                     val readFailure = contents.values.firstNotNullOfOrNull { it.exceptionOrNull() }
                     if (readFailure != null) return@async Result.failure<CheckResult>(readFailure)
-                    runCheck(repoName, check.javaClass.simpleName) {
+                    runCheck(nameWithOwner, check.javaClass.simpleName) {
                         check.run(
-                            repoName,
+                            nameWithOwner,
                             contents.mapValues { (_, content) -> content.getOrThrow() })
                     }
                 }
             }
         }
 
-    private suspend fun runDatastoreBasedChecks(repoName: String): List<Deferred<Result<CheckResult>>> =
+    private suspend fun runDatastoreBasedChecks(nameWithOwner: String): List<Deferred<Result<CheckResult>>> =
         coroutineScope {
             datastoreBasedChecks.map { check ->
-                async { runCheck(repoName, check.javaClass.simpleName) { check.run(repoName) } }
+                async { runCheck(nameWithOwner, check.javaClass.simpleName) { check.run(nameWithOwner) } }
             }
 
         }
 
 
-    private suspend fun runGitHubAPIBasedChecks(repoName: String): List<Deferred<Result<CheckResult?>>> =
+    private suspend fun runGitHubAPIBasedChecks(nameWithOwner: String): List<Deferred<Result<CheckResult?>>> =
         coroutineScope {
             gitHubAPIBasedChecks.map { check ->
-                async { runCheck(repoName, check.javaClass.simpleName) { check.run(repoName) } }
+                async { runCheck(nameWithOwner, check.javaClass.simpleName) { check.run(nameWithOwner) } }
             }
         }
 

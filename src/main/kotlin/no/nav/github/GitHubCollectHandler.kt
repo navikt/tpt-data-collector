@@ -116,10 +116,8 @@ class GitHubCollectHandler(
                 )
                 continue
             }
-            val (owner, repo) = parts
-
             val alerts = try {
-                gitHub.vulnerabilityAlertsFor(owner, repo)
+                gitHub.vulnerabilityAlertsFor(nameWithOwner)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

@@ -21,7 +21,7 @@ class RealWhodis(val httpClient: HttpClient, val baseUrl: String): Whodis {
     override suspend fun ownerTeamsFor(repo: String): List<String> =
         if (isValid(repo)) {
             // Whodis returns JSON null when no owning teams are known.
-            httpClient.request("$baseUrl/repository/$repo/owners") {
+            httpClient.request("$baseUrl/repository/${repo.substringAfter('/')}/owners") {
                 method = Get
                 header(Accept, "application/json")
             }.body<List<String>?>().orEmpty()
