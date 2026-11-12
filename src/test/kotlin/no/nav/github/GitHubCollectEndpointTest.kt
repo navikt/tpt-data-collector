@@ -24,7 +24,7 @@ class GitHubCollectEndpointTest {
                 FakeDatastore(),
                 FakeTptBackend(),
                 FakeWhodis(),
-                ApplikasjonsConfig(githubWebhookSecret = "dummy"),
+                ApplikasjonsConfig(githubWebhookSecret = "dummy", githubOrganization = "navikt"),
             )
         }
         val response = client.post("/collect/github") {

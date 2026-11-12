@@ -24,7 +24,7 @@ class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
         val hasCriticalAlerts = when (val result = gitHub.hasOpenCriticalDependabotAlerts(repo)) {
             is DependabotAlertsResult.Available -> result.hasOpenCriticalAlerts
             DependabotAlertsResult.Disabled -> {
-                logger.info("Skipping $name for navikt/$repo: Dependabot alerts are disabled")
+                logger.info("Skipping $name for $repo: Dependabot alerts are disabled")
                 return null
             }
         }

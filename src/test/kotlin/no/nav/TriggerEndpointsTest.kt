@@ -18,6 +18,8 @@ import io.ktor.server.testing.testApplication
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.Date
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
@@ -31,6 +33,8 @@ import no.nav.whodis.FakeWhodis
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.nio.file.Path
 
 class TriggerEndpointsTest {
@@ -46,6 +50,7 @@ class TriggerEndpointsTest {
         Files.writeString(jwks, JWKSet(signingKey.toPublicJWK()).toString())
         return ApplikasjonsConfig(
             githubWebhookSecret = "dummy",
+            githubOrganization = "navikt",
             openIdIssuer = issuer,
             openIdAudience = audience,
             openIdJwksUri = jwks.toUri().toString(),
@@ -130,8 +135,9 @@ class TriggerEndpointsTest {
         }
     }
 
-    @Test
-    fun `github webhook answers 202 and sends check results as a callback`() = testApplication {
+    @ParameterizedTest
+    @ValueSource(strings = ["navikt", "another-org"])
+    fun `github webhook answers 202 and sends check results for the configured organization`(organization: String) = testApplication {
         val received = CompletableDeferred<CheckResultsForRepo>()
         val backend = object : FakeTptBackend() {
             override suspend fun sendCheckResults(results: CheckResultsForRepo): Boolean {
@@ -140,14 +146,18 @@ class TriggerEndpointsTest {
             }
         }
         application {
-            businessModule(FakeGitHub(), FakeDatastore(), backend, FakeWhodis(), ApplikasjonsConfig(githubWebhookSecret = "dummy"))
+            businessModule(FakeGitHub(), FakeDatastore(), backend, FakeWhodis(), ApplikasjonsConfig(githubWebhookSecret = "dummy", githubOrganization = organization))
         }
 
+        val body = Files.readString(Paths.get("src/test/resources/github_push_webhook.json"))
+            .replace("navikt/", "$organization/")
+        val signature = Mac.getInstance("HmacSHA256").apply {
+            init(SecretKeySpec("dummy".toByteArray(), "HmacSHA256"))
+        }.doFinal(body.toByteArray()).joinToString("") { "%02x".format(it) }
         val response = client.post("/webhook/github") {
             contentType(ContentType.Application.Json)
-            setBody(Files.readString(Paths.get("src/test/resources/github_push_webhook.json")))
-            // Signature calculated using the explicitly configured test secret.
-            header("X-Hub-Signature-256", "sha256=468d95ef1e0ef6b498a78f0b46a3485c65bcc115c136f18a045aa6433bcf313e")
+            setBody(body)
+            header("X-Hub-Signature-256", "sha256=$signature")
         }
 
         assertEquals(HttpStatusCode.Accepted, response.status)

@@ -82,7 +82,7 @@ class GitHubTeamReposPaginationTest {
             expectSuccess = true
         }.use { client ->
             val transport = GitHubTransport(client, timeSource = testScheduler.timeSource, jitter = { it })
-            block(RealGitHub(client, "123", "456", privateKeyPem, transport), requestedUrls)
+            block(RealGitHub(client, "123", "456", privateKeyPem, "navikt", transport), requestedUrls)
         }
     }
 

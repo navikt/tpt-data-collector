@@ -83,7 +83,7 @@ class GitHubTreeInventoryTest {
         val client: HttpClient,
         val requests: List<TreeRequest>
     ) {
-        fun realGitHub() = RealGitHub(client, "123", "456", privateKeyPem)
+        fun realGitHub() = RealGitHub(client, "123", "456", privateKeyPem, "navikt")
     }
 
     private suspend fun withInventory(
@@ -188,7 +188,7 @@ class GitHubTreeInventoryTest {
             root to Response(tree(entry("partial"), truncated = true))
         )) { fixture ->
             val failure = assertThrows<GitHubFileInventoryException> { fixture.inventory.paths("main") }
-            assertTrue(failure.message!!.contains("navikt/repo"))
+            assertTrue(failure.message!!.contains("for repo:"))
             assertTrue(failure.message!!.contains("non-recursive tree response is truncated"))
         }
     }

@@ -83,7 +83,7 @@ fun main() {
             expectSuccess = true
         }
         val gitHub =
-            RealGitHub(httpClient, config.githubAppId, config.githubAppInstallationId, config.githubAppPrivateKey)
+            RealGitHub(httpClient, config.githubAppId, config.githubAppInstallationId, config.githubAppPrivateKey, config.githubOrganization)
 
         val neoDriver = GraphDatabase.driver(config.neo4jUri, AuthTokens.basic(config.neo4jUser, config.neo4Password))
         neoDriver.verifyConnectivity()
@@ -108,7 +108,7 @@ fun Application.businessModule(gitHub: GitHub,
                                whodis: Whodis,
                                config: ApplikasjonsConfig) {
     val checks = Checks(gitHub, datastore)
-    val githubWebhookHandler = GithubWebhookHandler(checks, tptBackend, whodis)
+    val githubWebhookHandler = GithubWebhookHandler(checks, tptBackend, whodis, config.githubOrganization)
     val tptRequestHandler = TptRequestHandler(gitHub, checks, tptBackend)
     val gitHubCollectHandler = GitHubCollectHandler(gitHub, whodis, tptBackend)
     val teamSlugPattern = Regex("^[a-z0-9][a-z0-9-]*$")
@@ -259,5 +259,4 @@ private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlug
         }
     }
 }
-
 
