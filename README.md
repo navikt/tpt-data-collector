@@ -14,7 +14,7 @@ Each deployment supports one organization for these checks. The `/collect/github
 
 Repository identities are qualified `owner/name` values throughout checks, GitHub requests, logs, and callbacks. Webhooks supply GitHub's `full_name`, and team repository listings preserve each repository's `full_name` rather than reconstructing its owner from configuration.
 
-**Breaking integration contract:** the checks callback uses `nameWithOwner` instead of `repoName`. Deploy only after tpt-backend supports this contract. Whodis ownership and Cartography lookups temporarily extract the short name to preserve their existing contracts.
+**Breaking integration contracts:** the checks callback uses `nameWithOwner` instead of `repoName`, and Whodis ownership lookup uses `/repository/{owner}/{repo}/owners`. Whodis team listings must return qualified names. Deploy only after tpt-backend and Whodis support these contracts. Cartography lookups temporarily extract the short name to preserve the existing contract.
 
 ## Endpoints
 
