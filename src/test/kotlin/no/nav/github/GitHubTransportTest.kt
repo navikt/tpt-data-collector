@@ -55,7 +55,7 @@ class GitHubTransportTest {
 
     private data class Response(
         val status: Int = 200,
-        val body: String = """{"name":"repo","archived":false}""",
+        val body: String = """{"name":"repo","full_name":"navikt/repo","archived":false}""",
         val headers: Map<String, String> = emptyMap()
     )
 
@@ -99,7 +99,7 @@ class GitHubTransportTest {
     @Test
     fun `success returns immediately and nullable results are not timeouts`() = runTest {
         withTransport { transport, times, _ ->
-            assertEquals("repo", transport.read().name)
+            assertEquals("navikt/repo", transport.read().nameWithOwner)
             assertEquals(listOf(0L), times)
             assertNull(transport.execute<String?>(GitHubOperation.FILE_CONTENTS) { null })
             assertEquals(0L, currentTime)
@@ -121,7 +121,7 @@ class GitHubTransportTest {
     @ValueSource(ints = [500, 502, 503, 504])
     fun `transient HTTP failures can recover`(status: Int) = runTest {
         withTransport(listOf(Response(status), Response())) { transport, times, _ ->
-            assertEquals("repo", transport.read().name)
+            assertEquals("navikt/repo", transport.read().nameWithOwner)
             assertEquals(listOf(0L, 1000L), times)
         }
     }
@@ -159,7 +159,7 @@ class GitHubTransportTest {
             "X-GitHub-Request-Id" to "ABCD:1234"
         )
         withTransport(listOf(Response(403, headers = headers), Response())) { transport, times, _ ->
-            assertEquals("repo", transport.read().name)
+            assertEquals("navikt/repo", transport.read().nameWithOwner)
             assertEquals(listOf(0L, 3000L), times)
         }
     }

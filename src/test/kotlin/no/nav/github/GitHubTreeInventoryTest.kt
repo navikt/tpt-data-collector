@@ -117,7 +117,7 @@ class GitHubTreeInventoryTest {
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
             expectSuccess = true
         }.use { client ->
-            val inventory = GitHubTreeInventory("repo", limits) { ref, recursive ->
+            val inventory = GitHubTreeInventory("navikt/repo", limits) { ref, recursive ->
                 val url = "https://api.github.com/repos/navikt/repo/git/trees/$ref" +
                     if (recursive) "?recursive=true" else ""
                 client.get(url).body<TreeResponse>()
@@ -188,7 +188,7 @@ class GitHubTreeInventoryTest {
             root to Response(tree(entry("partial"), truncated = true))
         )) { fixture ->
             val failure = assertThrows<GitHubFileInventoryException> { fixture.inventory.paths("main") }
-            assertTrue(failure.message!!.contains("for repo:"))
+            assertTrue(failure.message!!.contains("for navikt/repo:"))
             assertTrue(failure.message!!.contains("non-recursive tree response is truncated"))
         }
     }
@@ -346,7 +346,7 @@ class GitHubTreeInventoryTest {
             root to Response(tree(entry("dir", TreeEntryType.TREE, childSha))),
             child to Response(tree(entry("file"), sha = childSha))
         )) { fixture ->
-            assertEquals(listOf("dir", "dir/file"), fixture.realGitHub().allFilePathsIn("repo"))
+            assertEquals(listOf("dir", "dir/file"), fixture.realGitHub().allFilePathsIn("navikt/repo"))
             assertEquals(listOf(initial, root, child), fixture.requests)
         }
     }
@@ -363,7 +363,7 @@ class GitHubTreeInventoryTest {
         }) { fixture ->
             val gitHub = fixture.realGitHub()
             val failure = assertThrows<GitHubFileInventoryException> {
-                gitHub.allFilePathsIn("repo", TreeInventoryLimits(timeout = 500.milliseconds))
+                gitHub.allFilePathsIn("navikt/repo", TreeInventoryLimits(timeout = 500.milliseconds))
             }
             assertTrue(failure.message!!.contains("time budget"))
             assertTrue(fetchCancelled)
@@ -379,7 +379,7 @@ class GitHubTreeInventoryTest {
                 awaitCancellation()
             }) { fixture ->
                 val gitHub = fixture.realGitHub()
-                val work = async { gitHub.allFilePathsIn("repo") }
+                val work = async { gitHub.allFilePathsIn("navikt/repo") }
                 started.await()
                 work.cancel()
                 assertThrows<CancellationException> { work.await() }

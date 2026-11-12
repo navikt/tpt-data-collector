@@ -9,7 +9,7 @@ import no.nav.checks.Severity.MEDIUM
 
 interface FileBasedCheck {
     fun filesICareAbout(allAvailableFiles: Set<String>): List<String>
-    fun run(repo: String, filesToCheck: Map<String, String>): CheckResult
+    fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult
 }
 
 class DistrolessCheck : FileBasedCheck {
@@ -28,7 +28,7 @@ class DistrolessCheck : FileBasedCheck {
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
-    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+    override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val lastBaseImageUsed = filesToCheck.flatMap { (_, fileContents) ->
             fileContents.lines()
                 .map { it.lowercase() }
@@ -59,7 +59,7 @@ class CopyDotDotCheck : FileBasedCheck {
             dockerfilePattern.find(it) != null || it == ".dockerignore"
         }
 
-    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+    override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val now = Clock.System.now()
 
         if (filesToCheck.containsKey(".dockerignore")) {
@@ -76,7 +76,7 @@ class CopyDotDotCheck : FileBasedCheck {
         }
 
         return if (idxOfLastCopyLine > idxOfLastFromLine) {
-            CheckResult.NeedsWork(name, desc, severity, now, listOf("'COPY . .' instructions in the runtime image are present in $repo"))
+            CheckResult.NeedsWork(name, desc, severity, now, listOf("'COPY . .' instructions in the runtime image are present in $nameWithOwner"))
         } else {
             CheckResult.AllGood(name, desc, severity, now)
         }
@@ -94,7 +94,7 @@ class UnpinnedActionVersionsCheck : FileBasedCheck {
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { workflowFilePattern.matches(it) || it == lockfile }
 
-    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+    override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val now = Clock.System.now()
         if (filesToCheck.containsKey(lockfile)) return CheckResult.AllGood(name, desc, severity, now)
 
@@ -123,7 +123,7 @@ class PwnRequestCheck : FileBasedCheck {
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { workflowFilePattern.matches(it) }
 
-    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+    override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val filesToFix = filesToCheck.flatMap { (filename, fileContents) ->
             fileContents.lines()
                 .filter { it.contains("pull_request_target") }
@@ -155,7 +155,7 @@ class NpxUsageCheck : FileBasedCheck {
         allAvailableFiles.filter { it.contains("package.json") }
 
     override fun run(
-        repo: String,
+        nameWithOwner: String,
         filesToCheck: Map<String, String>
     ): CheckResult {
         val filesToFix = filesToCheck.flatMap { (filename, fileContents) ->
@@ -192,7 +192,7 @@ class CurlPipeShellCheck : FileBasedCheck {
                 workflowFilePattern.find(it) != null ||
         it.contains("package.json")}
 
-    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+    override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val now = Clock.System.now()
         val filesToFix = filesToCheck.flatMap { (filename, fileContents) ->
             fileContents.lines()
@@ -229,7 +229,7 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
-    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+    override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val namedIntermediaries = filesToCheck
             .filterNot { it.key.endsWith(".py") } // dirty trick to avoid the cartography repo
             .flatMap { (_, fileContents) ->
@@ -272,14 +272,14 @@ class HasGitignoreCheck : FileBasedCheck {
 
     override fun filesICareAbout(allAvailableFiles: Set<String>) = listOf(".gitignore")
 
-    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+    override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val hasGitignore = filesToCheck.keys.contains(".gitignore")
         val now = Clock.System.now()
         return if (hasGitignore) {
             CheckResult.AllGood(name, desc, severity, now)
         } else {
             CheckResult.NeedsWork(name, desc, severity, now,
-                listOf("$repo does not contain a .gitignore file"))
+                listOf("$nameWithOwner does not contain a .gitignore file"))
         }
     }
 }
@@ -293,10 +293,10 @@ class ReadmeCheck : FileBasedCheck {
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { readmePattern.matches(it.lowercase()) }
 
-    override fun run(repo: String, filesToCheck: Map<String, String>): CheckResult {
+    override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val now = Clock.System.now()
         if (filesToCheck.isEmpty()) return CheckResult.NeedsWork(name, desc, severity, now,
-            listOf("$repo does not appear to have a Readme"))
+            listOf("$nameWithOwner does not appear to have a Readme"))
 
         val containsEmptyOrOneLiners =
             filesToCheck.filter{ it.value.trim().isEmpty() || it.value.indexOf('\n') == -1 }

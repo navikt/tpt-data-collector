@@ -26,14 +26,22 @@ class GithubWebhookHandlerTest {
         defaultBranch: String,
     ) = runTest {
         val backend = FakeTptBackend()
+        val ownerLookups = mutableListOf<String>()
+        val whodis = object : FakeWhodis() {
+            override suspend fun ownerTeamsFor(nameWithOwner: String): List<String> {
+                ownerLookups += nameWithOwner
+                return super.ownerTeamsFor(nameWithOwner)
+            }
+        }
         val handler = GithubWebhookHandler(
-            Checks(FakeGitHub(), FakeDatastore()), backend, FakeWhodis(), organization,
+            Checks(FakeGitHub(), FakeDatastore()), backend, whodis, organization,
         )
 
         handler.handle(payload("$payloadOrganization/repo", defaultBranch, defaultBranch))
 
         val result = backend.sentCheckResults.single()
-        assertEquals("repo", result.repoName)
+        assertEquals("$payloadOrganization/repo", result.nameWithOwner)
+        assertEquals(listOf("$payloadOrganization/repo"), ownerLookups)
         assertEquals(listOf("tulleteam"), result.repoOwners)
         assertTrue(result.results.isNotEmpty())
     }
@@ -52,9 +60,9 @@ class GithubWebhookHandlerTest {
         val backend = FakeTptBackend()
         val ownerLookups = mutableListOf<String>()
         val whodis = object : FakeWhodis() {
-            override suspend fun ownerTeamsFor(repo: String): List<String> {
-                ownerLookups += repo
-                return super.ownerTeamsFor(repo)
+            override suspend fun ownerTeamsFor(nameWithOwner: String): List<String> {
+                ownerLookups += nameWithOwner
+                return super.ownerTeamsFor(nameWithOwner)
             }
         }
         val handler = GithubWebhookHandler(

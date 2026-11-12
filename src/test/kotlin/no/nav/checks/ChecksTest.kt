@@ -24,10 +24,21 @@ class ChecksTest {
     private val unpinnedWorkflow = "steps:\n  - uses: actions/checkout@v4"
 
     @Test
+    fun `unqualified repository names fail before checks run`() = runBlocking {
+        val gitHub = FileGitHub(mapOf(".gitignore" to ""))
+
+        assertThrows<IllegalArgumentException> {
+            Checks(gitHub, FakeDatastore()).runAll("repo", gitHub.files.keys)
+        }
+
+        assertTrue(gitHub.requestedFiles.isEmpty())
+    }
+
+    @Test
     fun `missing lockfile is not fetched and unpinned actions need work`() = runBlocking {
         val gitHub = FileGitHub(mapOf(workflow to unpinnedWorkflow))
 
-        val results = Checks(gitHub, FakeDatastore()).runAll("repo", gitHub.files.keys)
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", gitHub.files.keys)
 
         assertIs<CheckResult.NeedsWork>(results.single { it.name == "PinnedGitHubActionVersions" })
         assertEquals(listOf(workflow), gitHub.requestedFiles)
@@ -37,7 +48,7 @@ class ChecksTest {
     fun `existing empty lockfile still satisfies the action pinning check`() = runBlocking {
         val gitHub = FileGitHub(mapOf(workflow to unpinnedWorkflow, lockfile to ""))
 
-        val results = Checks(gitHub, FakeDatastore()).runAll("repo", gitHub.files.keys)
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", gitHub.files.keys)
 
         assertIs<CheckResult.AllGood>(results.single { it.name == "PinnedGitHubActionVersions" })
         assertEquals(setOf(workflow, lockfile), gitHub.requestedFiles.toSet())
@@ -47,7 +58,7 @@ class ChecksTest {
     fun `missing gitignore needs work without fetching it`() = runBlocking {
         val gitHub = FileGitHub(emptyMap())
 
-        val results = Checks(gitHub, FakeDatastore()).runAll("repo", emptySet())
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", emptySet())
 
         assertIs<CheckResult.NeedsWork>(results.single { it.name == "HasGitignoreCheck" })
         assertTrue(gitHub.requestedFiles.isEmpty())
@@ -57,7 +68,7 @@ class ChecksTest {
     fun `existing empty gitignore passes the presence check`() = runBlocking {
         val gitHub = FileGitHub(mapOf(".gitignore" to ""))
 
-        val results = Checks(gitHub, FakeDatastore()).runAll("repo", gitHub.files.keys)
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", gitHub.files.keys)
 
         assertIs<CheckResult.AllGood>(results.single { it.name == "HasGitignoreCheck" })
         assertEquals(listOf(".gitignore"), gitHub.requestedFiles)
@@ -70,16 +81,16 @@ class ChecksTest {
             expectSuccess = true
         }.use { client ->
             val gitHub = object : FakeGitHub() {
-                override suspend fun readFileContents(repoName: String, filePath: String): String {
+                override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
                     if (filePath == workflow) {
-                        client.get("https://api.github.com/repos/navikt/$repoName/contents/$filePath")
+                        client.get("https://api.github.com/repos/$nameWithOwner/contents/$filePath")
                         error("Expected the HTTP request to fail")
                     }
                     return "Project\nA descriptive readme."
                 }
             }
 
-            val results = Checks(gitHub, FakeDatastore()).runAll("repo", setOf(workflow, "README.md"))
+            val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf(workflow, "README.md"))
             val names = results.map { it.name }.toSet()
 
             assertTrue("PinnedGitHubActionVersions" !in names)
@@ -98,7 +109,7 @@ class ChecksTest {
             failedFiles = setOf(lockfile)
         )
 
-        val results = Checks(gitHub, FakeDatastore()).runAll("repo", gitHub.files.keys)
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", gitHub.files.keys)
 
         assertTrue(results.none { it.name == "PinnedGitHubActionVersions" })
         assertIs<CheckResult.AllGood>(results.single { it.name == "PwnRequestCheck" })
@@ -108,7 +119,7 @@ class ChecksTest {
     fun `unreadable gitignore does not pass the presence check`() = runBlocking {
         val gitHub = FileGitHub(mapOf(".gitignore" to "build/"), failedFiles = setOf(".gitignore"))
 
-        val results = Checks(gitHub, FakeDatastore()).runAll("repo", gitHub.files.keys)
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", gitHub.files.keys)
 
         assertTrue(results.none { it.name == "HasGitignoreCheck" })
         assertTrue(results.any { it.name == "OldDeployments" })
@@ -118,7 +129,7 @@ class ChecksTest {
     fun `successful empty workflow is not treated as a failed read`() = runBlocking {
         val gitHub = FileGitHub(mapOf(workflow to ""))
 
-        val results = Checks(gitHub, FakeDatastore()).runAll("repo", gitHub.files.keys)
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", gitHub.files.keys)
 
         assertIs<CheckResult.AllGood>(results.single { it.name == "PinnedGitHubActionVersions" })
     }
@@ -126,14 +137,14 @@ class ChecksTest {
     @Test
     fun `file read cancellation propagates`() {
         val gitHub = object : FakeGitHub() {
-            override suspend fun readFileContents(repoName: String, filePath: String): String {
+            override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
                 throw CancellationException("Collection cancelled")
             }
         }
 
         assertThrows<CancellationException> {
             runBlocking {
-                Checks(gitHub, FakeDatastore()).runAll("repo", setOf(workflow))
+                Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf(workflow))
             }
         }
     }
@@ -144,7 +155,7 @@ class ChecksTest {
     ) : FakeGitHub() {
         val requestedFiles = mutableListOf<String>()
 
-        override suspend fun readFileContents(repoName: String, filePath: String): String {
+        override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
             requestedFiles += filePath
             if (filePath in failedFiles) throw IOException("File read failed")
             return files[filePath] ?: throw IOException("File not found")

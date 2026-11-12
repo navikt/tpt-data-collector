@@ -25,7 +25,7 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
             $$"MATCH (:GitHubRepository {name: $repo})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug AS team, d.environment_name AS env, d.created_at AS created"
         val result =
             driver.executableQuery(query)
-                .withParameters(mapOf("repo" to originRepo))
+                .withParameters(mapOf("repo" to originRepo.substringAfter('/')))
                 .execute()
         return result.records()
             .map {

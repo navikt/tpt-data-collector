@@ -69,10 +69,8 @@ class GitHubCollectHandler(
                 logger.warn("Skipping repo with unexpected format: $nameWithOwner")
                 continue
             }
-            val (owner, repo) = parts
-
             val alerts = try {
-                gitHub.vulnerabilityAlertsFor(owner, repo)
+                gitHub.vulnerabilityAlertsFor(nameWithOwner)
             } catch (e: Exception) {
                 logger.error("Failed to fetch vulnerability alerts for $nameWithOwner", e)
                 continue

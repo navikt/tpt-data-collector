@@ -21,6 +21,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import no.nav.checks.CheckResult
 import no.nav.checks.CheckResultsForRepo
 import no.nav.checks.Severity
@@ -73,7 +75,7 @@ class TptBackendClientTest {
         val client = client(ok)
         val event = GitHubSyncEvent(listOf("team"), "2026-01-01T10:00:00Z")
         val checks = CheckResultsForRepo(
-            "repo", listOf("team"),
+            "another-org/repo", listOf("team"),
             listOf(CheckResult.AllGood("check", "desc", Severity.LOW, Clock.System.now()))
         )
 
@@ -87,6 +89,9 @@ class TptBackendClientTest {
         )
         assertEquals(event, Json.decodeFromString<GitHubSyncEvent>(bodies[0]))
         assertEquals(checks, Json.decodeFromString<CheckResultsForRepo>(bodies[1]))
+        val checksJson = Json.parseToJsonElement(bodies[1]).jsonObject
+        assertEquals("another-org/repo", checksJson.getValue("nameWithOwner").jsonPrimitive.content)
+        assertFalse("repoName" in checksJson)
     }
 
     @Test
@@ -119,7 +124,7 @@ class TptBackendClientTest {
     fun `does not retry client errors`() = runBlocking {
         val before = TPTMetrics.callbacksFailed(CHECK_RESULTS)
 
-        assertFalse(client(error(HttpStatusCode.BadRequest)).sendCheckResults(CheckResultsForRepo("repo", emptyList(), emptyList())))
+        assertFalse(client(error(HttpStatusCode.BadRequest)).sendCheckResults(CheckResultsForRepo("navikt/repo", emptyList(), emptyList())))
 
         assertEquals(1, requests.size)
         assertEquals(before + 1, TPTMetrics.callbacksFailed(CHECK_RESULTS))

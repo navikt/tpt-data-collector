@@ -12,22 +12,22 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
 
     suspend fun handle(webhookPayload: WebhookPayload) {
         TPTMetrics.webhookReceived()
-        val repo = webhookPayload.repository.name
-        logger.info("'$repo' had a push to push to '${webhookPayload.ref}'")
+        val nameWithOwner = webhookPayload.repository.nameWithOwner
+        logger.info("'$nameWithOwner' had a push to '${webhookPayload.ref}'")
         if (!isRelevant(webhookPayload)) {
-            logger.debug("Skipping checks for '$repo, it is not relevant'")
+            logger.debug("Skipping checks for '$nameWithOwner', it is not relevant")
             return
         }
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val repoOwners = try {
             TPTMetrics.whodisLookups(1)
-            whodis.ownerTeamsFor(repo)
+            whodis.ownerTeamsFor(nameWithOwner)
         } catch(ex: Exception) {
-            logger.error("Error while finding owners for '$repo'", ex)
+            logger.error("Error while finding owners for '$nameWithOwner'", ex)
             emptyList()
         }
-        val results = checks.runAll(webhookPayload.repository.name, changedFiles)
-        val resultsForRepo = CheckResultsForRepo(repo, repoOwners, results)
+        val results = checks.runAll(nameWithOwner, changedFiles)
+        val resultsForRepo = CheckResultsForRepo(nameWithOwner, repoOwners, results)
         if (backend.sendCheckResults(resultsForRepo)) {
             TPTMetrics.msgsSentToTpt(1)
         }
@@ -35,6 +35,6 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
         val pushBranch = payload.ref.split("/").last()
-        return payload.repository.fullName.startsWith("$organization/", ignoreCase = true) && pushBranch == payload.repository.masterBranch
+        return payload.repository.nameWithOwner.startsWith("$organization/", ignoreCase = true) && pushBranch == payload.repository.masterBranch
     }
 }
