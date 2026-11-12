@@ -7,7 +7,7 @@ import org.neo4j.driver.Driver
 
 interface Datastore {
     suspend fun ping(): Boolean
-    fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, Instant>>
+    fun activeDeploymentsFor(nameWithOwner: String): List<Triple<String, String, Instant>>
 }
 
 class Neo4jDatastore(val driver: Driver) : Datastore {
@@ -20,12 +20,12 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
         }
     }
 
-    override fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, Instant>> {
+    override fun activeDeploymentsFor(nameWithOwner: String): List<Triple<String, String, Instant>> {
         val query =
-            $$"MATCH (:GitHubRepository {name: $repo})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug AS team, d.environment_name AS env, d.created_at AS created"
+            $$"MATCH (:GitHubRepository {full_name: $repo})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug AS team, d.environment_name AS env, d.created_at AS created"
         val result =
             driver.executableQuery(query)
-                .withParameters(mapOf("repo" to originRepo))
+                .withParameters(mapOf("repo" to nameWithOwner))
                 .execute()
         return result.records()
             .map {
@@ -41,10 +41,10 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
 class FakeDatastore : Datastore {
     override suspend fun ping(): Boolean = true
 
-    override fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, Instant>> {
+    override fun activeDeploymentsFor(nameWithOwner: String): List<Triple<String, String, Instant>> {
         return when {
-            originRepo == "good" -> listOf(Triple("yoloteam", "env1", Clock.System.now()))
-            originRepo == "bad" -> listOf(
+            nameWithOwner == "navikt/good" -> listOf(Triple("yoloteam", "env1", Clock.System.now()))
+            nameWithOwner == "navikt/bad" -> listOf(
                 Triple("yoloteam", "env1", Clock.System.now()),
                 Triple("yoloteam", "env2", Clock.System.now().minus(91.days)),
             )

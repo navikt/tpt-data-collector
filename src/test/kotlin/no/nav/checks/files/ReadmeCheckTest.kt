@@ -23,7 +23,7 @@ class ReadmeCheckTest {
     @Test
     fun `Repo should contain at least one Readme file`() {
         val check = ReadmeCheck()
-        val result = check.run("tullerepo", emptyMap())
+        val result = check.run("navikt/tullerepo", emptyMap())
         assertTrue(result is CheckResult.NeedsWork)
     }
 
@@ -31,7 +31,7 @@ class ReadmeCheckTest {
     fun `Readme cannot be empty`() {
         val filesToCheck = mapOf("readme" to "")
         val check = ReadmeCheck()
-        val result = check.run("tullerepo", filesToCheck)
+        val result = check.run("navikt/tullerepo", filesToCheck)
         assertTrue(result is CheckResult.NeedsWork)
     }
 
@@ -40,7 +40,7 @@ class ReadmeCheckTest {
         val filesToCheck = mapOf("readme" to """
         """.trimIndent())
         val check = ReadmeCheck()
-        val result = check.run("tullerepo", filesToCheck)
+        val result = check.run("navikt/tullerepo", filesToCheck)
         assertTrue(result is CheckResult.NeedsWork)
     }
 
@@ -48,7 +48,7 @@ class ReadmeCheckTest {
     fun `Readme must contain more than one line`() {
         val filesToCheck = mapOf("readme" to "this is the only line")
         val check = ReadmeCheck()
-        val result = check.run("tullerepo", filesToCheck)
+        val result = check.run("navikt/tullerepo", filesToCheck)
         assertTrue(result is CheckResult.NeedsWork)
     }
 
@@ -59,7 +59,7 @@ class ReadmeCheckTest {
             line two
         """.trimIndent())
         val check = ReadmeCheck()
-        val result = check.run("tullerepo", filesToCheck)
+        val result = check.run("navikt/tullerepo", filesToCheck)
         assertTrue(result is CheckResult.AllGood)
     }
 

@@ -8,9 +8,13 @@ An application that collects data from GitHub and the Cartography database, runs
 
 ## Configuration
 
-`GITHUB_ORGANIZATION` is required and must not be blank. It selects the organization used for GitHub repository checks and team repository lookups. Push webhooks trigger checks only for repositories in this organization on their default branch. There is no implicit organization fallback; the Nais deployment explicitly sets `GITHUB_ORGANIZATION=navikt`.
+`GITHUB_ORGANIZATION` is required and must not be blank. It selects the organization for team repository lookups and webhook filtering. Push webhooks trigger checks only for repositories in this organization on their default branch; organization matching is case-insensitive. There is no implicit organization fallback; the Nais deployment explicitly sets `GITHUB_ORGANIZATION=navikt`.
 
 Each deployment supports one organization for these checks. The `/collect/github` endpoint continues to use explicit `owner/name` repository identities. Configuring another organization does not make Nav-specific infrastructure integrations portable.
+
+Repository identities are qualified `owner/name` values throughout checks, GitHub requests, logs, and callbacks. Webhooks supply GitHub's `full_name`, and team repository listings preserve each repository's `full_name` rather than reconstructing its owner from configuration.
+
+**Breaking integration contracts:** the checks callback uses `nameWithOwner` instead of `repoName`; Whodis ownership lookup uses `/repository/{owner}/{repo}/owners`; and Cartography lookups match `GitHubRepository.full_name`. Whodis team listings must return qualified names. There is no short-name fallback. Deploy only after tpt-backend, Whodis, and Cartography support these contracts.
 
 ## Endpoints
 
@@ -111,6 +115,8 @@ All results are delivered as callbacks to [tpt-backend](https://github.com/navik
 | `POST /callbacks/github/vulnerabilities` | Once per repository during a `/collect/github` run |
 | `POST /callbacks/github/sync/complete` | After a `/collect/github` run. Always sent, also when the run fails |
 | `POST /callbacks/checks` | Once per repository for `/team/{slug}` and GitHub webhooks |
+
+The checks callback body has `nameWithOwner` (for example, `"navikt/my-repo"`), `repoOwners` (team slugs), and `results` (check results). The previous `repoName` field is no longer sent.
 
 Failed callbacks (network errors, `5xx`, `408`, `429`) are retried with exponential backoff. Callbacks that still fail are logged and counted in the `tpt_backend_callbacks_failed` metric, tagged with `callback`.
 

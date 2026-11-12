@@ -157,7 +157,7 @@ fun Application.businessModule(gitHub: GitHub,
                     return@post
                 }
 
-                runInBackground("GitHub webhook for ${payload.repository.name}") {
+                runInBackground("GitHub webhook for ${payload.repository.nameWithOwner}") {
                     githubWebhookHandler.handle(payload)
                 }
                 call.respond(HttpStatusCode.Accepted)
@@ -259,4 +259,3 @@ private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlug
         }
     }
 }
-

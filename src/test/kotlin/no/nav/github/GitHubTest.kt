@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertNotNull
+import org.junit.jupiter.api.assertThrows
 
 
 class GitHubTest {
@@ -47,6 +48,23 @@ class GitHubTest {
         val json = Json{ignoreUnknownKeys = true}
         val parsed = json.decodeFromString<List<DependabotAlert>>(securityVulnerabilityJson)
         assertNotNull(parsed)
+    }
+
+    @Test
+    fun `team repository response decodes full name rather than short name`() {
+        val parsed = Json { ignoreUnknownKeys = true }.decodeFromString<ReposForTeamResponse>(
+            """{"name":"repo","full_name":"another-owner/repo"}"""
+        )
+        assertEquals("another-owner/repo", parsed.nameWithOwner)
+    }
+
+    @Test
+    fun `team repository response requires full name rather than synthesizing owner`() {
+        assertThrows<kotlinx.serialization.SerializationException> {
+            Json { ignoreUnknownKeys = true }.decodeFromString<ReposForTeamResponse>(
+                """{"name":"repo"}"""
+            )
+        }
     }
 
     @Test

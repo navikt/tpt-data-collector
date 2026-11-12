@@ -99,7 +99,7 @@ class TptBackendClient(
         post(VULNERABILITY_DATA, "/callbacks/github/vulnerabilities", Json.encodeToString(message), message.nameWithOwner)
 
     override suspend fun sendCheckResults(results: CheckResultsForRepo) =
-        post(CHECK_RESULTS, "/callbacks/checks", Json.encodeToString(results), results.repoName)
+        post(CHECK_RESULTS, "/callbacks/checks", Json.encodeToString(results), results.nameWithOwner)
 
     override suspend fun sendSyncStarted(event: GitHubSyncEvent) =
         post(SYNC_STARTED, "/callbacks/github/sync/started", Json.encodeToString(event), "teams ${event.teams}")

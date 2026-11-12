@@ -99,7 +99,10 @@ internal enum class TreeEntryType {
 }
 
 @Serializable
-internal data class ReposForTeamResponse(val name: String, val archived: Boolean = false)
+internal data class ReposForTeamResponse(
+    @SerialName("full_name") val nameWithOwner: String,
+    val archived: Boolean = false
+)
 
 // GraphQL response types for vulnerability alerts
 

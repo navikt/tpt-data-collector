@@ -12,16 +12,15 @@ class NewestCommitCheckTest {
     @Test
     fun `All good if time of newest commit is less than 30 days ago`() = runTest {
         val check = NewestCommitCheck(FakeGitHub())
-        val results = check.run("goodOne")
+        val results = check.run("navikt/goodOne")
         assertTrue(results is CheckResult.AllGood)
     }
 
     @Test
     fun `Fails if time of newest commit is more than 30 days ago`() = runTest {
         val check = NewestCommitCheck(FakeGitHub())
-        val results = check.run("oldOne")
+        val results = check.run("navikt/oldOne")
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
 }
-

@@ -22,7 +22,7 @@ class HasGitignoreCheckTest {
             ".github/workflows/yolo.yaml" to "whatever"
         )
         val check = HasGitignoreCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
@@ -33,7 +33,7 @@ class HasGitignoreCheckTest {
             ".gitignore" to "whatever"
         )
         val check = HasGitignoreCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 

@@ -34,7 +34,7 @@ class CopyDotDotCheckTest {
             """.trimIndent()
         )
         val check = CopyDotDotCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
@@ -48,7 +48,7 @@ class CopyDotDotCheckTest {
             """.trimIndent()
         )
         val check = CopyDotDotCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
@@ -63,7 +63,7 @@ class CopyDotDotCheckTest {
             ".dockerignore" to """whatever"""
         )
         val check = CopyDotDotCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 
@@ -78,7 +78,7 @@ class CopyDotDotCheckTest {
             """.trimIndent()
         )
         val check = CopyDotDotCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 
@@ -91,7 +91,7 @@ class CopyDotDotCheckTest {
             """.trimIndent()
         )
         val check = CopyDotDotCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 

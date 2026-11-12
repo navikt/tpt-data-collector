@@ -11,19 +11,19 @@ class GithubToolingStatusCheckTest {
     @Test
     fun `No analyses should be flagged`() = runTest {
         val fakeGitHub = object : FakeGitHub() {
-            override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<no.nav.github.GithubCodeScanningAnalysis> {
+            override suspend fun latestCodeScanningAnalysesFor(nameWithOwner: String): List<no.nav.github.GithubCodeScanningAnalysis> {
                 return emptyList()
             }
         }
         val check = GithubToolingStatusCheck(fakeGitHub)
-        val result = check.run("bogusrepo")
+        val result = check.run("navikt/bogusrepo")
         assertTrue(result is CheckResult.NeedsWork)
     }
 
     @Test
     fun `Analysis with error should be flagged`() = runTest {
         val fakeGitHub = object : FakeGitHub() {
-            override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<no.nav.github.GithubCodeScanningAnalysis> {
+            override suspend fun latestCodeScanningAnalysesFor(nameWithOwner: String): List<no.nav.github.GithubCodeScanningAnalysis> {
                 return listOf(no.nav.github.GithubCodeScanningAnalysis(
                     ".github/workflows/codeql-analysis.yml:analyse/language:perl",
                     no.nav.github.CodeScanningTool("CodeQL"),
@@ -34,14 +34,14 @@ class GithubToolingStatusCheckTest {
             }
         }
         val check = GithubToolingStatusCheck(fakeGitHub)
-        val result = check.run("bogusrepo")
+        val result = check.run("navikt/bogusrepo")
         assertTrue(result is CheckResult.NeedsWork)
     }
 
     @Test
     fun `Analyses with no errors should pass`() = runTest {
         // Reusing FakeGitHub is OK since it has a happy case
-       val result = GithubToolingStatusCheck(FakeGitHub()).run("bogusrepo")
+       val result = GithubToolingStatusCheck(FakeGitHub()).run("navikt/bogusrepo")
        assertTrue(result is CheckResult.AllGood)
     }
 

@@ -22,6 +22,7 @@ import no.nav.checks.githubapi.GithubToolingStatusCheck
 import no.nav.checks.githubapi.NewestCommitCheck
 import no.nav.datastore.Datastore
 import no.nav.github.GitHub
+import no.nav.github.requireQualifiedRepositoryName
 import no.nav.metrics.TPTMetrics
 
 class Checks(val gitHub: GitHub, datastore: Datastore) {
@@ -38,11 +39,12 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         NewestCommitCheck(gitHub)
     )
 
-    suspend fun runAll(repoName: String, relevantFiles: Set<String>): List<CheckResult> {
+    suspend fun runAll(nameWithOwner: String, relevantFiles: Set<String>): List<CheckResult> {
+        requireQualifiedRepositoryName(nameWithOwner)
         val timedResults = mapOf(
-            "Files" to measureTimedValue { runFileBasedChecks(repoName, relevantFiles).awaitAll() },
-            "Datastore" to measureTimedValue { runDatastoreBasedChecks(repoName).awaitAll() },
-            "GitHubApi" to measureTimedValue { runGitHubAPIBasedChecks(repoName).awaitAll() }
+            "Files" to measureTimedValue { runFileBasedChecks(nameWithOwner, relevantFiles).awaitAll() },
+            "Datastore" to measureTimedValue { runDatastoreBasedChecks(nameWithOwner).awaitAll() },
+            "GitHubApi" to measureTimedValue { runGitHubAPIBasedChecks(nameWithOwner).awaitAll() }
         )
 
         val allResults = timedResults.values.flatMap { it.value }
@@ -56,7 +58,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
             )
         }
         val nrOfIssuesFound = successfulResults.count { it is CheckResult.NeedsWork }
-        logger.info("Ran ${allResults.size} checks for '$repoName, ${failedResults.size} of them failed")
+        logger.info("Ran ${allResults.size} checks for '$nameWithOwner', ${failedResults.size} of them failed")
         TPTMetrics.checkFailed(failedResults.size)
         TPTMetrics.issuesFound(nrOfIssuesFound)
         timedResults.forEach { (checkType, v) -> TPTMetrics.checksRanIn(checkType, v.duration) }
@@ -65,7 +67,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
     }
 
     private suspend fun runFileBasedChecks(
-        repoName: String,
+        nameWithOwner: String,
         relevantFiles: Set<String>
     ): List<Deferred<Result<CheckResult>>> =
         coroutineScope {
@@ -73,7 +75,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 .associateWith { it.filesICareAbout(relevantFiles).toSet() }
                 .filterValues { it.isNotEmpty() }
             if (filesNeededByChecks.isEmpty()) {
-                logger.info("No file based checks to run for '$repoName'")
+                logger.info("No file based checks to run for '$nameWithOwner'")
                 return@coroutineScope emptyList()
             }
 
@@ -81,10 +83,10 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 .intersect(relevantFiles)
                 .associateWith { filePath ->
                     async {
-                        runCatching { gitHub.readFileContents(repoName, filePath) }
+                        runCatching { gitHub.readFileContents(nameWithOwner, filePath) }
                             .onFailure { ex ->
                                 if (ex is CancellationException) throw ex
-                                logger.error("Failed to read file $filePath in repo $repoName: $ex")
+                                logger.error("Failed to read file $filePath in repo $nameWithOwner: $ex")
                             }
                     }.await()
                 }
@@ -94,7 +96,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 async {
                     runCatching {
                         check.run(
-                            repoName,
+                            nameWithOwner,
                             allFilesWeNeed
                                 .filterKeys { it in filesNeededForThisCheck }
                                 .mapValues { (_, contents) -> contents.getOrThrow() })
@@ -105,19 +107,19 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
             }
         }
 
-    private suspend fun runDatastoreBasedChecks(repoName: String): List<Deferred<Result<CheckResult>>> =
+    private suspend fun runDatastoreBasedChecks(nameWithOwner: String): List<Deferred<Result<CheckResult>>> =
         coroutineScope {
             datastoreBasedChecks.map { check ->
-                async { runCatching { check.run(repoName) } }
+                async { runCatching { check.run(nameWithOwner) } }
             }
 
         }
 
 
-    private suspend fun runGitHubAPIBasedChecks(repoName: String): List<Deferred<Result<CheckResult?>>> =
+    private suspend fun runGitHubAPIBasedChecks(nameWithOwner: String): List<Deferred<Result<CheckResult?>>> =
         coroutineScope {
             gitHubAPIBasedChecks.map { check ->
-                async { runCatching { check.run(repoName) } }
+                async { runCatching { check.run(nameWithOwner) } }
             }
         }
 }

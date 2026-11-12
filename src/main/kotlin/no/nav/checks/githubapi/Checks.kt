@@ -11,7 +11,7 @@ import no.nav.github.GitHub
 
 interface GitHubApiBasedCheck {
     /** Returns null when an expected unavailable capability prevents assessment. */
-    suspend fun run(repo: String): CheckResult?
+    suspend fun run(nameWithOwner: String): CheckResult?
 }
 
 class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
@@ -20,18 +20,18 @@ class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
     private val severity = HIGH
     private val logger = KtorSimpleLogger(this::class.java.name)
 
-    override suspend fun run(repo: String): CheckResult? {
-        val hasCriticalAlerts = when (val result = gitHub.hasOpenCriticalDependabotAlerts(repo)) {
+    override suspend fun run(nameWithOwner: String): CheckResult? {
+        val hasCriticalAlerts = when (val result = gitHub.hasOpenCriticalDependabotAlerts(nameWithOwner)) {
             is DependabotAlertsResult.Available -> result.hasOpenCriticalAlerts
             DependabotAlertsResult.Disabled -> {
-                logger.info("Skipping $name for $repo: Dependabot alerts are disabled")
+                logger.info("Skipping $name for $nameWithOwner: Dependabot alerts are disabled")
                 return null
             }
         }
         val now = Clock.System.now()
         return if (hasCriticalAlerts) {
             CheckResult.NeedsWork(name,desc, severity, now,
-                listOf("GitHub reports open critical vulnerabilities in $repo")
+                listOf("GitHub reports open critical vulnerabilities in $nameWithOwner")
             )
         } else {
             CheckResult.AllGood(name, desc, severity, now)
@@ -44,18 +44,18 @@ class GithubToolingStatusCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
     private val desc = "GitHub security tooling enables discovery of security problems."
     private val severity = Severity.MEDIUM
 
-    override suspend fun run(repo: String): CheckResult {
+    override suspend fun run(nameWithOwner: String): CheckResult {
         val now = Clock.System.now()
-        val latestToolConfigResults = gitHub.latestCodeScanningAnalysesFor(repo)
+        val latestToolConfigResults = gitHub.latestCodeScanningAnalysesFor(nameWithOwner)
         if (latestToolConfigResults.isEmpty()) {
             // No code scanning enabled
             return CheckResult.NeedsWork(name, desc, severity,now,
-                listOf("$repo has no code scanning analyses, possibly no tools configured"))
+                listOf("$nameWithOwner has no code scanning analyses, possibly no tools configured"))
         }
         if (latestToolConfigResults.any { it.error.isNotEmpty() }) {
             val errors = latestToolConfigResults.filter { it.error.isNotEmpty() }.map { it.error }
             return CheckResult.NeedsWork(name, desc, severity, now,
-                listOf("$repo has code scanning analyses with errors: ${errors.joinToString(", ")}"))
+                listOf("$nameWithOwner has code scanning analyses with errors: ${errors.joinToString(", ")}"))
         }
         else {
             return CheckResult.AllGood(name, desc, severity, now)
@@ -68,14 +68,14 @@ class NewestCommitCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
     private val desc = "Commit security updates for dependencies regularly even if there are no changes in your own code"
     private val severity = Severity.MEDIUM
 
-    override suspend fun run(repo: String): CheckResult {
+    override suspend fun run(nameWithOwner: String): CheckResult {
         val now = Clock.System.now()
-        val newestCommitTime = gitHub.latestCommitTimeFor(repo)
+        val newestCommitTime = gitHub.latestCommitTimeFor(nameWithOwner)
 
         val daysSinceLastCommit =  now - newestCommitTime
         if (daysSinceLastCommit > 30.days) {
             return CheckResult.NeedsWork(name, desc, severity,now,
-                listOf("'$repo' hasn't seen a commit in ${daysSinceLastCommit.inWholeDays} days"))
+                listOf("'$nameWithOwner' hasn't seen a commit in ${daysSinceLastCommit.inWholeDays} days"))
         }
 
         return CheckResult.AllGood(name, desc, severity, now)

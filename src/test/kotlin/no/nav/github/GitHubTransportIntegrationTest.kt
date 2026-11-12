@@ -75,7 +75,7 @@ internal class GitHubTransportIntegrationTest {
         "$repoPath/dependabot/alerts" to listOf(Response("[]")),
         "$repoPath/code-scanning/analyses" to listOf(Response("[]")),
         "$repoPath/commits" to listOf(Response("""[{"commit":{"author":{"date":"2026-11-11T00:00:00Z"}}}]""")),
-        teamPath to listOf(Response("""[{"name":"repo"}]""")),
+        teamPath to listOf(Response("""[{"name":"repo","full_name":"navikt/repo"}]""")),
         "/graphql" to listOf(Response(graphPage))
     )
 
@@ -118,28 +118,44 @@ internal class GitHubTransportIntegrationTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = [
+        "", "repo", "/repo", "owner/", "owner/repo/extra", "owner//repo", " owner/repo",
+        "owner/repo ", "owner/repo?query", "owner/repo#fragment", "owner/.", "owner/.."
+    ])
+    fun `malformed qualified names fail all repository REST operations before HTTP`(nameWithOwner: String) = runTest {
+        withGitHub(emptyMap()) { gitHub, requests ->
+            assertThrows<IllegalArgumentException> { gitHub.readFileContents(nameWithOwner, "file") }
+            assertThrows<IllegalArgumentException> { gitHub.hasOpenCriticalDependabotAlerts(nameWithOwner) }
+            assertThrows<IllegalArgumentException> { gitHub.latestCodeScanningAnalysesFor(nameWithOwner) }
+            assertThrows<IllegalArgumentException> { gitHub.allFilePathsIn(nameWithOwner) }
+            assertThrows<IllegalArgumentException> { gitHub.latestCommitTimeFor(nameWithOwner) }
+            assertTrue(requests.isEmpty())
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = ["navikt", "another-org"])
-    fun `all organization scoped requests use the configured organization`(organization: String) = runTest {
+    fun `repository requests preserve explicit owner and only team lookup uses configured organization`(organization: String) = runTest {
         val responses = successfulResponses().mapKeys { (path, _) ->
-            path.replace("/navikt/", "/$organization/")
+            if (path.startsWith("/orgs/")) path.replace("/navikt/", "/$organization/") else path
         }
         withGitHub(responses, organization) { gitHub, requests ->
-            assertEquals("hello", gitHub.readFileContents("repo", "file"))
-            assertEquals(DependabotAlertsResult.Available(false), gitHub.hasOpenCriticalDependabotAlerts("repo"))
-            assertTrue(gitHub.latestCodeScanningAnalysesFor("repo").isEmpty())
-            assertTrue(gitHub.allFilePathsIn("repo").isEmpty())
-            assertEquals(listOf("repo"), gitHub.allReposForTeam("team"))
-            assertEquals(Instant.parse("2026-11-11T00:00:00Z"), gitHub.latestCommitTimeFor("repo"))
+            assertEquals("hello", gitHub.readFileContents("navikt/repo", "file"))
+            assertEquals(DependabotAlertsResult.Available(false), gitHub.hasOpenCriticalDependabotAlerts("navikt/repo"))
+            assertTrue(gitHub.latestCodeScanningAnalysesFor("navikt/repo").isEmpty())
+            assertTrue(gitHub.allFilePathsIn("navikt/repo").isEmpty())
+            assertEquals(listOf("navikt/repo"), gitHub.allReposForTeam("team"))
+            assertEquals(Instant.parse("2026-11-11T00:00:00Z"), gitHub.latestCommitTimeFor("navikt/repo"))
             assertEquals(
                 listOf(
                     tokenPath,
-                    "/repos/$organization/repo/contents/file",
-                    "/repos/$organization/repo/dependabot/alerts",
-                    "/repos/$organization/repo/code-scanning/analyses",
-                    "/repos/$organization/repo",
-                    "/repos/$organization/repo/git/trees/main",
+                    "/repos/navikt/repo/contents/file",
+                    "/repos/navikt/repo/dependabot/alerts",
+                    "/repos/navikt/repo/code-scanning/analyses",
+                    "/repos/navikt/repo",
+                    "/repos/navikt/repo/git/trees/main",
                     "/orgs/$organization/teams/team/repos",
-                    "/repos/$organization/repo/commits",
+                    "/repos/navikt/repo/commits",
                 ),
                 requests.map { it.key },
             )
@@ -164,16 +180,16 @@ internal class GitHubTransportIntegrationTest {
         responses[path] = listOf(Response("""{"message":"Unavailable"}""", 503)) + responses.getValue(path)
         withGitHub(responses) { gitHub, requests ->
             when (operation) {
-                GitHubOperation.FILE_CONTENTS -> assertEquals("hello", gitHub.readFileContents("repo", "file"))
+                GitHubOperation.FILE_CONTENTS -> assertEquals("hello", gitHub.readFileContents("navikt/repo", "file"))
                 GitHubOperation.DEPENDABOT_ALERTS ->
-                    assertEquals(DependabotAlertsResult.Available(false), gitHub.hasOpenCriticalDependabotAlerts("repo"))
-                GitHubOperation.CODE_SCANNING -> assertTrue(gitHub.latestCodeScanningAnalysesFor("repo").isEmpty())
-                GitHubOperation.REPOSITORY, GitHubOperation.TREE -> assertTrue(gitHub.allFilePathsIn("repo").isEmpty())
+                    assertEquals(DependabotAlertsResult.Available(false), gitHub.hasOpenCriticalDependabotAlerts("navikt/repo"))
+                GitHubOperation.CODE_SCANNING -> assertTrue(gitHub.latestCodeScanningAnalysesFor("navikt/repo").isEmpty())
+                GitHubOperation.REPOSITORY, GitHubOperation.TREE -> assertTrue(gitHub.allFilePathsIn("navikt/repo").isEmpty())
                 GitHubOperation.TEAM_REPOSITORIES, GitHubOperation.INSTALLATION_TOKEN ->
-                    assertEquals(listOf("repo"), gitHub.allReposForTeam("team"))
-                GitHubOperation.VULNERABILITY_ALERTS -> assertTrue(gitHub.vulnerabilityAlertsFor("navikt", "repo").isEmpty())
+                    assertEquals(listOf("navikt/repo"), gitHub.allReposForTeam("team"))
+                GitHubOperation.VULNERABILITY_ALERTS -> assertTrue(gitHub.vulnerabilityAlertsFor("navikt/repo").isEmpty())
                 GitHubOperation.COMMITS -> assertEquals(
-                    Instant.parse("2026-11-11T00:00:00Z"), gitHub.latestCommitTimeFor("repo")
+                    Instant.parse("2026-11-11T00:00:00Z"), gitHub.latestCommitTimeFor("navikt/repo")
                 )
             }
             val retried = requests.filter { it.key == path }
@@ -192,13 +208,13 @@ internal class GitHubTransportIntegrationTest {
     @Test
     fun `later team pages retry independently and retain Link headers`() = runTest {
         val responses = successfulResponses() + mapOf(
-            teamPath to listOf(Response("""[{"name":"first"}]""", headers = mapOf(
+            teamPath to listOf(Response("""[{"name":"first","full_name":"navikt/first"}]""", headers = mapOf(
                 HttpHeaders.Link to "<https://api.github.com$teamPath?per_page=100&page=2>; rel=\"next\""
             ))),
-            "$teamPath?page=2" to listOf(Response("{}", 503), Response("""[{"name":"second"}]"""))
+            "$teamPath?page=2" to listOf(Response("{}", 503), Response("""[{"name":"second","full_name":"navikt/second"}]"""))
         )
         withGitHub(responses) { gitHub, requests ->
-            assertEquals(listOf("first", "second"), gitHub.allReposForTeam("team"))
+            assertEquals(listOf("navikt/first", "navikt/second"), gitHub.allReposForTeam("team"))
             assertEquals(listOf(tokenPath, teamPath, "$teamPath?page=2", "$teamPath?page=2"), requests.map { it.key })
         }
     }
@@ -210,7 +226,7 @@ internal class GitHubTransportIntegrationTest {
             Response(firstPage), Response("{}", 503), Response(graphPage)
         ))
         withGitHub(responses) { gitHub, requests ->
-            assertTrue(gitHub.vulnerabilityAlertsFor("navikt", "repo").isEmpty())
+            assertTrue(gitHub.vulnerabilityAlertsFor("navikt/repo").isEmpty())
             val graphRequests = requests.filter { it.key == "/graphql" }
             assertEquals(3, graphRequests.size)
             assertEquals(graphRequests[1].body, graphRequests[2].body)
@@ -234,7 +250,7 @@ internal class GitHubTransportIntegrationTest {
         ))
         withCapturedLogs { events ->
             withGitHub(responses) { gitHub, requests ->
-                assertTrue(gitHub.vulnerabilityAlertsFor("navikt", "repo").isEmpty())
+                assertTrue(gitHub.vulnerabilityAlertsFor("navikt/repo").isEmpty())
                 val graphRequests = requests.filter { it.key == "/graphql" }
                 assertEquals(2, graphRequests.size)
                 assertEquals(graphRequests[0].body, graphRequests[1].body)
@@ -263,7 +279,7 @@ internal class GitHubTransportIntegrationTest {
         ))
         withGitHub(responses) { gitHub, requests ->
             val failure = assertThrows<GitHubTransportException> {
-                gitHub.vulnerabilityAlertsFor("navikt", "repo")
+                gitHub.vulnerabilityAlertsFor("navikt/repo")
             }
             assertEquals(
                 if (primary) GitHubFailure.PRIMARY_RATE_LIMIT else GitHubFailure.SECONDARY_RATE_LIMIT,
@@ -293,7 +309,7 @@ internal class GitHubTransportIntegrationTest {
             ))
             withGitHub(responses) { gitHub, requests ->
                 val failure = assertThrows<GitHubTransportException> {
-                    gitHub.vulnerabilityAlertsFor("navikt", "repo")
+                    gitHub.vulnerabilityAlertsFor("navikt/repo")
                 }
                 assertEquals(reason, failure.stopReason)
                 assertEquals(1, requests.count { it.key == "/graphql" })
@@ -306,7 +322,7 @@ internal class GitHubTransportIntegrationTest {
     fun `GraphQL rate limits without timing headers cannot use short backoff`() = runTest {
         withGitHub(successfulResponses() + ("/graphql" to listOf(Response(graphRateLimit)))) { gitHub, requests ->
             val failure = assertThrows<GitHubTransportException> {
-                gitHub.vulnerabilityAlertsFor("navikt", "repo")
+                gitHub.vulnerabilityAlertsFor("navikt/repo")
             }
             assertEquals(GitHubFailure.SECONDARY_RATE_LIMIT, failure.failure)
             assertEquals(GitHubStopReason.TIME_BUDGET, failure.stopReason)
@@ -323,7 +339,7 @@ internal class GitHubTransportIntegrationTest {
         ))
         withGitHub(responses) { gitHub, requests ->
             val failure = assertThrows<GitHubTransportException> {
-                gitHub.vulnerabilityAlertsFor("navikt", "repo")
+                gitHub.vulnerabilityAlertsFor("navikt/repo")
             }
             assertEquals(GitHubStopReason.TIME_BUDGET, failure.stopReason)
             assertEquals(2, failure.attempt)
@@ -340,7 +356,7 @@ internal class GitHubTransportIntegrationTest {
             Response(graphPage)
         ))
         withGitHub(responses) { gitHub, requests ->
-            assertTrue(gitHub.vulnerabilityAlertsFor("navikt", "repo").isEmpty())
+            assertTrue(gitHub.vulnerabilityAlertsFor("navikt/repo").isEmpty())
             assertEquals(2, requests.count { it.key == "/graphql" })
             assertEquals(2000L, currentTime)
         }
@@ -361,7 +377,7 @@ internal class GitHubTransportIntegrationTest {
             withCapturedLogs { events ->
                 withGitHub(responses) { gitHub, requests ->
                     assertThrows<GitHubVulnerabilityCollectionException> {
-                        gitHub.vulnerabilityAlertsFor("navikt", "repo")
+                        gitHub.vulnerabilityAlertsFor("navikt/repo")
                     }
                     assertEquals(1, requests.count { it.key == "/graphql" })
                     assertEquals(0L, currentTime)
@@ -377,7 +393,7 @@ internal class GitHubTransportIntegrationTest {
             Response(graphPage, headers = mapOf("X-RateLimit-Remaining" to "0"))
         ))
         withGitHub(responses) { gitHub, requests ->
-            assertTrue(gitHub.vulnerabilityAlertsFor("navikt", "repo").isEmpty())
+            assertTrue(gitHub.vulnerabilityAlertsFor("navikt/repo").isEmpty())
             assertEquals(1, requests.count { it.key == "/graphql" })
             assertEquals(0L, currentTime)
         }
@@ -391,7 +407,7 @@ internal class GitHubTransportIntegrationTest {
             Response(graphPage)
         ))
         withGitHub(responses) { gitHub, requests ->
-            val alerts = gitHub.vulnerabilityAlertsFor("navikt", "repo")
+            val alerts = gitHub.vulnerabilityAlertsFor("navikt/repo")
             assertEquals(1, alerts.size)
             assertEquals("example", alerts.single().securityVulnerability?.pkg?.name)
             val graphRequests = requests.filter { it.key == "/graphql" }
@@ -427,7 +443,7 @@ internal class GitHubTransportIntegrationTest {
         ))
         withGitHub(responses) { gitHub, requests ->
             val failure = assertThrows<GitHubFileInventoryException> {
-                gitHub.allFilePathsIn("repo", TreeInventoryLimits(timeout = 2.seconds))
+                gitHub.allFilePathsIn("navikt/repo", TreeInventoryLimits(timeout = 2.seconds))
             }
             assertTrue(failure.message!!.contains("time budget"))
             assertEquals(2000L, currentTime)
@@ -442,7 +458,7 @@ internal class GitHubTransportIntegrationTest {
         ))
         withCapturedLogs { events ->
             withGitHub(responses) { gitHub, requests ->
-                assertTrue(gitHub.allFilePathsIn("repo").isEmpty())
+                assertTrue(gitHub.allFilePathsIn("navikt/repo").isEmpty())
                 assertEquals(1, requests.count { it.key == "$repoPath/git/trees/main" })
                 assertTrue(events.isEmpty())
                 assertEquals(0L, currentTime)

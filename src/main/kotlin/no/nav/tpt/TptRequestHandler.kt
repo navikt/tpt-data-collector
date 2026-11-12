@@ -11,17 +11,17 @@ class TptRequestHandler(private val gitHub: GitHub, private val checks: Checks, 
     val logger = KtorSimpleLogger(this::class.java.name)
 
     suspend fun runAllChecksFor(teamSlug: String) {
-        gitHub.allReposForTeam(teamSlug).forEach { repo ->
+        gitHub.allReposForTeam(teamSlug).forEach { nameWithOwner ->
             val allFilesInRepo = try {
-                gitHub.allFilePathsIn(repo)
+                gitHub.allFilePathsIn(nameWithOwner)
             } catch (ex: CancellationException) {
                 throw ex
             } catch (ex: Exception) {
-                logger.warn("Skipping checks for GitHub repo $repo: complete file inventory unavailable", ex)
+                logger.warn("Skipping checks for GitHub repo $nameWithOwner: complete file inventory unavailable", ex)
                 return@forEach
             }
-            val checkResults = checks.runAll(repo, allFilesInRepo.toSet())
-            if (backend.sendCheckResults(CheckResultsForRepo(repo, listOf(teamSlug), checkResults))) {
+            val checkResults = checks.runAll(nameWithOwner, allFilesInRepo.toSet())
+            if (backend.sendCheckResults(CheckResultsForRepo(nameWithOwner, listOf(teamSlug), checkResults))) {
                 TPTMetrics.msgsSentToTpt(1)
             }
         }
