@@ -1,16 +1,84 @@
 package no.nav.github
 
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
 import no.nav.checks.Checks
 import no.nav.datastore.FakeDatastore
 import no.nav.tpt.FakeTptBackend
 import no.nav.whodis.FakeWhodis
+import no.nav.whodis.RealWhodis
+import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 class GithubWebhookHandlerTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["null", "[]"])
+    fun `missing owners publish checks with an informational message and no error`(body: String) = runTest {
+        withCapturedLogs { events ->
+            HttpClient(MockEngine {
+                respond(body, headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
+            }) {
+                install(ContentNegotiation) { json() }
+                expectSuccess = true
+            }.use { client ->
+                val backend = FakeTptBackend()
+                val handler = GithubWebhookHandler(
+                    Checks(FakeGitHub(), FakeDatastore()), backend, RealWhodis(client, "http://whodis"), "navikt",
+                )
+
+                handler.handle(payload("navikt/repo", "main"))
+
+                val result = backend.sentCheckResults.single()
+                assertTrue(result.repoOwners.isEmpty())
+                assertTrue(result.results.isNotEmpty())
+                assertTrue(events.none { it.level.isMoreSpecificThan(Level.WARN) })
+                val message = events.single {
+                    it.message.formattedMessage == "No owning team found for repository 'repo'"
+                }
+                assertEquals(Level.INFO, message.level)
+                assertNull(message.thrown)
+            }
+        }
+    }
+
+    @Test
+    fun `lookup failures retain error logging and publication without owners`() = runTest {
+        withCapturedLogs { events ->
+            val failure = IllegalStateException("Whodis lookup failed")
+            val whodis = object : FakeWhodis() {
+                override suspend fun ownerTeamsFor(repo: String): List<String> = throw failure
+            }
+            val backend = FakeTptBackend()
+            val handler = GithubWebhookHandler(
+                Checks(FakeGitHub(), FakeDatastore()), backend, whodis, "navikt",
+            )
+
+            handler.handle(payload("navikt/repo", "main"))
+
+            val result = backend.sentCheckResults.single()
+            assertTrue(result.repoOwners.isEmpty())
+            assertTrue(result.results.isNotEmpty())
+            val message = events.single { it.message.formattedMessage == "Error while finding owners for 'repo'" }
+            assertEquals(Level.ERROR, message.level)
+            assertSame(failure, message.thrown)
+            assertTrue(events.none { it.message.formattedMessage.startsWith("No owning team found") })
+        }
+    }
+
     @ParameterizedTest
     @CsvSource(
         "navikt, navikt, main",

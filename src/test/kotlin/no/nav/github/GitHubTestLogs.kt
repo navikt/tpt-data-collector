@@ -18,6 +18,7 @@ internal suspend fun withCapturedLogs(block: suspend (List<LogEvent>) -> Unit) {
     }
     val loggers = listOf(
         GitHubTransport::class.java.name,
+        GithubWebhookHandler::class.java.name,
         "no.nav.checks.Checks",
         "no.nav.checks.githubapi.CriticalVulnerabilitiesCheck"
     ).map { context.getLogger(it) }

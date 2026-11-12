@@ -21,7 +21,11 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val repoOwners = try {
             TPTMetrics.whodisLookups(1)
-            whodis.ownerTeamsFor(repo)
+            whodis.ownerTeamsFor(repo).also { owners ->
+                if (owners.isEmpty()) {
+                    logger.info("No owning team found for repository '$repo'")
+                }
+            }
         } catch(ex: Exception) {
             logger.error("Error while finding owners for '$repo'", ex)
             emptyList()
