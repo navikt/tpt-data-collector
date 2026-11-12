@@ -12,9 +12,17 @@ import org.junit.jupiter.params.provider.CsvSource
 
 class GithubWebhookHandlerTest {
     @ParameterizedTest
-    @CsvSource("navikt, main", "another-org, main", "another-org, master")
+    @CsvSource(
+        "navikt, navikt, main",
+        "another-org, another-org, main",
+        "another-org, another-org, master",
+        "Navikt, navikt, main",
+        "navikt, Navikt, main",
+        "Another-Org, aNoThEr-OrG, main",
+    )
     fun `configured organization pushes to the default branch send unchanged repository results`(
         organization: String,
+        payloadOrganization: String,
         defaultBranch: String,
     ) = runTest {
         val backend = FakeTptBackend()
@@ -22,7 +30,7 @@ class GithubWebhookHandlerTest {
             Checks(FakeGitHub(), FakeDatastore()), backend, FakeWhodis(), organization,
         )
 
-        handler.handle(payload("$organization/repo", defaultBranch, defaultBranch))
+        handler.handle(payload("$payloadOrganization/repo", defaultBranch, defaultBranch))
 
         val result = backend.sentCheckResults.single()
         assertEquals("repo", result.repoName)
@@ -35,8 +43,10 @@ class GithubWebhookHandlerTest {
         "navikt/repo, main",
         "other-org/repo, main",
         "another-org-extra/repo, main",
+        "ANOTHER-ORG-EXTRA/repo, main",
         "another-org, main",
         "another-org/repo, feature",
+        "ANOTHER-ORG/repo, Main",
     )
     fun `other organizations and non default branches do not trigger checks`(fullName: String, branch: String) = runTest {
         val backend = FakeTptBackend()

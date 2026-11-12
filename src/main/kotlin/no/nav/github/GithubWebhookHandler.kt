@@ -35,6 +35,6 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
 
     private fun isRelevant(payload: WebhookPayload): Boolean {
         val pushBranch = payload.ref.split("/").last()
-        return payload.repository.fullName.startsWith("$organization/") && pushBranch == payload.repository.masterBranch
+        return payload.repository.fullName.startsWith("$organization/", ignoreCase = true) && pushBranch == payload.repository.masterBranch
     }
 }
