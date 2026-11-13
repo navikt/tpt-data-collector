@@ -11,9 +11,48 @@ import org.apache.logging.log4j.core.appender.AbstractAppender
 import org.apache.logging.log4j.core.config.Property
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import io.ktor.util.logging.KtorSimpleLogger
+import kotlinx.coroutines.runBlocking
+import no.nav.github.withCapturedLogs
+import no.nav.logging.logEvent
+import org.apache.logging.log4j.CloseableThreadContext
+import org.apache.logging.log4j.ThreadContext
+import org.slf4j.event.Level
 
 class PlatformLoggingTest {
+    @Test
+    fun `application context is serialized into JSON and restored after each event`() = runBlocking {
+        val loggerName = "no.nav.StructuredLoggingTest"
+        val context = LogManager.getContext(false) as LoggerContext
+        val layout = requireNotNull(context.configuration.getAppender<Appender>("stdout_json").layout)
+        val logger = KtorSimpleLogger(loggerName)
+        withCapturedLogs(loggerName) { events ->
+            CloseableThreadContext.put("repository", "outer").use {
+                logger.logEvent(
+                    Level.WARN, "Repository update not sent",
+                    "repository" to "navikt/repo", "team" to "example", "attempt" to 3
+                )
+                assertEquals("outer", ThreadContext.get("repository"))
+                assertNull(ThreadContext.get("team"))
+                logger.info("Unrelated event")
+            }
+
+            val output = String(layout.toByteArray(events.first()), Charsets.UTF_8).trimEnd()
+            assertEquals(1, output.lines().size)
+            val event = Json.parseToJsonElement(output).jsonObject
+            val fields = event.getValue("mdc").jsonObject
+            assertEquals("navikt/repo", fields.getValue("repository").jsonPrimitive.content)
+            assertEquals("example", fields.getValue("team").jsonPrimitive.content)
+            assertEquals("3", fields.getValue("attempt").jsonPrimitive.content)
+            assertFalse(event.containsKey("exception"))
+            assertEquals("outer", events.last().contextData.getValue<String>("repository"))
+            assertFalse(events.last().contextData.containsKey("team"))
+        }
+    }
+
     @Test
     fun `platform warnings and exceptions are written as one structured log event`() {
         val context = LogManager.getContext(false) as LoggerContext

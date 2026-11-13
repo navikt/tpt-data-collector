@@ -240,14 +240,16 @@ internal class GitHubTransportIntegrationTest {
                 assertEquals(graphRequests[0].body, graphRequests[1].body)
                 assertEquals(2000L, currentTime)
                 val event = events.single()
-                val message = event.message.formattedMessage
-                assertTrue(message.contains("operation=VULNERABILITY_ALERTS context=navikt/repo"))
-                assertTrue(message.contains("status=200 requestId=ABCD:1234 attempt=1"))
-                assertTrue(message.contains(
-                    "failure=${if (primary) "PRIMARY_RATE_LIMIT" else "SECONDARY_RATE_LIMIT"}"
-                ))
-                assertTrue(message.contains("decision=retry") && message.contains("delayMs=2000"))
-                assertFalse(message.contains("private upstream details"))
+                assertEquals("GitHub request failed; retrying", event.message.formattedMessage)
+                assertEquals("vulnerability_alerts", event.contextData.getValue<String>("operation"))
+                assertEquals("navikt/repo", event.contextData.getValue<String>("context"))
+                assertEquals("200", event.contextData.getValue<String>("status"))
+                assertEquals("ABCD:1234", event.contextData.getValue<String>("request_id"))
+                assertEquals("1", event.contextData.getValue<String>("attempt"))
+                assertEquals(if (primary) "primary_rate_limit" else "secondary_rate_limit",
+                    event.contextData.getValue<String>("failure"))
+                assertEquals("2000", event.contextData.getValue<String>("delay_ms"))
+                assertFalse(event.contextData.toMap().toString().contains("private upstream details"))
                 assertNull(event.thrown)
             }
         }

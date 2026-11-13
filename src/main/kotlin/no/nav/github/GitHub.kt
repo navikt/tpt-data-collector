@@ -30,6 +30,9 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.intOrNull
+import no.nav.logging.logEvent
+import org.slf4j.event.Level
 
 interface GitHub {
     suspend fun readFileContents(repoName: String, filePath: String): String
@@ -205,7 +208,9 @@ class RealGitHub internal constructor(
         val allAlerts = mutableListOf<VulnerabilityAlertNode>()
         val seenCursors = mutableSetOf<String>()
         var cursor: String? = null
+        var page = 0
         do {
+            page++
             val requestBody = Json.encodeToString(
                 buildJsonObject {
                     put("query", query)
@@ -216,14 +221,18 @@ class RealGitHub internal constructor(
                     })
                 }
             )
-            val response = transport.execute(GitHubOperation.VULNERABILITY_ALERTS, "$owner/$repo") {
+            val (response, requestId) = transport.execute(GitHubOperation.VULNERABILITY_ALERTS, "$owner/$repo") {
                 val httpResponse = request(Post, graphqlUrl, authToken, requestBody)
-                httpResponse.body<VulnerabilityAlertsGraphQLResponse>().also {
+                val body = httpResponse.body<VulnerabilityAlertsGraphQLResponse>().also {
                     checkGraphQLRateLimit(httpResponse, it.errors)
                 }
+                body to httpResponse.safeRequestId()
             }
             fun incomplete(reason: String): Nothing =
-                throw GitHubVulnerabilityCollectionException(owner, repo, reason)
+                throw GitHubVulnerabilityCollectionException(
+                    owner, repo, reason,
+                    mapOf("page" to page, "request_id" to requestId) + response.errors.safeDiagnostics()
+                )
 
             if (response.errors.isNotEmpty()) {
                 // Upstream messages can contain request data; report the count, not the payload.
@@ -271,7 +280,7 @@ class RealGitHub internal constructor(
         if (!tokenNeedsRefresh()) {
             return installationAccessToken.load()?.value ?: ""
         }
-        logger.info("Refreshing access token")
+        logger.logEvent(Level.DEBUG, "Refreshing GitHub installation access token", "operation" to "installation_token")
         val newAccessToken = createExchangeToken().andExchangeForInstallationToken()
         installationAccessToken.store(newAccessToken)
         return installationAccessToken.load()?.value ?: ""
@@ -305,8 +314,46 @@ class RealGitHub internal constructor(
     }
 }
 
-internal class GitHubVulnerabilityCollectionException(owner: String, repo: String, reason: String) :
+internal class GitHubVulnerabilityCollectionException(
+    owner: String,
+    repo: String,
+    val reason: String,
+    val diagnostics: Map<String, Any?> = emptyMap()
+) :
     IllegalStateException("Incomplete GitHub vulnerability collection for $owner/$repo: $reason")
+
+private val diagnosticErrorTypes = setOf(
+    "FORBIDDEN", "UNAUTHORIZED", "NOT_FOUND", "RATE_LIMITED", "INTERNAL", "SERVICE_UNAVAILABLE",
+    "MAX_NODE_LIMIT_EXCEEDED", "GRAPHQL_VALIDATION_FAILED"
+)
+
+private val diagnosticFields = setOf(
+    "repository", "vulnerabilityAlerts", "nodes", "dependencyScope", "dependabotUpdate",
+    "pullRequest", "permalink", "state", "securityAdvisory", "publishedAt", "cvss", "score",
+    "summary", "identifiers", "value", "type", "securityVulnerability", "severity",
+    "package", "ecosystem", "name", "pageInfo", "hasNextPage", "endCursor"
+)
+
+private fun List<GraphQLError>.safeDiagnostics(): Map<String, Any?> {
+    if (isEmpty()) return emptyMap()
+    fun GraphQLError.safePath(): String {
+        val parts = path?.takeIf { it.isNotEmpty() && it.size <= 12 } ?: return "OTHER"
+        return parts.map { part ->
+            when {
+                part is JsonPrimitive && part.isString && part.content in diagnosticFields -> part.content
+                part is JsonPrimitive && !part.isString && part.intOrNull?.let { it >= 0 } == true -> "[]"
+                else -> return "OTHER"
+            }
+        }.joinToString(".")
+    }
+    return mapOf(
+        "failure" to "graphql_errors",
+        "error_count" to size,
+        "error_types" to asSequence().map { it.type?.takeIf(diagnosticErrorTypes::contains) ?: "OTHER" }
+            .distinct().take(5).joinToString(","),
+        "error_paths" to asSequence().map { it.safePath() }.distinct().take(5).joinToString(",")
+    )
+}
 
 internal fun needsRefresh(now: Instant = Clock.System.now(), expiresAt: Instant): Boolean {
     val in10Mins = now.plus(10.minutes)
