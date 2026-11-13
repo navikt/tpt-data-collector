@@ -23,6 +23,9 @@ import no.nav.checks.githubapi.NewestCommitCheck
 import no.nav.datastore.Datastore
 import no.nav.github.GitHub
 import no.nav.metrics.TPTMetrics
+import no.nav.logging.logEvent
+import no.nav.logging.logFailure
+import org.slf4j.event.Level
 
 class Checks(val gitHub: GitHub, datastore: Datastore) {
     val logger = KtorSimpleLogger(this::class.java.name)
@@ -48,15 +51,16 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         val allResults = timedResults.values.flatMap { it.value }
         val successfulResults = allResults.mapNotNull { it.getOrNull() }
         val failedResults = allResults.filter { it.isFailure }
-        if (failedResults.isNotEmpty()) {
-            logger.warn(
-                "Failures during checks: ${
-                    failedResults.mapNotNull { it.exceptionOrNull() }.joinToString(" -- ")
-                }"
-            )
-        }
         val nrOfIssuesFound = successfulResults.count { it is CheckResult.NeedsWork }
-        logger.info("Ran ${allResults.size} checks for '$repoName, ${failedResults.size} of them failed")
+        logger.logEvent(
+            Level.INFO, "Repository checks finished",
+            "repository" to repoName,
+            "outcome" to if (failedResults.isEmpty()) "success" else "partial",
+            "checks_attempted" to allResults.size, "checks_completed" to successfulResults.size,
+            "checks_failed" to failedResults.size,
+            "checks_unavailable" to allResults.size - successfulResults.size - failedResults.size,
+            "issues_found" to nrOfIssuesFound
+        )
         TPTMetrics.checkFailed(failedResults.size)
         TPTMetrics.issuesFound(nrOfIssuesFound)
         timedResults.forEach { (checkType, v) -> TPTMetrics.checksRanIn(checkType, v.duration) }
@@ -73,7 +77,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 .associateWith { it.filesICareAbout(relevantFiles).toSet() }
                 .filterValues { it.isNotEmpty() }
             if (filesNeededByChecks.isEmpty()) {
-                logger.info("No file based checks to run for '$repoName'")
+                logger.logEvent(Level.DEBUG, "No file-based checks to run", "repository" to repoName)
                 return@coroutineScope emptyList()
             }
 
@@ -84,22 +88,31 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                         runCatching { gitHub.readFileContents(repoName, filePath) }
                             .onFailure { ex ->
                                 if (ex is CancellationException) throw ex
-                                logger.error("Failed to read file $filePath in repo $repoName: $ex")
+                                logger.logFailure(
+                                    "File read failed; dependent checks omitted", ex,
+                                    "operation" to "file_contents", "repository" to repoName, "file" to filePath,
+                                    "affected_checks" to filesNeededByChecks.filterValues { filePath in it }
+                                        .keys.joinToString(",") { it.javaClass.simpleName }
+                                )
                             }
                     }.await()
                 }
-            logger.info("Read the contents of ${allFilesWeNeed.values.count { it.isSuccess }} file(s)")
+            logger.logEvent(
+                Level.DEBUG, "Repository file reads finished", "repository" to repoName,
+                "files_read" to allFilesWeNeed.values.count { it.isSuccess },
+                "files_failed" to allFilesWeNeed.values.count { it.isFailure }
+            )
 
             filesNeededByChecks.map { (check, filesNeededForThisCheck) ->
                 async {
-                    runCatching {
+                    val contents = allFilesWeNeed.filterKeys { it in filesNeededForThisCheck }
+                    // A shared read failure is logged once above, with all affected checks.
+                    val readFailure = contents.values.firstNotNullOfOrNull { it.exceptionOrNull() }
+                    if (readFailure != null) return@async Result.failure<CheckResult>(readFailure)
+                    runCheck(repoName, check.javaClass.simpleName) {
                         check.run(
                             repoName,
-                            allFilesWeNeed
-                                .filterKeys { it in filesNeededForThisCheck }
-                                .mapValues { (_, contents) -> contents.getOrThrow() })
-                    }.onFailure { ex ->
-                        if (ex is CancellationException) throw ex
+                            contents.mapValues { (_, content) -> content.getOrThrow() })
                     }
                 }
             }
@@ -108,7 +121,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
     private suspend fun runDatastoreBasedChecks(repoName: String): List<Deferred<Result<CheckResult>>> =
         coroutineScope {
             datastoreBasedChecks.map { check ->
-                async { runCatching { check.run(repoName) } }
+                async { runCheck(repoName, check.javaClass.simpleName) { check.run(repoName) } }
             }
 
         }
@@ -117,7 +130,20 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
     private suspend fun runGitHubAPIBasedChecks(repoName: String): List<Deferred<Result<CheckResult?>>> =
         coroutineScope {
             gitHubAPIBasedChecks.map { check ->
-                async { runCatching { check.run(repoName) } }
+                async { runCheck(repoName, check.javaClass.simpleName) { check.run(repoName) } }
             }
+        }
+
+    private suspend fun <T> runCheck(repoName: String, checkName: String, run: suspend () -> T): Result<T> =
+        try {
+            Result.success(run())
+        } catch (ex: CancellationException) {
+            throw ex
+        } catch (ex: Exception) {
+            logger.logFailure(
+                "Repository check failed; result omitted", ex,
+                "repository" to repoName, "check" to checkName
+            )
+            Result.failure(ex)
         }
 }

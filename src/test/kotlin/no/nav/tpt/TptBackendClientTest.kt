@@ -26,10 +26,13 @@ import no.nav.checks.CheckResultsForRepo
 import no.nav.checks.Severity
 import no.nav.github.GitHubRepositoryMessage
 import no.nav.github.GitHubSyncEvent
+import no.nav.github.withCapturedLogs
 import no.nav.metrics.TPTMetrics
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertNull
+import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.Test
 
 class TptBackendClientTest {
@@ -53,6 +56,61 @@ class TptBackendClientTest {
 
     private val ok: suspend MockRequestHandleScope.() -> HttpResponseData = { respond("", HttpStatusCode.NoContent) }
     private fun error(status: HttpStatusCode): suspend MockRequestHandleScope.() -> HttpResponseData = { respondError(status) }
+
+    @Test
+    fun `exhausted callback logs status repository and attempt without a stack trace or payload`() = runBlocking {
+        withCapturedLogs(TptBackendClient::class.java.name) { events ->
+            val client = client({
+                respond("""{"private":"response body"}""", HttpStatusCode.ServiceUnavailable)
+            })
+            assertFalse(client.sendVulnerabilityData(GitHubRepositoryMessage("navikt/repo", emptyList(), emptyList())))
+
+            val failure = events.single { it.level == Level.ERROR }
+            assertEquals("navikt/repo", failure.contextData.getValue<String>("repository"))
+            assertEquals(VULNERABILITY_DATA, failure.contextData.getValue<String>("callback"))
+            assertEquals("503", failure.contextData.getValue<String>("status"))
+            assertEquals("3", failure.contextData.getValue<String>("attempt"))
+            assertEquals("tpt_backend", failure.contextData.getValue<String>("dependency"))
+            assertNull(failure.thrown)
+            assertEquals(2, events.count { it.level == Level.WARN })
+            val diagnostic = events.joinToString { it.message.formattedMessage + it.contextData.toMap() }
+            assertFalse(diagnostic.contains("response body"))
+            assertFalse(diagnostic.contains("m2m-token"))
+        }
+    }
+
+    @Test
+    fun `token network failures identify the dependency without exposing exception messages`() = runBlocking {
+        withCapturedLogs(TptBackendClient::class.java.name) { events ->
+            HttpClient(MockEngine { error("Callback must not be sent") }).use { httpClient ->
+                val client = TptBackendClient(httpClient, "http://tpt-backend", {
+                    throw IOException("private token endpoint details")
+                }, fastRetries)
+                assertFalse(client.sendSyncStarted(GitHubSyncEvent(listOf("team"), "now")))
+
+                val failure = events.single { it.level == Level.ERROR }
+                assertEquals("texas", failure.contextData.getValue<String>("dependency"))
+                assertEquals("network", failure.contextData.getValue<String>("failure"))
+                assertEquals("team", failure.contextData.getValue<String>("teams"))
+                assertTrue(events.all { it.thrown == null })
+                assertFalse(events.joinToString {
+                    it.message.formattedMessage + it.contextData.toMap()
+                }.contains("private token endpoint details"))
+            }
+        }
+    }
+
+    @Test
+    fun `unexpected callback failures retain their stack trace`() = runBlocking {
+        withCapturedLogs(TptBackendClient::class.java.name) { events ->
+            val cause = IllegalStateException("Unexpected client failure")
+            assertFalse(client({ throw cause }).sendSyncStarted(GitHubSyncEvent(emptyList(), "now")))
+
+            val failure = events.single { it.level == Level.ERROR }
+            assertTrue(generateSequence(failure.thrown) { it.cause }.any { it === cause })
+            assertEquals("unexpected", failure.contextData.getValue<String>("failure"))
+        }
+    }
 
     @Test
     fun `posts vulnerability data with bearer token to the callback endpoint`() = runBlocking {

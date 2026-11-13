@@ -23,6 +23,7 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.path
+import io.ktor.server.request.httpMethod
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -65,6 +66,7 @@ import no.nav.tpt.TptBackendClient
 import no.nav.tpt.TptRequestHandler
 import no.nav.whodis.RealWhodis
 import no.nav.whodis.Whodis
+import no.nav.logging.logFailure
 import org.neo4j.driver.AuthTokens
 import org.neo4j.driver.GraphDatabase
 import org.slf4j.event.Level
@@ -139,7 +141,11 @@ fun Application.businessModule(gitHub: GitHub,
 
     install(StatusPages) {
         exception<Throwable> { call, cause ->
-            cause.printStackTrace()
+            if (cause is CancellationException) throw cause
+            this@businessModule.log.logFailure(
+                "HTTP request failed", cause,
+                "method" to call.request.httpMethod.value, "path" to call.request.path()
+            )
             call.respondText(text = "500: Well that didn't work..." , status = InternalServerError)
         }
     }
@@ -157,7 +163,7 @@ fun Application.businessModule(gitHub: GitHub,
                     return@post
                 }
 
-                runInBackground("GitHub webhook for ${payload.repository.name}") {
+                runInBackground("github_webhook", "repository" to payload.repository.fullName) {
                     githubWebhookHandler.handle(payload)
                 }
                 call.respond(HttpStatusCode.Accepted)
@@ -171,7 +177,7 @@ fun Application.businessModule(gitHub: GitHub,
                     call.respond(HttpStatusCode.BadRequest)
                     return@post
                 }
-                runInBackground("checks for team $teamSlug") {
+                runInBackground("team_checks", "team" to teamSlug) {
                     tptRequestHandler.runAllChecksFor(teamSlug)
                 }
                 call.respond(HttpStatusCode.Accepted)
@@ -189,7 +195,10 @@ fun Application.businessModule(gitHub: GitHub,
                     call.respond(HttpStatusCode.BadRequest)
                     return@post
                 }
-                runInBackground("GitHub collection for $body") {
+                runInBackground(
+                    "github_collection", "team_count" to body.teams.size,
+                    "repository_count" to body.repositories.size
+                ) {
                     gitHubCollectHandler.collect(body)
                 }
                 call.respond(HttpStatusCode.Accepted)
@@ -198,14 +207,18 @@ fun Application.businessModule(gitHub: GitHub,
     }
 }
 
-private fun Application.runInBackground(description: String, work: suspend () -> Unit) {
+private fun Application.runInBackground(
+    operation: String,
+    vararg context: Pair<String, Any?>,
+    work: suspend () -> Unit
+) {
     launch(Dispatchers.IO) {
         try {
             work()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.error("Background job failed: $description", e)
+            log.logFailure("Background job failed", e, "operation" to operation, *context)
         }
     }
 }
@@ -259,4 +272,3 @@ private fun createGhWebhookAuthPlugin(macSecret: String) = createRouteScopedPlug
         }
     }
 }
-

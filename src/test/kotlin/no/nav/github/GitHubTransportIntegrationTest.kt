@@ -256,6 +256,35 @@ internal class GitHubTransportIntegrationTest {
     }
 
     @ParameterizedTest
+    @ValueSource(ints = [401, 503])
+    fun `terminal transport failure is logged once by the collection handler with impact`(status: Int) = runTest {
+        val responses = successfulResponses() + ("/graphql" to listOf(
+            Response("""{"message":"private response"}""", status,
+                mapOf("X-GitHub-Request-Id" to "ABCD:1234"))
+        ))
+        withCapturedLogs(GitHubCollectHandler::class.java.name) { events ->
+            withGitHub(responses) { gitHub, _ ->
+                GitHubCollectHandler(gitHub, FakeWhodis(), FakeTptBackend()).collect(
+                    GitHubCollectRequest(repositories = listOf("navikt/repo"))
+                )
+                val terminal = events.single {
+                    it.message.formattedMessage == "Vulnerability collection incomplete; repository update not sent"
+                }
+                assertEquals(if (status == 401) org.apache.logging.log4j.Level.ERROR
+                    else org.apache.logging.log4j.Level.WARN, terminal.level)
+                assertEquals("navikt/repo", terminal.contextData.getValue<String>("repository"))
+                assertEquals(status.toString(), terminal.contextData.getValue<String>("status"))
+                assertEquals("ABCD:1234", terminal.contextData.getValue<String>("request_id"))
+                assertNull(terminal.thrown)
+                assertEquals(if (status == 503) 2 else 0,
+                    events.count { it.message.formattedMessage == "GitHub request failed; retrying" })
+                assertEquals(if (status == 503) 3 else 1,
+                    events.count { it.level.isMoreSpecificThan(org.apache.logging.log4j.Level.WARN) })
+            }
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = [true, false])
     fun `GraphQL HTTP 200 rate limits exhaust the shared attempt budget`(primary: Boolean) = runTest {
         val wait = if (primary) Instant.parse("2026-11-11T12:00:00Z").epochSeconds.toString() else "0"

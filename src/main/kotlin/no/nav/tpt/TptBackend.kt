@@ -23,6 +23,10 @@ import no.nav.checks.CheckResultsForRepo
 import no.nav.github.GitHubRepositoryMessage
 import no.nav.github.GitHubSyncEvent
 import no.nav.metrics.TPTMetrics
+import no.nav.logging.FailureDetails
+import no.nav.logging.logDetails
+import no.nav.logging.logEvent
+import org.slf4j.event.Level
 
 /**
  * Delivers results to tpt-backend's callback endpoints. Implementations never throw on delivery
@@ -96,52 +100,84 @@ class TptBackendClient(
     private val logger = KtorSimpleLogger(this::class.java.name)
 
     override suspend fun sendVulnerabilityData(message: GitHubRepositoryMessage) =
-        post(VULNERABILITY_DATA, "/callbacks/github/vulnerabilities", Json.encodeToString(message), message.nameWithOwner)
+        post(VULNERABILITY_DATA, "/callbacks/github/vulnerabilities", Json.encodeToString(message),
+            "repository" to message.nameWithOwner)
 
     override suspend fun sendCheckResults(results: CheckResultsForRepo) =
-        post(CHECK_RESULTS, "/callbacks/checks", Json.encodeToString(results), results.repoName)
+        post(CHECK_RESULTS, "/callbacks/checks", Json.encodeToString(results), "repository" to results.repoName)
 
     override suspend fun sendSyncStarted(event: GitHubSyncEvent) =
-        post(SYNC_STARTED, "/callbacks/github/sync/started", Json.encodeToString(event), "teams ${event.teams}")
+        post(SYNC_STARTED, "/callbacks/github/sync/started", Json.encodeToString(event),
+            "teams" to event.teams.take(20).joinToString(",").take(500), "team_count" to event.teams.size)
 
     override suspend fun sendSyncComplete(event: GitHubSyncEvent) =
-        post(SYNC_COMPLETE, "/callbacks/github/sync/complete", Json.encodeToString(event), "teams ${event.teams}")
+        post(SYNC_COMPLETE, "/callbacks/github/sync/complete", Json.encodeToString(event),
+            "teams" to event.teams.take(20).joinToString(",").take(500), "team_count" to event.teams.size)
 
-    private suspend fun post(callback: String, path: String, jsonBody: String, subject: String): Boolean {
+    private suspend fun post(
+        callback: String,
+        path: String,
+        jsonBody: String,
+        vararg context: Pair<String, Any?>
+    ): Boolean {
         var attempt = 1
         while (true) {
+            var dependency = "texas"
             val failure = try {
+                val token = tokenProvider.token()
+                dependency = "tpt_backend"
                 val response = httpClient.post("${baseUrl.trimEnd('/')}$path") {
                     expectSuccess = false
-                    bearerAuth(tokenProvider.token())
+                    bearerAuth(token)
                     setBody(TextContent(jsonBody, ContentType.Application.Json))
                 }
+                val details = FailureDetails(
+                    Level.ERROR, listOf("failure" to "http", "status" to response.status.value)
+                )
                 when {
                     response.status.isSuccess() -> return true
                     !response.status.isRetryable() -> {
-                        return giveUp(callback, subject, attempt, "HTTP ${response.status}")
+                        return giveUp(callback, context, attempt, dependency, details)
                     }
-                    else -> "HTTP ${response.status}"
+                    else -> details
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                "${e::class.simpleName}: ${e.message}"
+                e.logDetails()
             }
 
             if (attempt >= retryPolicy.maxAttempts) {
-                return giveUp(callback, subject, attempt, failure)
+                return giveUp(callback, context, attempt, dependency, failure)
             }
+            val backoff = retryPolicy.delayBeforeAttempt(attempt + 1)
+            logger.logEvent(
+                Level.WARN, "Backend callback failed; retrying",
+                *context, *failure.fields.toTypedArray(),
+                "callback" to callback, "dependency" to dependency,
+                "attempt" to attempt, "max_attempts" to retryPolicy.maxAttempts,
+                "delay_ms" to backoff.inWholeMilliseconds,
+                cause = failure.cause
+            )
             attempt++
-            val backoff = retryPolicy.delayBeforeAttempt(attempt)
-            logger.warn("Callback $callback for $subject failed ($failure), retrying in $backoff (attempt $attempt/${retryPolicy.maxAttempts})")
             delay(backoff)
         }
     }
 
-    private fun giveUp(callback: String, subject: String, attempts: Int, reason: String): Boolean {
+    private fun giveUp(
+        callback: String,
+        context: Array<out Pair<String, Any?>>,
+        attempts: Int,
+        dependency: String,
+        failure: FailureDetails
+    ): Boolean {
         TPTMetrics.callbackFailed(callback)
-        logger.error("Callback $callback for $subject failed after $attempts attempt(s): $reason")
+        logger.logEvent(
+            Level.ERROR, "Backend callback delivery failed; update not delivered",
+            *context, *failure.fields.toTypedArray(),
+            "callback" to callback, "dependency" to dependency, "attempt" to attempts,
+            "max_attempts" to retryPolicy.maxAttempts, cause = failure.cause
+        )
         return false
     }
 
