@@ -4,6 +4,7 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 internal data class FileContentsResponse(
@@ -112,7 +113,8 @@ internal data class VulnerabilityAlertsGraphQLResponse(
 @Serializable
 internal data class GraphQLError(
     @SerialName("message") val message: String,
-    @SerialName("type") val type: String? = null
+    @SerialName("type") val type: String? = null,
+    @SerialName("path") val path: List<JsonElement>? = null
 )
 
 @Serializable

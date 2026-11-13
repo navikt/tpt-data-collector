@@ -240,15 +240,46 @@ internal class GitHubTransportIntegrationTest {
                 assertEquals(graphRequests[0].body, graphRequests[1].body)
                 assertEquals(2000L, currentTime)
                 val event = events.single()
-                val message = event.message.formattedMessage
-                assertTrue(message.contains("operation=VULNERABILITY_ALERTS context=navikt/repo"))
-                assertTrue(message.contains("status=200 requestId=ABCD:1234 attempt=1"))
-                assertTrue(message.contains(
-                    "failure=${if (primary) "PRIMARY_RATE_LIMIT" else "SECONDARY_RATE_LIMIT"}"
-                ))
-                assertTrue(message.contains("decision=retry") && message.contains("delayMs=2000"))
-                assertFalse(message.contains("private upstream details"))
+                assertEquals("GitHub request failed; retrying", event.message.formattedMessage)
+                assertEquals("vulnerability_alerts", event.contextData.getValue<String>("operation"))
+                assertEquals("navikt/repo", event.contextData.getValue<String>("context"))
+                assertEquals("200", event.contextData.getValue<String>("status"))
+                assertEquals("ABCD:1234", event.contextData.getValue<String>("request_id"))
+                assertEquals("1", event.contextData.getValue<String>("attempt"))
+                assertEquals(if (primary) "primary_rate_limit" else "secondary_rate_limit",
+                    event.contextData.getValue<String>("failure"))
+                assertEquals("2000", event.contextData.getValue<String>("delay_ms"))
+                assertFalse(event.contextData.toMap().toString().contains("private upstream details"))
                 assertNull(event.thrown)
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [401, 503])
+    fun `terminal transport failure is logged once by the collection handler with impact`(status: Int) = runTest {
+        val responses = successfulResponses() + ("/graphql" to listOf(
+            Response("""{"message":"private response"}""", status,
+                mapOf("X-GitHub-Request-Id" to "ABCD:1234"))
+        ))
+        withCapturedLogs(GitHubCollectHandler::class.java.name) { events ->
+            withGitHub(responses) { gitHub, _ ->
+                GitHubCollectHandler(gitHub, FakeWhodis(), FakeTptBackend()).collect(
+                    GitHubCollectRequest(repositories = listOf("navikt/repo"))
+                )
+                val terminal = events.single {
+                    it.message.formattedMessage == "Vulnerability collection incomplete; repository update not sent"
+                }
+                assertEquals(if (status == 401) org.apache.logging.log4j.Level.ERROR
+                    else org.apache.logging.log4j.Level.WARN, terminal.level)
+                assertEquals("navikt/repo", terminal.contextData.getValue<String>("repository"))
+                assertEquals(status.toString(), terminal.contextData.getValue<String>("status"))
+                assertEquals("ABCD:1234", terminal.contextData.getValue<String>("request_id"))
+                assertNull(terminal.thrown)
+                assertEquals(if (status == 503) 2 else 0,
+                    events.count { it.message.formattedMessage == "GitHub request failed; retrying" })
+                assertEquals(if (status == 503) 3 else 1,
+                    events.count { it.level.isMoreSpecificThan(org.apache.logging.log4j.Level.WARN) })
             }
         }
     }

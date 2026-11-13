@@ -381,9 +381,11 @@ class GitHubExpectedResponsesTest {
                 assertIs<CheckResult.NeedsWork>(byRepo.getValue("critical").results.single { it.name == "HasCriticalVulns" })
                 assertTrue(events.none { it.level.isMoreSpecificThan(Level.WARN) })
                 val skipped = events.single {
-                    it.message.formattedMessage == "Skipping HasCriticalVulns for disabled: Dependabot alerts are disabled"
+                    it.message.formattedMessage == "Check unavailable; Dependabot alerts are disabled"
                 }
                 assertEquals(Level.INFO, skipped.level)
+                assertEquals("disabled", skipped.contextData.getValue<String>("repository"))
+                assertEquals("HasCriticalVulns", skipped.contextData.getValue<String>("check"))
                 assertNull(skipped.thrown)
             }
         }
@@ -406,10 +408,13 @@ class GitHubExpectedResponsesTest {
 
                 assertTrue(results.none { it.name == "HasCriticalVulns" })
                 assertEquals(before + 1, failedChecks())
-                assertTrue(events.any {
-                    it.level == Level.WARN && it.message.formattedMessage.startsWith("Failures during checks:")
-                })
-                assertTrue(events.none { it.message.formattedMessage.startsWith("Skipping HasCriticalVulns") })
+                val failure = events.single { it.level.isMoreSpecificThan(Level.WARN) }
+                assertEquals(Level.ERROR, failure.level)
+                assertEquals("repo", failure.contextData.getValue<String>("repository"))
+                assertEquals("CriticalVulnerabilitiesCheck", failure.contextData.getValue<String>("check"))
+                assertEquals("authorization", failure.contextData.getValue<String>("failure"))
+                assertNull(failure.thrown)
+                assertTrue(events.none { it.message.formattedMessage.contains("Dependabot alerts are disabled") })
             }
         }
     }

@@ -47,9 +47,10 @@ class GithubWebhookHandlerTest {
                 assertTrue(result.results.isNotEmpty())
                 assertTrue(events.none { it.level.isMoreSpecificThan(Level.WARN) })
                 val message = events.single {
-                    it.message.formattedMessage == "No owning team found for repository 'repo'"
+                    it.message.formattedMessage == "No owning team found for repository"
                 }
                 assertEquals(Level.INFO, message.level)
+                assertEquals("repo", message.contextData.getValue<String>("repository"))
                 assertNull(message.thrown)
             }
         }
@@ -72,8 +73,11 @@ class GithubWebhookHandlerTest {
             val result = backend.sentCheckResults.single()
             assertTrue(result.repoOwners.isEmpty())
             assertTrue(result.results.isNotEmpty())
-            val message = events.single { it.message.formattedMessage == "Error while finding owners for 'repo'" }
+            val message = events.single {
+                it.message.formattedMessage == "Repository owner lookup failed; publishing checks without owners"
+            }
             assertEquals(Level.ERROR, message.level)
+            assertEquals("repo", message.contextData.getValue<String>("repository"))
             assertSame(failure, message.thrown)
             assertTrue(events.none { it.message.formattedMessage.startsWith("No owning team found") })
         }

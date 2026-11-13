@@ -434,16 +434,19 @@ class GitHubTransportTest {
                         request(HttpMethod.Get, "$url?private=query-secret", token).body<String>()
                     }
                 }
-                val messages = events.map { it.message.formattedMessage }
-                assertEquals(3, messages.size)
-                assertTrue(messages.all {
-                    it.contains("operation=FILE_CONTENTS") && it.contains("context=navikt/repo") &&
-                        it.contains("status=503") && it.contains("requestId=ABCD:1234")
+                assertEquals(2, events.size)
+                assertTrue(events.all {
+                    it.contextData.getValue<String>("operation") == "file_contents" &&
+                        it.contextData.getValue<String>("context") == "navikt/repo" &&
+                        it.contextData.getValue<String>("status") == "503" &&
+                        it.contextData.getValue<String>("request_id") == "ABCD:1234"
                 })
-                assertTrue(messages.first().contains("attempt=1") && messages.first().contains("decision=retry"))
-                assertTrue(messages.last().contains("attempt=3") && messages.last().contains("decision=stop"))
+                assertEquals("1", events.first().contextData.getValue<String>("attempt"))
+                assertEquals("2", events.last().contextData.getValue<String>("attempt"))
+                assertTrue(events.all { it.message.formattedMessage == "GitHub request failed; retrying" })
                 assertTrue(events.all { it.thrown == null })
-                val diagnostic = messages.joinToString() + failure.stackTraceToString()
+                val diagnostic = events.joinToString { it.message.formattedMessage + it.contextData.toMap() } +
+                    failure.stackTraceToString()
                 listOf(token, "private-response-payload", "private-cookie", "query-secret").forEach {
                     assertFalse(diagnostic.contains(it))
                 }
@@ -454,16 +457,17 @@ class GitHubTransportTest {
     @Test
     fun `invalid context and request IDs cannot inject diagnostic fields`() = runTest {
         withCapturedLogs { events ->
-            withTransport(listOf(Response(401, headers = mapOf("X-GitHub-Request-Id" to "secret=value")))) {
+            withTransport(listOf(
+                Response(503, headers = mapOf("X-GitHub-Request-Id" to "secret=value")), Response()
+            )) {
                 transport, _, _ ->
-                assertThrows<GitHubTransportException> {
-                    transport.execute(GitHubOperation.FILE_CONTENTS, "repo secret=value") {
-                        request(HttpMethod.Get, url, token)
-                    }
+                transport.execute(GitHubOperation.FILE_CONTENTS, "repo secret=value") {
+                    request(HttpMethod.Get, url, token)
                 }
-                val message = events.single().message.formattedMessage
-                assertTrue(message.contains("context=none") && message.contains("requestId=none"))
-                assertFalse(message.contains("secret=value"))
+                val event = events.single()
+                assertEquals("none", event.contextData.getValue<String>("context"))
+                assertEquals("none", event.contextData.getValue<String>("request_id"))
+                assertFalse(event.contextData.toMap().toString().contains("secret=value"))
             }
         }
     }

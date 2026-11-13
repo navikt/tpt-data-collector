@@ -6,6 +6,10 @@ import no.nav.checks.CheckResultsForRepo
 import no.nav.checks.Checks
 import no.nav.metrics.TPTMetrics
 import no.nav.tpt.TptBackend
+import kotlinx.coroutines.CancellationException
+import no.nav.logging.logEvent
+import no.nav.logging.logFailure
+import org.slf4j.event.Level
 
 class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whodis: Whodis, private val organization: String) {
     val logger = KtorSimpleLogger(this::class.java.name)
@@ -13,21 +17,32 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
     suspend fun handle(webhookPayload: WebhookPayload) {
         TPTMetrics.webhookReceived()
         val repo = webhookPayload.repository.name
-        logger.info("'$repo' had a push to push to '${webhookPayload.ref}'")
         if (!isRelevant(webhookPayload)) {
-            logger.debug("Skipping checks for '$repo, it is not relevant'")
+            logger.logEvent(
+                Level.DEBUG, "Push ignored; not in the configured organization or default branch",
+                "repository" to webhookPayload.repository.fullName, "ref" to webhookPayload.ref
+            )
             return
         }
+        logger.logEvent(
+            Level.DEBUG, "Processing default-branch push",
+            "repository" to webhookPayload.repository.fullName, "ref" to webhookPayload.ref
+        )
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val repoOwners = try {
             TPTMetrics.whodisLookups(1)
             whodis.ownerTeamsFor(repo).also { owners ->
                 if (owners.isEmpty()) {
-                    logger.info("No owning team found for repository '$repo'")
+                    logger.logEvent(Level.INFO, "No owning team found for repository", "repository" to repo)
                 }
             }
-        } catch(ex: Exception) {
-            logger.error("Error while finding owners for '$repo'", ex)
+        } catch (ex: CancellationException) {
+            throw ex
+        } catch (ex: Exception) {
+            logger.logFailure(
+                "Repository owner lookup failed; publishing checks without owners", ex,
+                "operation" to "repository_owners", "dependency" to "whodis", "repository" to repo
+            )
             emptyList()
         }
         val results = checks.runAll(webhookPayload.repository.name, changedFiles)

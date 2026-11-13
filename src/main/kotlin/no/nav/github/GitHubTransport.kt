@@ -34,6 +34,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerializationException
+import no.nav.logging.logEvent
+import org.slf4j.event.Level
 
 internal enum class GitHubReplay { READ, TOKEN_EXCHANGE, NEVER }
 
@@ -179,7 +181,6 @@ internal class GitHubTransport(
                 lastResponse = lastResponse ?: requestAttempt.response
 
                 fun stop(reason: GitHubStopReason): Nothing {
-                    diagnostic(operation, context, attempt, lastResponse, failure.kind, "stop", reason.name)
                     throw GitHubTransportException(operation, failure.kind, reason, attempt, lastResponse)
                 }
                 if (!failure.retryable) stop(GitHubStopReason.PERMANENT)
@@ -191,7 +192,7 @@ internal class GitHubTransport(
                 require(jittered >= Duration.ZERO && jittered <= backoff) { "Jitter must stay within the backoff bound" }
                 val wait = maxOf(jittered, failure.minimumWait)
                 if (wait >= policy.totalTimeout - started.elapsedNow()) stop(GitHubStopReason.TIME_BUDGET)
-                diagnostic(operation, context, attempt, lastResponse, failure.kind, "retry", "TRANSIENT", wait)
+                diagnostic(operation, context, attempt, lastResponse, failure.kind, wait)
                 delay(wait)
                 backoff = (backoff * 2).coerceAtMost(policy.maxBackoff)
                 lastResponse = null
@@ -200,7 +201,6 @@ internal class GitHubTransport(
         }
         if (result != null) return result.value
         lastResponse = lastResponse ?: activeAttempt?.response
-        diagnostic(operation, context, attempt, lastResponse, GitHubFailure.DEADLINE, "stop", "TIME_BUDGET")
         throw GitHubTransportException(operation, GitHubFailure.DEADLINE, GitHubStopReason.TIME_BUDGET, attempt, lastResponse)
     }
 
@@ -277,15 +277,15 @@ internal class GitHubTransport(
         attempt: Int,
         response: HttpResponse?,
         failure: GitHubFailure,
-        decision: String,
-        reason: String,
-        wait: Duration = Duration.ZERO
+        wait: Duration
     ) {
         val safeContext = context?.takeIf { it.matches(Regex("[A-Za-z0-9._/-]{1,200}")) } ?: "none"
-        logger.warn(
-            "GitHub transport operation=${operation.name} context=$safeContext " +
-                "status=${response?.status?.value ?: "none"} requestId=${response.safeRequestId()} " +
-                "attempt=$attempt failure=${failure.name} decision=$decision reason=$reason delayMs=${wait.inWholeMilliseconds}"
+        logger.logEvent(
+            Level.WARN, "GitHub request failed; retrying",
+            "operation" to operation.name.lowercase(), "context" to safeContext,
+            "status" to response?.status?.value, "request_id" to response.safeRequestId(),
+            "attempt" to attempt, "failure" to failure.name.lowercase(),
+            "delay_ms" to wait.inWholeMilliseconds
         )
     }
 
@@ -304,5 +304,5 @@ internal class GitHubTransport(
 private fun String.isRateLimitMessage(): Boolean =
     contains("rate limit", ignoreCase = true) || contains("abuse detection", ignoreCase = true)
 
-private fun HttpResponse?.safeRequestId(): String =
+internal fun HttpResponse?.safeRequestId(): String =
     this?.headers?.get("X-GitHub-Request-Id")?.takeIf { it.matches(Regex("[A-Za-z0-9:-]{1,128}")) } ?: "none"

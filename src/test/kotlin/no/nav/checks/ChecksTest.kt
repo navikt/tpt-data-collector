@@ -12,7 +12,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import no.nav.datastore.FakeDatastore
 import no.nav.github.FakeGitHub
+import no.nav.github.withCapturedLogs
+import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
@@ -22,6 +26,42 @@ class ChecksTest {
     private val workflow = ".github/workflows/build.yml"
     private val lockfile = ".github/workflows/actions.lock"
     private val unpinnedWorkflow = "steps:\n  - uses: actions/checkout@v4"
+
+    @Test
+    fun `shared file read failures are logged once with repository file and affected checks`() = runBlocking {
+        withCapturedLogs { events ->
+            val gitHub = FileGitHub(mapOf(workflow to unpinnedWorkflow), failedFiles = setOf(workflow))
+            Checks(gitHub, FakeDatastore()).runAll("repo", gitHub.files.keys)
+
+            val failure = events.single { it.level.isMoreSpecificThan(Level.WARN) }
+            assertEquals(Level.WARN, failure.level)
+            assertEquals("repo", failure.contextData.getValue<String>("repository"))
+            assertEquals(workflow, failure.contextData.getValue<String>("file"))
+            assertTrue(failure.contextData.getValue<String>("affected_checks").contains("PwnRequestCheck"))
+            assertTrue(failure.contextData.getValue<String>("affected_checks").contains("UnpinnedActionVersionsCheck"))
+            assertNull(failure.thrown)
+            val summary = events.single { it.message.formattedMessage == "Repository checks finished" }
+            assertEquals("partial", summary.contextData.getValue<String>("outcome"))
+            assertTrue(summary.contextData.getValue<String>("checks_failed").toInt() > 1)
+        }
+    }
+
+    @Test
+    fun `unexpected check failure retains the exception and names the repository and check`() = runBlocking {
+        withCapturedLogs { events ->
+            val cause = IllegalStateException("Unexpected API failure")
+            val gitHub = object : FakeGitHub() {
+                override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<no.nav.github.GithubCodeScanningAnalysis> =
+                    throw cause
+            }
+            Checks(gitHub, FakeDatastore()).runAll("repo", emptySet())
+
+            val failure = events.single { it.level == Level.ERROR }
+            assertEquals("repo", failure.contextData.getValue<String>("repository"))
+            assertEquals("GithubToolingStatusCheck", failure.contextData.getValue<String>("check"))
+            assertSame(cause, failure.thrown)
+        }
+    }
 
     @Test
     fun `missing lockfile is not fetched and unpinned actions need work`() = runBlocking {

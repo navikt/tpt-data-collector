@@ -8,6 +8,8 @@ import no.nav.checks.Severity
 import no.nav.checks.Severity.HIGH
 import no.nav.github.DependabotAlertsResult
 import no.nav.github.GitHub
+import no.nav.logging.logEvent
+import org.slf4j.event.Level
 
 interface GitHubApiBasedCheck {
     /** Returns null when an expected unavailable capability prevents assessment. */
@@ -24,7 +26,10 @@ class CriticalVulnerabilitiesCheck(val gitHub: GitHub) : GitHubApiBasedCheck {
         val hasCriticalAlerts = when (val result = gitHub.hasOpenCriticalDependabotAlerts(repo)) {
             is DependabotAlertsResult.Available -> result.hasOpenCriticalAlerts
             DependabotAlertsResult.Disabled -> {
-                logger.info("Skipping $name for $repo: Dependabot alerts are disabled")
+                logger.logEvent(
+                    Level.INFO, "Check unavailable; Dependabot alerts are disabled",
+                    "repository" to repo, "check" to name
+                )
                 return null
             }
         }
