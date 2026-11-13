@@ -4,6 +4,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -13,27 +14,48 @@ import java.nio.file.Paths
 import no.nav.config.ApplikasjonsConfig
 import no.nav.datastore.FakeDatastore
 import no.nav.github.FakeGitHub
+import no.nav.github.withCapturedLogs
+import no.nav.metrics.TPTMetrics
 import no.nav.tpt.FakeTptBackend
 import no.nav.whodis.FakeWhodis
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class KtorModulesTest {
 
     @Test
     fun `operational endpoints remain available independently of GitHub`() = testApplication {
-        application {
-            businessModule(FakeGitHub(), FakeDatastore(),
-                FakeTptBackend(), FakeWhodis(), ApplikasjonsConfig(githubWebhookSecret = "dummy", githubOrganization = "navikt"))
-            naisModule()
-        }
+        withCapturedLogs("io.micrometer.prometheusmetrics.PrometheusMeterRegistry") { events ->
+            TPTMetrics.webhookReceived()
+            application {
+                businessModule(FakeGitHub(), FakeDatastore(),
+                    FakeTptBackend(), FakeWhodis(), ApplikasjonsConfig(githubWebhookSecret = "dummy", githubOrganization = "navikt"))
+                naisModule()
+            }
 
-        listOf(
-            "/internal/isAlive",
-            "/internal/isReady",
-            "/internal/metrics",
-        ).forEach { path ->
-            assertEquals(HttpStatusCode.OK, client.get(path).status)
+            listOf(
+                "/internal/isAlive",
+                "/internal/isReady",
+                "/internal/metrics",
+            ).forEach { path ->
+                assertEquals(HttpStatusCode.OK, client.get(path).status)
+            }
+
+            val scrape = client.get("/internal/metrics").bodyAsText()
+            assertTrue(scrape.contains("webhooks_received_total"))
+            val timers = TPTMetrics.registry.find("ktor.http.server.requests").timers()
+            assertFalse(timers.isEmpty())
+            timers.forEach { timer ->
+                assertEquals(
+                    listOf(0.5, 0.9, 0.95, 0.99),
+                    timer.takeSnapshot().percentileValues().map { it.percentile() },
+                )
+            }
+            assertFalse(events.any {
+                it.message.formattedMessage.contains("A MeterFilter is being configured after a Meter")
+            })
         }
     }
 

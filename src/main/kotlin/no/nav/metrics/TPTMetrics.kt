@@ -2,7 +2,10 @@ package no.nav.metrics
 
 import io.micrometer.core.instrument.Clock
 import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.Timer
+import io.micrometer.core.instrument.config.MeterFilter
+import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import io.prometheus.metrics.model.registry.PrometheusRegistry
@@ -10,14 +13,23 @@ import kotlin.time.Duration
 import kotlin.time.toJavaDuration
 
 object TPTMetrics {
+    const val HTTP_REQUESTS_METRIC_NAME = "ktor.http.server.requests"
+
     private val collectorRegistry = PrometheusRegistry.defaultRegistry
+    private val requestDistributionStatistics =
+        DistributionStatisticConfig.builder().percentiles(0.5, 0.9, 0.95, 0.99).build()
 
     val registry =
         PrometheusMeterRegistry(
             PrometheusConfig.DEFAULT,
             collectorRegistry,
             Clock.SYSTEM,
-        )
+        ).apply {
+            config().meterFilter(object : MeterFilter {
+                override fun configure(id: Meter.Id, config: DistributionStatisticConfig): DistributionStatisticConfig =
+                    if (id.name == HTTP_REQUESTS_METRIC_NAME) requestDistributionStatistics.merge(config) else config
+            })
+        }
 
     private val webhookReceivedCounter: Counter by lazy {
         Counter.builder("webhooks_received")

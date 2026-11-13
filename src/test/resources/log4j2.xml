@@ -2,6 +2,7 @@
 <Configuration status="WARN">
     <Appenders>
         <Console name="stdout_json" target="SYSTEM_OUT">
+            <ThresholdFilter level="WARN" onMatch="ACCEPT" onMismatch="DENY"/>
             <JsonTemplateLayout eventTemplateUri="classpath:LogstashJsonEventLayoutV1.json"/>
         </Console>
     </Appenders>

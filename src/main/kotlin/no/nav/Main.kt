@@ -226,6 +226,9 @@ private fun Application.runInBackground(
 fun Application.naisModule() {
     install(MicrometerMetrics) {
         registry = TPTMetrics.registry
+        metricName = TPTMetrics.HTTP_REQUESTS_METRIC_NAME
+        // The shared registry configures timer distributions before any application counters are registered.
+        registerDistributionStatisticConfig = false
         meterBinders = listOf(
             Log4j2Metrics(),
             JvmGcMetrics(),
