@@ -231,7 +231,8 @@ class RealGitHub internal constructor(
             fun incomplete(reason: String): Nothing =
                 throw GitHubVulnerabilityCollectionException(
                     owner, repo, reason,
-                    mapOf("page" to page, "request_id" to requestId) + response.errors.safeDiagnostics()
+                    mapOf("page" to page, "request_id" to requestId) + response.errors.safeDiagnostics(),
+                    accessDenied = response.errors.any { it.type == "FORBIDDEN" || it.type == "UNAUTHORIZED" }
                 )
 
             if (response.errors.isNotEmpty()) {
@@ -318,7 +319,8 @@ internal class GitHubVulnerabilityCollectionException(
     owner: String,
     repo: String,
     val reason: String,
-    val diagnostics: Map<String, Any?> = emptyMap()
+    val diagnostics: Map<String, Any?> = emptyMap(),
+    val accessDenied: Boolean = false
 ) :
     IllegalStateException("Incomplete GitHub vulnerability collection for $owner/$repo: $reason")
 

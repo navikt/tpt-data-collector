@@ -35,11 +35,10 @@ internal fun Logger.logEvent(
 internal fun Logger.logFailure(
     message: String,
     failure: Throwable,
-    vararg fields: Pair<String, Any?>,
-    level: Level? = null
+    vararg fields: Pair<String, Any?>
 ) {
     val details = failure.logDetails()
-    logEvent(level ?: details.level, message, *fields, *details.fields.toTypedArray(), cause = details.cause)
+    logEvent(details.level, message, *fields, *details.fields.toTypedArray(), cause = details.cause)
 }
 
 internal data class FailureDetails(
@@ -62,9 +61,7 @@ internal fun Throwable.logDetails(): FailureDetails = when (this) {
         )
     )
     is GitHubVulnerabilityCollectionException -> FailureDetails(
-        if (diagnostics["error_types"]?.toString()?.split(",")?.any {
-            it == "FORBIDDEN" || it == "UNAUTHORIZED"
-        } == true) Level.ERROR else Level.WARN,
+        if (accessDenied) Level.ERROR else Level.WARN,
         listOf("failure" to "incomplete_response", "reason" to reason) + diagnostics.toList()
     )
     is GitHubFileInventoryException, is GitHubPaginationException -> FailureDetails(
