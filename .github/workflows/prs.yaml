@@ -28,4 +28,4 @@ jobs:
           cache: gradle
       - uses: gradle/actions/setup-gradle@v6.4.1
       - name: Test & build
-        run: ./gradlew test build
+        run: ./gradlew test installDist

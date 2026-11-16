@@ -1,4 +1,5 @@
 [versions]
+kotlin = "2.4.21"
 ktor = "3.6.1"
 kotlinx-serialization = "1.12.0"
 kotlin-test = "2.4.21"
@@ -35,6 +36,11 @@ log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "lo
 log4j-layout-template-json = { module = "org.apache.logging.log4j:log4j-layout-template-json", version.ref = "log4j2" }
 log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j2" }
 log4j-jpl = { module = "org.apache.logging.log4j:log4j-jpl", version.ref = "log4j2" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 
 [bundles]
 ktor = [

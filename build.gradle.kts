@@ -1,10 +1,15 @@
 plugins {
-    kotlin("jvm") version "2.4.21"
-    kotlin("plugin.serialization") version "2.4.21"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.ktor)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
     jvmToolchain(25)
+}
+
+application {
+    mainClass.set("no.nav.MainKt")
 }
 
 dependencies {
@@ -33,34 +38,10 @@ dependencies {
     testImplementation(libs.ktor.client.mock)
 }
 
-tasks {
-    withType<Jar> {
-        archiveBaseName.set("app")
-
-        manifest {
-            attributes["Main-Class"] = "no.nav.MainKt"
-            attributes["Class-Path"] = configurations.runtimeClasspath.get().joinToString(separator = " ") {
-                it.name
-            }
-        }
-
-        doLast {
-            configurations.runtimeClasspath.get().forEach {
-                val file = File("${layout.buildDirectory.get()}/libs/${it.name}")
-                if (!file.exists())
-                    it.copyTo(file)
-            }
-        }
-    }
-
-    withType<Test> {
-        useJUnitPlatform()
-        testLogging {
-            showExceptions = true
-        }
-    }
-
-    withType<Wrapper> {
-        gradleVersion = "9.8.1"
+tasks.test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+        showExceptions = true
     }
 }
