@@ -226,6 +226,10 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
         "chainguard/"
     )
 
+    private val benignImages = listOf(
+        "scratch"
+    )
+
     override fun filesICareAbout(allAvailableFiles: Set<String>) =
         allAvailableFiles.filter { dockerfilePattern.find(it) != null }
 
@@ -250,7 +254,9 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
                 .map { it.substringAfter("from ").substringBeforeLast("as ").trim() }
                 .filterNot(::isChainguard)
                 .filterNot { namedIntermediaries.contains(it) }
-        }.filterNot { it.contains("@sha") }
+        }
+            .filterNot { benignImages.contains(it) }
+            .filterNot { it.contains("@sha") }
 
         val now = Clock.System.now()
         return if (nonPinnedNonChainguardImages.isEmpty()) {
