@@ -19,6 +19,34 @@ import org.junit.jupiter.api.assertThrows
 class GitHubCollectHandlerTest {
 
     @Test
+    fun `invalid repository identities are counted and skipped without stopping collection`() = runBlocking {
+        withCapturedLogs(GitHubCollectHandler::class.java.name) { events ->
+            val requested = mutableListOf<String>()
+            val gitHub = object : FakeGitHub() {
+                override suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode> {
+                    requested += nameWithOwner
+                    return emptyList()
+                }
+            }
+            val backend = FakeTptBackend()
+            val invalidNames = listOf("unqualified", "owner/repo with space", "/repo", "owner/", "owner/..")
+            GitHubCollectHandler(gitHub, FakeWhodis(), backend).collect(
+                GitHubCollectRequest(repositories = invalidNames + "navikt/valid")
+            )
+
+            assertEquals(listOf("navikt/valid"), requested)
+            assertEquals(listOf("navikt/valid"), backend.sentVulnerabilityData.map { it.nameWithOwner })
+            val failures = events.filter { it.message.formattedMessage.startsWith("Vulnerability collection incomplete") }
+            assertEquals(invalidNames, failures.map { it.contextData.getValue<String>("repository") })
+            val summary = events.single { it.message.formattedMessage == "GitHub collection finished" }
+            assertEquals(invalidNames.size.toString(), summary.contextData.getValue<String>("repositories_failed"))
+            assertEquals("1", summary.contextData.getValue<String>("repositories_sent"))
+            assertEquals("partial", summary.contextData.getValue<String>("outcome"))
+            assertEquals(1, backend.sentSyncComplete.size)
+        }
+    }
+
+    @Test
     fun `incomplete collection logs context and impact without a stack trace`() = runBlocking {
         withCapturedLogs(GitHubCollectHandler::class.java.name) { events ->
             val gitHub = object : FakeGitHub() {

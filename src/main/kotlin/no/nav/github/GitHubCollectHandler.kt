@@ -107,16 +107,8 @@ class GitHubCollectHandler(
 
         // 3. For each unique repo, fetch vulnerability alerts and send them to the backend
         for ((nameWithOwner, owningTeams) in repoToTeams) {
-            val parts = nameWithOwner.split("/")
-            if (parts.size != 2) {
-                summary.repositoriesFailed++
-                logger.logEvent(
-                    Level.WARN, "Invalid repository format; repository update not sent",
-                    "repository" to nameWithOwner, "operation" to "vulnerability_alerts"
-                )
-                continue
-            }
             val alerts = try {
+                requireQualifiedRepositoryName(nameWithOwner)
                 gitHub.vulnerabilityAlertsFor(nameWithOwner)
             } catch (e: CancellationException) {
                 throw e
