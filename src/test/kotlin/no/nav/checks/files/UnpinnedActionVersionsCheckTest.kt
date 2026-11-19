@@ -36,7 +36,7 @@ class UnpinnedActionVersionsCheckTest {
             """.trimIndent()
         )
         val check = UnpinnedActionVersionsCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
         assertEquals(1, results.reasons.size)
     }
@@ -50,7 +50,7 @@ class UnpinnedActionVersionsCheckTest {
             """.trimIndent()
         )
         val check = UnpinnedActionVersionsCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 
@@ -67,7 +67,7 @@ class UnpinnedActionVersionsCheckTest {
             ".github/workflows/actions.lock" to """whatever""".trimIndent()
         )
         val check = UnpinnedActionVersionsCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 

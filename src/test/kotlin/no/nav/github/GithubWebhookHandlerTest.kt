@@ -50,7 +50,7 @@ class GithubWebhookHandlerTest {
                     it.message.formattedMessage == "No owning team found for repository"
                 }
                 assertEquals(Level.INFO, message.level)
-                assertEquals("repo", message.contextData.getValue<String>("repository"))
+                assertEquals("navikt/repo", message.contextData.getValue<String>("repository"))
                 assertNull(message.thrown)
             }
         }
@@ -77,7 +77,7 @@ class GithubWebhookHandlerTest {
                 it.message.formattedMessage == "Repository owner lookup failed; publishing checks without owners"
             }
             assertEquals(Level.ERROR, message.level)
-            assertEquals("repo", message.contextData.getValue<String>("repository"))
+            assertEquals("navikt/repo", message.contextData.getValue<String>("repository"))
             assertSame(failure, message.thrown)
             assertTrue(events.none { it.message.formattedMessage.startsWith("No owning team found") })
         }
@@ -98,14 +98,22 @@ class GithubWebhookHandlerTest {
         defaultBranch: String,
     ) = runTest {
         val backend = FakeTptBackend()
+        val ownerLookups = mutableListOf<String>()
+        val whodis = object : FakeWhodis() {
+            override suspend fun ownerTeamsFor(nameWithOwner: String): List<String> {
+                ownerLookups += nameWithOwner
+                return super.ownerTeamsFor(nameWithOwner)
+            }
+        }
         val handler = GithubWebhookHandler(
-            Checks(FakeGitHub(), FakeDatastore()), backend, FakeWhodis(), organization,
+            Checks(FakeGitHub(), FakeDatastore()), backend, whodis, organization,
         )
 
         handler.handle(payload("$payloadOrganization/repo", defaultBranch, defaultBranch))
 
         val result = backend.sentCheckResults.single()
-        assertEquals("repo", result.repoName)
+        assertEquals("$payloadOrganization/repo", result.nameWithOwner)
+        assertEquals(listOf("$payloadOrganization/repo"), ownerLookups)
         assertEquals(listOf("tulleteam"), result.repoOwners)
         assertTrue(result.results.isNotEmpty())
     }
@@ -124,9 +132,9 @@ class GithubWebhookHandlerTest {
         val backend = FakeTptBackend()
         val ownerLookups = mutableListOf<String>()
         val whodis = object : FakeWhodis() {
-            override suspend fun ownerTeamsFor(repo: String): List<String> {
-                ownerLookups += repo
-                return super.ownerTeamsFor(repo)
+            override suspend fun ownerTeamsFor(nameWithOwner: String): List<String> {
+                ownerLookups += nameWithOwner
+                return super.ownerTeamsFor(nameWithOwner)
             }
         }
         val handler = GithubWebhookHandler(

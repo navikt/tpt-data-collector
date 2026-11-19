@@ -27,7 +27,7 @@ class DistrolessCheckTest {
             """.trimIndent()
         )
         val check = DistrolessCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 
@@ -42,7 +42,7 @@ class DistrolessCheckTest {
             """.trimIndent()
         )
         val check = DistrolessCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
     }
 
@@ -57,7 +57,7 @@ class DistrolessCheckTest {
             """.trimIndent()
         )
         val check = DistrolessCheck()
-        val results = check.run("bogusrepo", filesToCheck)
+        val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)
     }
 

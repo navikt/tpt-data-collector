@@ -79,7 +79,7 @@ class TriggerEndpointsTest {
             }
         }
         val gitHub = object : FakeGitHub() {
-            override suspend fun allReposForTeam(teamName: String) = listOf("some-repo")
+            override suspend fun allReposForTeam(teamName: String) = listOf("navikt/some-repo")
         }
         application { businessModule(gitHub, FakeDatastore(), backend, FakeWhodis(), config()) }
 
@@ -87,7 +87,7 @@ class TriggerEndpointsTest {
 
         assertEquals(HttpStatusCode.Accepted, response.status)
         val results = withTimeout(10.seconds) { received.await() }
-        assertEquals("some-repo", results.repoName)
+        assertEquals("navikt/some-repo", results.nameWithOwner)
         assertEquals(listOf("my-team"), results.repoOwners)
     }
 
@@ -162,7 +162,7 @@ class TriggerEndpointsTest {
 
         assertEquals(HttpStatusCode.Accepted, response.status)
         val results = withTimeout(10.seconds) { received.await() }
-        assertEquals("tpt-data-collector", results.repoName)
+        assertEquals("$organization/tpt-data-collector", results.nameWithOwner)
         assertEquals(listOf("tulleteam"), results.repoOwners)
     }
 }

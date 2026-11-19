@@ -20,7 +20,7 @@ class Repository (
     val id: Long,
     val name: String,
     @JsonNames("full_name")
-    val fullName: String,
+    val nameWithOwner: String,
     @JsonNames("master_branch")
     val masterBranch: String,
 )

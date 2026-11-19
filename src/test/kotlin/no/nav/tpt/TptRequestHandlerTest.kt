@@ -18,8 +18,8 @@ class TptRequestHandlerTest {
     private class RecordingDatastore : Datastore {
         val checkedRepos = mutableListOf<String>()
         override suspend fun ping() = true
-        override fun activeDeploymentsFor(originRepo: String): List<Triple<String, String, Instant>> {
-            checkedRepos += originRepo
+        override fun activeDeploymentsFor(nameWithOwner: String): List<Triple<String, String, Instant>> {
+            checkedRepos += nameWithOwner
             return emptyList()
         }
     }
@@ -28,27 +28,27 @@ class TptRequestHandlerTest {
     fun `inventory failures skip checks and publication but do not stop subsequent repositories`() = runBlocking {
         for (failure in listOf(
             IOException("GitHub unavailable"),
-            GitHubFileInventoryException("failed", "non-recursive tree response is truncated"),
-            GitHubFileInventoryException("failed", "tree fetch budget exceeded"),
-            GitHubFileInventoryException("failed", "inventory time budget exceeded")
+            GitHubFileInventoryException("navikt/failed", "non-recursive tree response is truncated"),
+            GitHubFileInventoryException("navikt/failed", "tree fetch budget exceeded"),
+            GitHubFileInventoryException("navikt/failed", "inventory time budget exceeded")
         )) {
             val datastore = RecordingDatastore()
             val backend = FakeTptBackend()
             val listingAttempts = mutableListOf<String>()
             val gitHub = object : FakeGitHub() {
-                override suspend fun allReposForTeam(teamName: String) = listOf("failed", "next")
-                override suspend fun allFilePathsIn(repoName: String): List<String> {
-                    listingAttempts += repoName
-                    if (repoName == "failed") throw failure
+                override suspend fun allReposForTeam(teamName: String) = listOf("navikt/failed", "navikt/next")
+                override suspend fun allFilePathsIn(nameWithOwner: String): List<String> {
+                    listingAttempts += nameWithOwner
+                    if (nameWithOwner == "navikt/failed") throw failure
                     return listOf(".gitignore")
                 }
             }
 
             TptRequestHandler(gitHub, Checks(gitHub, datastore), backend).runAllChecksFor("team")
 
-            assertEquals(listOf("failed", "next"), listingAttempts)
-            assertEquals(listOf("next"), datastore.checkedRepos)
-            assertEquals(listOf("next"), backend.sentCheckResults.map { it.repoName })
+            assertEquals(listOf("navikt/failed", "navikt/next"), listingAttempts)
+            assertEquals(listOf("navikt/next"), datastore.checkedRepos)
+            assertEquals(listOf("navikt/next"), backend.sentCheckResults.map { it.nameWithOwner })
             assertEquals(listOf("team"), backend.sentCheckResults.single().repoOwners)
             assertTrue(backend.sentCheckResults.single().results
                 .single { it.name == "HasGitignoreCheck" } is CheckResult.AllGood)
@@ -60,14 +60,14 @@ class TptRequestHandlerTest {
         val datastore = RecordingDatastore()
         val backend = FakeTptBackend()
         val gitHub = object : FakeGitHub() {
-            override suspend fun allReposForTeam(teamName: String) = listOf("empty")
+            override suspend fun allReposForTeam(teamName: String) = listOf("navikt/empty")
         }
 
         TptRequestHandler(gitHub, Checks(gitHub, datastore), backend).runAllChecksFor("team")
 
-        assertEquals(listOf("empty"), datastore.checkedRepos)
+        assertEquals(listOf("navikt/empty"), datastore.checkedRepos)
         val results = backend.sentCheckResults.single()
-        assertEquals("empty", results.repoName)
+        assertEquals("navikt/empty", results.nameWithOwner)
         assertTrue(results.results.single { it.name == "HasGitignoreCheck" } is CheckResult.NeedsWork)
     }
 
@@ -77,9 +77,9 @@ class TptRequestHandlerTest {
         val backend = FakeTptBackend()
         val listingAttempts = mutableListOf<String>()
         val gitHub = object : FakeGitHub() {
-            override suspend fun allReposForTeam(teamName: String) = listOf("cancelled", "next")
-            override suspend fun allFilePathsIn(repoName: String): List<String> {
-                listingAttempts += repoName
+            override suspend fun allReposForTeam(teamName: String) = listOf("navikt/cancelled", "navikt/next")
+            override suspend fun allFilePathsIn(nameWithOwner: String): List<String> {
+                listingAttempts += nameWithOwner
                 throw CancellationException("Collection cancelled")
             }
         }
@@ -88,8 +88,41 @@ class TptRequestHandlerTest {
             runBlocking { TptRequestHandler(gitHub, Checks(gitHub, datastore), backend).runAllChecksFor("team") }
         }
 
-        assertEquals(listOf("cancelled"), listingAttempts)
+        assertEquals(listOf("navikt/cancelled"), listingAttempts)
         assertTrue(datastore.checkedRepos.isEmpty())
         assertTrue(backend.sentCheckResults.isEmpty())
+    }
+
+    @Test
+    fun `same repository name under different owners remains distinct throughout checks`() = runBlocking {
+        val repositories = listOf("first-org/repo", "second-org/repo")
+        val datastore = RecordingDatastore()
+        val backend = FakeTptBackend()
+        val inventoryRequests = mutableListOf<String>()
+        val fileRequests = mutableListOf<String>()
+        val apiRequests = mutableListOf<String>()
+        val gitHub = object : FakeGitHub() {
+            override suspend fun allReposForTeam(teamName: String) = repositories
+            override suspend fun allFilePathsIn(nameWithOwner: String): List<String> {
+                inventoryRequests += nameWithOwner
+                return listOf(".gitignore")
+            }
+            override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
+                fileRequests += nameWithOwner
+                return ""
+            }
+            override suspend fun hasOpenCriticalDependabotAlerts(nameWithOwner: String): no.nav.github.DependabotAlertsResult {
+                apiRequests += nameWithOwner
+                return super.hasOpenCriticalDependabotAlerts(nameWithOwner)
+            }
+        }
+
+        TptRequestHandler(gitHub, Checks(gitHub, datastore), backend).runAllChecksFor("team")
+
+        assertEquals(repositories, inventoryRequests)
+        assertEquals(repositories, fileRequests)
+        assertEquals(repositories, apiRequests)
+        assertEquals(repositories, datastore.checkedRepos)
+        assertEquals(repositories, backend.sentCheckResults.map { it.nameWithOwner })
     }
 }

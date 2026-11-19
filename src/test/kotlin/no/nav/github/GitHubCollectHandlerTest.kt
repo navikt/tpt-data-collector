@@ -19,11 +19,39 @@ import org.junit.jupiter.api.assertThrows
 class GitHubCollectHandlerTest {
 
     @Test
+    fun `invalid repository identities are counted and skipped without stopping collection`() = runBlocking {
+        withCapturedLogs(GitHubCollectHandler::class.java.name) { events ->
+            val requested = mutableListOf<String>()
+            val gitHub = object : FakeGitHub() {
+                override suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode> {
+                    requested += nameWithOwner
+                    return emptyList()
+                }
+            }
+            val backend = FakeTptBackend()
+            val invalidNames = listOf("unqualified", "owner/repo with space", "/repo", "owner/", "owner/..")
+            GitHubCollectHandler(gitHub, FakeWhodis(), backend).collect(
+                GitHubCollectRequest(repositories = invalidNames + "navikt/valid")
+            )
+
+            assertEquals(listOf("navikt/valid"), requested)
+            assertEquals(listOf("navikt/valid"), backend.sentVulnerabilityData.map { it.nameWithOwner })
+            val failures = events.filter { it.message.formattedMessage.startsWith("Vulnerability collection incomplete") }
+            assertEquals(invalidNames, failures.map { it.contextData.getValue<String>("repository") })
+            val summary = events.single { it.message.formattedMessage == "GitHub collection finished" }
+            assertEquals(invalidNames.size.toString(), summary.contextData.getValue<String>("repositories_failed"))
+            assertEquals("1", summary.contextData.getValue<String>("repositories_sent"))
+            assertEquals("partial", summary.contextData.getValue<String>("outcome"))
+            assertEquals(1, backend.sentSyncComplete.size)
+        }
+    }
+
+    @Test
     fun `incomplete collection logs context and impact without a stack trace`() = runBlocking {
         withCapturedLogs(GitHubCollectHandler::class.java.name) { events ->
             val gitHub = object : FakeGitHub() {
-                override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> =
-                    throw GitHubVulnerabilityCollectionException(owner, repo, "GraphQL data is null or missing")
+                override suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode> =
+                    throw GitHubVulnerabilityCollectionException(nameWithOwner, "GraphQL data is null or missing")
             }
             val backend = FakeTptBackend()
             GitHubCollectHandler(gitHub, FakeWhodis(), backend).collect(
@@ -46,7 +74,7 @@ class GitHubCollectHandlerTest {
         withCapturedLogs(GitHubCollectHandler::class.java.name) { events ->
             val cause = IllegalStateException("Unexpected failure")
             val gitHub = object : FakeGitHub() {
-                override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> =
+                override suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode> =
                     throw cause
             }
             GitHubCollectHandler(gitHub, FakeWhodis(), FakeTptBackend()).collect(
@@ -104,8 +132,8 @@ class GitHubCollectHandlerTest {
             val requested = mutableListOf<String>()
             val backend = FakeTptBackend()
             val gitHub = object : FakeGitHub() {
-                override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> {
-                    requested += repo
+                override suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode> {
+                    requested += nameWithOwner
                     throw CancellationException("Cancelled")
                 }
             }
@@ -114,7 +142,7 @@ class GitHubCollectHandlerTest {
                     GitHubCollectRequest(repositories = listOf("navikt/first", "navikt/second"))
                 )
             }
-            assertEquals(listOf("first"), requested)
+            assertEquals(listOf("navikt/first"), requested)
             assertEquals(1, backend.sentSyncComplete.size)
             assertTrue(events.none { it.level.isMoreSpecificThan(Level.WARN) })
         }
@@ -136,7 +164,7 @@ class GitHubCollectHandlerTest {
     )
 
     private val fakeGitHub = object : FakeGitHub() {
-        override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> =
+        override suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode> =
             listOf(alert(PullRequestInfo("https://github.com/navikt/fake-repo/pull/1", "OPEN")))
     }
 
@@ -159,7 +187,7 @@ class GitHubCollectHandlerTest {
     fun `only includes dependabot pull request url when the pull request is open`() = runBlocking {
         val backend = FakeTptBackend()
         val gitHub = object : FakeGitHub() {
-            override suspend fun vulnerabilityAlertsFor(owner: String, repo: String) = listOf(
+            override suspend fun vulnerabilityAlertsFor(nameWithOwner: String) = listOf(
                 alert(PullRequestInfo("https://github.com/navikt/some-repo/pull/1", "OPEN")),
                 alert(PullRequestInfo("https://github.com/navikt/some-repo/pull/2", "CLOSED")),
                 alert(PullRequestInfo("https://github.com/navikt/some-repo/pull/3", "MERGED")),
@@ -179,7 +207,7 @@ class GitHubCollectHandlerTest {
     fun `repos with no vulnerabilities still produce a callback with empty list`() = runBlocking {
         val backend = FakeTptBackend()
         val emptyGitHub = object : FakeGitHub() {
-            override suspend fun vulnerabilityAlertsFor(owner: String, repo: String) = emptyList<VulnerabilityAlertNode>()
+            override suspend fun vulnerabilityAlertsFor(nameWithOwner: String) = emptyList<VulnerabilityAlertNode>()
         }
         val handler = GitHubCollectHandler(emptyGitHub, FakeWhodis(), backend)
         handler.collect(GitHubCollectRequest(repositories = listOf("navikt/some-repo")))
@@ -257,5 +285,29 @@ class GitHubCollectHandlerTest {
         val message = backend.sentVulnerabilityData.first()
         assertEquals("navikt/shared-repo", message.nameWithOwner)
         assertEquals(listOf("team-a", "team-b"), message.naisTeams.sorted())
+    }
+
+    @Test
+    fun `repositories with the same short name retain their owners during collection`() = runBlocking {
+        val requestedRepos = mutableListOf<String>()
+        val gitHub = object : FakeGitHub() {
+            override suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode> {
+                requestedRepos += nameWithOwner
+                return emptyList()
+            }
+        }
+        val whodis = object : FakeWhodis() {
+            override suspend fun repositoriesForTeam(teamSlug: String) = listOf("first-org/repo")
+        }
+        val backend = FakeTptBackend()
+
+        GitHubCollectHandler(gitHub, whodis, backend).collect(
+            GitHubCollectRequest(teams = listOf("team"), repositories = listOf("second-org/repo")),
+        )
+
+        assertEquals(listOf("first-org/repo", "second-org/repo"), requestedRepos)
+        assertEquals(requestedRepos, backend.sentVulnerabilityData.map { it.nameWithOwner })
+        assertEquals(listOf("team"), backend.sentVulnerabilityData[0].naisTeams)
+        assertTrue(backend.sentVulnerabilityData[1].naisTeams.isEmpty())
     }
 }

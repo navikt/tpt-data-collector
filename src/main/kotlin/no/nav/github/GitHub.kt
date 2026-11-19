@@ -35,26 +35,26 @@ import no.nav.logging.logEvent
 import org.slf4j.event.Level
 
 interface GitHub {
-    suspend fun readFileContents(repoName: String, filePath: String): String
-    suspend fun hasOpenCriticalDependabotAlerts(repoName: String): DependabotAlertsResult
-    suspend fun allFilePathsIn(repoName: String): List<String>
+    suspend fun readFileContents(nameWithOwner: String, filePath: String): String
+    suspend fun hasOpenCriticalDependabotAlerts(nameWithOwner: String): DependabotAlertsResult
+    suspend fun allFilePathsIn(nameWithOwner: String): List<String>
     /** Complete non-archived repository list, or failure; collection has a 60-second overall deadline. */
     suspend fun allReposForTeam(teamName: String): List<String>
     /** Newest analysis per category within the 100 most recent analyses; older categories are excluded. */
-    suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis>
-    suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode>
-    suspend fun latestCommitTimeFor(repoName: String): Instant
+    suspend fun latestCodeScanningAnalysesFor(nameWithOwner: String): List<GithubCodeScanningAnalysis>
+    suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode>
+    suspend fun latestCommitTimeFor(nameWithOwner: String): Instant
 }
 
 open class FakeGitHub: GitHub {
-    override suspend fun readFileContents(repoName: String, filePath: String): String {
+    override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
         return ""
     }
 
-    override suspend fun hasOpenCriticalDependabotAlerts(repoName: String): DependabotAlertsResult =
+    override suspend fun hasOpenCriticalDependabotAlerts(nameWithOwner: String): DependabotAlertsResult =
         DependabotAlertsResult.Available(true)
 
-    override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
+    override suspend fun latestCodeScanningAnalysesFor(nameWithOwner: String): List<GithubCodeScanningAnalysis> {
         return listOf(GithubCodeScanningAnalysis(
             ".github/workflows/codeql-analysis.yml:analyse/language:perl",
             CodeScanningTool("CodeQL"),
@@ -64,13 +64,13 @@ open class FakeGitHub: GitHub {
         ))
     }
 
-    override suspend fun allFilePathsIn(repoName: String): List<String> = emptyList()
+    override suspend fun allFilePathsIn(nameWithOwner: String): List<String> = emptyList()
 
     override suspend fun allReposForTeam(teamName: String): List<String> = emptyList()
 
-    override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> = emptyList()
-    override suspend fun latestCommitTimeFor(repoName: String) =
-        if (repoName == "goodOne") Clock.System.now() - 29.days else Clock.System.now() - 31.days
+    override suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode> = emptyList()
+    override suspend fun latestCommitTimeFor(nameWithOwner: String) =
+        if (nameWithOwner.substringAfter('/') == "goodOne") Clock.System.now() - 29.days else Clock.System.now() - 31.days
 }
 
 @OptIn(ExperimentalAtomicApi::class)
@@ -91,17 +91,19 @@ class RealGitHub internal constructor(
     private val signer = RSASSASigner( JWK.parseFromPEMEncodedObjects(privateKeyPEM).toRSAKey())
     private var installationAccessToken: AtomicReference<AccessToken?> = AtomicReference(null)
 
-    override suspend fun readFileContents(repoName: String, filePath: String): String {
-        val url = "$apiBaseUrl/repos/$organization/$repoName/contents/$filePath"
+    override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
+        requireQualifiedRepositoryName(nameWithOwner)
+        val url = "$apiBaseUrl/repos/$nameWithOwner/contents/$filePath"
         val authToken = retrieveAccessToken()
-        val response: FileContentsResponse = makeHttpRequest(GitHubOperation.FILE_CONTENTS, repoName, Get, url, authToken)
+        val response: FileContentsResponse = makeHttpRequest(GitHubOperation.FILE_CONTENTS, nameWithOwner, Get, url, authToken)
         return response.decode()
     }
 
-    override suspend fun hasOpenCriticalDependabotAlerts(repoName: String): DependabotAlertsResult {
-        val url = "$apiBaseUrl/repos/$organization/$repoName/dependabot/alerts?state=open&severity=critical&per_page=1"
+    override suspend fun hasOpenCriticalDependabotAlerts(nameWithOwner: String): DependabotAlertsResult {
+        requireQualifiedRepositoryName(nameWithOwner)
+        val url = "$apiBaseUrl/repos/$nameWithOwner/dependabot/alerts?state=open&severity=critical&per_page=1"
         val authToken = retrieveAccessToken()
-        return transport.execute(GitHubOperation.DEPENDABOT_ALERTS, repoName) {
+        return transport.execute(GitHubOperation.DEPENDABOT_ALERTS, nameWithOwner) {
             try {
                 val response = request(Get, url, authToken).body<List<DependabotAlert>>()
                 DependabotAlertsResult.Available(response.isNotEmpty())
@@ -121,10 +123,11 @@ class RealGitHub internal constructor(
             response.headers["X-RateLimit-Remaining"]?.trim()?.toLongOrNull() != 0L &&
             response.gitHubErrorMessage() == "Dependabot alerts are disabled for this repository."
 
-    override suspend fun latestCodeScanningAnalysesFor(repoName: String): List<GithubCodeScanningAnalysis> {
-        val url = "$apiBaseUrl/repos/$organization/$repoName/code-scanning/analyses?per_page=100&sort=created&direction=desc"
+    override suspend fun latestCodeScanningAnalysesFor(nameWithOwner: String): List<GithubCodeScanningAnalysis> {
+        requireQualifiedRepositoryName(nameWithOwner)
+        val url = "$apiBaseUrl/repos/$nameWithOwner/code-scanning/analyses?per_page=100&sort=created&direction=desc"
         val authToken = retrieveAccessToken()
-        return transport.execute(GitHubOperation.CODE_SCANNING, repoName) {
+        return transport.execute(GitHubOperation.CODE_SCANNING, nameWithOwner) {
             try {
                 val response = request(Get, url, authToken).body<List<GithubCodeScanningAnalysis>>()
                 response
@@ -136,18 +139,19 @@ class RealGitHub internal constructor(
         }
     }
 
-    override suspend fun allFilePathsIn(repoName: String): List<String> =
-        allFilePathsIn(repoName, TreeInventoryLimits())
+    override suspend fun allFilePathsIn(nameWithOwner: String): List<String> =
+        allFilePathsIn(nameWithOwner, TreeInventoryLimits())
 
-    internal suspend fun allFilePathsIn(repoName: String, limits: TreeInventoryLimits): List<String> =
-        withTimeoutOrNull(limits.timeout) {
-            val rootRepoUrl = "$apiBaseUrl/repos/$organization/$repoName"
+    internal suspend fun allFilePathsIn(nameWithOwner: String, limits: TreeInventoryLimits): List<String> {
+        requireQualifiedRepositoryName(nameWithOwner)
+        return withTimeoutOrNull(limits.timeout) {
+            val rootRepoUrl = "$apiBaseUrl/repos/$nameWithOwner"
             val authToken = retrieveAccessToken()
             val rootRepoResponse: RepoRootResponse =
-                makeHttpRequest(GitHubOperation.REPOSITORY, repoName, Get, rootRepoUrl, authToken)
-            GitHubTreeInventory(repoName, limits) { ref, recursive ->
+                makeHttpRequest(GitHubOperation.REPOSITORY, nameWithOwner, Get, rootRepoUrl, authToken)
+            GitHubTreeInventory(nameWithOwner, limits) { ref, recursive ->
                 val treeUrl = "$rootRepoUrl/git/trees/$ref" + if (recursive) "?recursive=true" else ""
-                transport.execute(GitHubOperation.TREE, repoName) {
+                transport.execute(GitHubOperation.TREE, nameWithOwner) {
                     try {
                         request(Get, treeUrl, authToken).body<TreeResponse>()
                     } catch (ex: ClientRequestException) {
@@ -156,7 +160,8 @@ class RealGitHub internal constructor(
                     }
                 }
             }.paths(rootRepoResponse.defaultBranch)
-        } ?: throw GitHubFileInventoryException(repoName, "inventory time budget exceeded")
+        } ?: throw GitHubFileInventoryException(nameWithOwner, "inventory time budget exceeded")
+    }
 
     override suspend fun allReposForTeam(teamName: String): List<String> =
         withTimeoutOrNull(60.seconds) {
@@ -175,10 +180,12 @@ class RealGitHub internal constructor(
                 repos += page
                 url = next
             }
-            repos.filter { !it.archived }.map { it.name }
+            repos.filter { !it.archived }.map { it.nameWithOwner }
         } ?: throw GitHubPaginationException("team repository collection time budget exceeded")
 
-    override suspend fun vulnerabilityAlertsFor(owner: String, repo: String): List<VulnerabilityAlertNode> {
+    override suspend fun vulnerabilityAlertsFor(nameWithOwner: String): List<VulnerabilityAlertNode> {
+        requireQualifiedRepositoryName(nameWithOwner)
+        val (owner, repo) = nameWithOwner.split('/')
         val graphqlUrl = "$apiBaseUrl/graphql"
         val authToken = retrieveAccessToken()
         val query = """
@@ -221,7 +228,7 @@ class RealGitHub internal constructor(
                     })
                 }
             )
-            val (response, requestId) = transport.execute(GitHubOperation.VULNERABILITY_ALERTS, "$owner/$repo") {
+            val (response, requestId) = transport.execute(GitHubOperation.VULNERABILITY_ALERTS, nameWithOwner) {
                 val httpResponse = request(Post, graphqlUrl, authToken, requestBody)
                 val body = httpResponse.body<VulnerabilityAlertsGraphQLResponse>().also {
                     checkGraphQLRateLimit(httpResponse, it.errors)
@@ -230,7 +237,7 @@ class RealGitHub internal constructor(
             }
             fun incomplete(reason: String): Nothing =
                 throw GitHubVulnerabilityCollectionException(
-                    owner, repo, reason,
+                    nameWithOwner, reason,
                     mapOf("page" to page, "request_id" to requestId) + response.errors.safeDiagnostics(),
                     accessDenied = response.errors.any { it.type == "FORBIDDEN" || it.type == "UNAUTHORIZED" }
                 )
@@ -258,11 +265,12 @@ class RealGitHub internal constructor(
         return allAlerts
     }
 
-    override suspend fun latestCommitTimeFor(repoName: String): Instant {
-        val url = "$apiBaseUrl/repos/$organization/$repoName/commits"
+    override suspend fun latestCommitTimeFor(nameWithOwner: String): Instant {
+        requireQualifiedRepositoryName(nameWithOwner)
+        val url = "$apiBaseUrl/repos/$nameWithOwner/commits"
         val authToken = retrieveAccessToken()
         val commitsResponse: List<CommitResponse> =
-            makeHttpRequest(GitHubOperation.COMMITS, repoName, Get, url, authToken)
+            makeHttpRequest(GitHubOperation.COMMITS, nameWithOwner, Get, url, authToken)
         return commitsResponse.maxOf { it.commit.author.date }
     }
 
@@ -316,13 +324,12 @@ class RealGitHub internal constructor(
 }
 
 internal class GitHubVulnerabilityCollectionException(
-    owner: String,
-    repo: String,
+    nameWithOwner: String,
     val reason: String,
     val diagnostics: Map<String, Any?> = emptyMap(),
     val accessDenied: Boolean = false
 ) :
-    IllegalStateException("Incomplete GitHub vulnerability collection for $owner/$repo: $reason")
+    IllegalStateException("Incomplete GitHub vulnerability collection for $nameWithOwner: $reason")
 
 private val diagnosticErrorTypes = setOf(
     "FORBIDDEN", "UNAUTHORIZED", "NOT_FOUND", "RATE_LIMITED", "INTERNAL", "SERVICE_UNAVAILABLE",

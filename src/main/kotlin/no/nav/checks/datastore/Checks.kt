@@ -8,7 +8,7 @@ import no.nav.checks.Severity.MEDIUM
 import no.nav.datastore.Datastore
 
 interface DatastoreBasedCheck {
-    fun run(repo: String): CheckResult
+    fun run(nameWithOwner: String): CheckResult
 }
 
 class OldDeploymentsCheck(val datastore: Datastore): DatastoreBasedCheck {
@@ -16,11 +16,11 @@ class OldDeploymentsCheck(val datastore: Datastore): DatastoreBasedCheck {
     private val desc = "Deployments should be refreshed regularly to get security updates."
     private val severity = MEDIUM
 
-    override fun run(repo: String): CheckResult {
+    override fun run(nameWithOwner: String): CheckResult {
         val now = Clock.System.now()
         val ninetyDaysAgo = now - 90.days
         val outdatedDeployments =
-            datastore.activeDeploymentsFor( repo)
+            datastore.activeDeploymentsFor(nameWithOwner)
                 .filter { (_, _, deployTime) -> isOlderThan(deployTime, ninetyDaysAgo) }
         return if (outdatedDeployments.isNotEmpty()) {
             CheckResult.NeedsWork(
@@ -28,7 +28,7 @@ class OldDeploymentsCheck(val datastore: Datastore): DatastoreBasedCheck {
                 desc,
                 severity,
                 now,
-                outdatedDeployments.map { "${it.first} is running an old (${it.third}) deployment of $repo in ${it.second}" }
+                outdatedDeployments.map { "${it.first} is running an old (${it.third}) deployment of $nameWithOwner in ${it.second}" }
             )
         } else {
             CheckResult.AllGood(name, desc, severity, now)
