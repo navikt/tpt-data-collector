@@ -22,7 +22,7 @@ class Neo4jDatastore(val driver: Driver) : Datastore {
 
     override fun activeDeploymentsFor(nameWithOwner: String): List<Triple<String, String, Instant>> {
         val query =
-            $$"MATCH (:GitHubRepository {full_name: $repo})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug AS team, d.environment_name AS env, d.created_at AS created"
+            $$"MATCH (:GitHubRepository {fullname: $repo})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug AS team, d.environment_name AS env, d.created_at AS created"
         val result =
             driver.executableQuery(query)
                 .withParameters(mapOf("repo" to nameWithOwner))

@@ -9,7 +9,7 @@ import org.neo4j.driver.ExecutableQuery
 
 class Neo4jDatastoreTest {
     @Test
-    fun `deployment lookup matches full_name and binds qualified repository identities`() {
+    fun `deployment lookup matches fullname and binds qualified repository identities`() {
         val queries = mutableListOf<String>()
         val parameters = mutableListOf<Any?>()
         val result = stub(EagerResult::class.java) { method, _ ->
@@ -43,7 +43,7 @@ class Neo4jDatastoreTest {
         assertEquals(emptyList<Any>(), datastore.activeDeploymentsFor(nameWithOwner = "navikt/shared"))
         assertEquals(emptyList<Any>(), datastore.activeDeploymentsFor(nameWithOwner = "other-owner/shared"))
         val expectedQuery =
-            $$"MATCH (:GitHubRepository {full_name: $repo})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug AS team, d.environment_name AS env, d.created_at AS created"
+            $$"MATCH (:GitHubRepository {fullname: $repo})<-[:DEPLOYED_FROM]-(d:NaisDeployment {is_active: true}) RETURN d.team_slug AS team, d.environment_name AS env, d.created_at AS created"
         assertEquals(listOf(expectedQuery, expectedQuery), queries)
         assertEquals(
             listOf(mapOf("repo" to "navikt/shared"), mapOf("repo" to "other-owner/shared")),
