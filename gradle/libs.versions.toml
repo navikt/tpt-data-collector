@@ -1,11 +1,11 @@
 [versions]
 kotlin = "2.4.21"
 ktor = "3.6.1"
-kotlinx-serialization = "1.12.0"
+kotlinx-serialization = "1.13.0"
 kotlin-test = "2.4.21"
 prometheus = "1.17.2"
 junit-jupiter = "6.1.3"
-bouncycastle = "1.86"
+bouncycastle = "1.87"
 neo4j = "6.3.0"
 nimbus = "10.10"
 log4j2 = "2.26.1"
