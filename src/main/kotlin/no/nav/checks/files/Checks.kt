@@ -8,7 +8,7 @@ import no.nav.checks.Severity.MEDIUM
 
 
 interface FileBasedCheck {
-    fun filesICareAbout(allAvailableFiles: Set<String>): List<String>
+    fun filesICareAbout(changedFiles: Set<String>): List<String>
     fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult
 }
 
@@ -25,8 +25,8 @@ class DistrolessCheck : FileBasedCheck {
         "gcr.io/distroless/"
     )
 
-    override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { dockerfilePattern.find(it) != null }
+    override fun filesICareAbout(changedFiles: Set<String>) =
+        changedFiles.filter { dockerfilePattern.find(it) != null }
 
     override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val lastBaseImageUsed = filesToCheck.flatMap { (_, fileContents) ->
@@ -54,8 +54,8 @@ class CopyDotDotCheck : FileBasedCheck {
     private val severity = MEDIUM
     private val dockerfilePattern = Regex("""(^|[._-])[Dd]ockerfile([._-]|$)""")
 
-    override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter {
+    override fun filesICareAbout(changedFiles: Set<String>) =
+        changedFiles.filter {
             dockerfilePattern.find(it) != null || it == ".dockerignore"
         }
 
@@ -91,8 +91,8 @@ class UnpinnedActionVersionsCheck : FileBasedCheck {
     private val unpinnedPattern = Regex("""^\s*-\s*uses:\s*[A-Za-z0-9_\-/]+@v.*$""")
     private val lockfile = ".github/workflows/actions.lock"
 
-    override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { workflowFilePattern.matches(it) || it == lockfile }
+    override fun filesICareAbout(changedFiles: Set<String>) =
+        changedFiles.filter { workflowFilePattern.matches(it) || it == lockfile }
 
     override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val now = Clock.System.now()
@@ -120,8 +120,8 @@ class PwnRequestCheck : FileBasedCheck {
     private val severity = HIGH
     private val workflowFilePattern = Regex("""^\.github/workflows/[A-Za-z0-9_-]+\.ya?ml$""")
 
-    override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { workflowFilePattern.matches(it) }
+    override fun filesICareAbout(changedFiles: Set<String>) =
+        changedFiles.filter { workflowFilePattern.matches(it) }
 
     override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val filesToFix = filesToCheck.flatMap { (filename, fileContents) ->
@@ -151,8 +151,8 @@ class NpxUsageCheck : FileBasedCheck {
     private val desc = "npx bypasses package-lock and may download and execute malicious versions of packages"
     private val severity = HIGH
 
-    override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { it.contains("package.json") }
+    override fun filesICareAbout(changedFiles: Set<String>) =
+        changedFiles.filter { it.contains("package.json") }
 
     override fun run(
         nameWithOwner: String,
@@ -187,8 +187,8 @@ class CurlPipeShellCheck : FileBasedCheck {
     private val workflowFilePattern = Regex("""^\.github/workflows/[A-Za-z0-9_-]+\.ya?ml$""")
     private val pipeToShellPattern = Regex("""(?i)\bcurl\b[^\n|]*\|\s*(?:/[^ \t|]+/)?z?(?:ba)?sh\b""")
 
-    override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { dockerfilePattern.find(it) != null ||
+    override fun filesICareAbout(changedFiles: Set<String>) =
+        changedFiles.filter { dockerfilePattern.find(it) != null ||
                 workflowFilePattern.find(it) != null ||
         it.contains("package.json")}
 
@@ -230,8 +230,8 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
         "scratch"
     )
 
-    override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { dockerfilePattern.find(it) != null }
+    override fun filesICareAbout(changedFiles: Set<String>) =
+        changedFiles.filter { dockerfilePattern.find(it) != null }
 
     override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val namedIntermediaries = filesToCheck
@@ -276,7 +276,7 @@ class HasGitignoreCheck : FileBasedCheck {
     private val desc = "Gitignore provides a safety net so that sensitive files are not committed."
     private val severity = MEDIUM
 
-    override fun filesICareAbout(allAvailableFiles: Set<String>) = listOf(".gitignore")
+    override fun filesICareAbout(changedFiles: Set<String>) = listOf(".gitignore")
 
     override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val hasGitignore = filesToCheck.keys.contains(".gitignore")
@@ -296,8 +296,8 @@ class ReadmeCheck : FileBasedCheck {
     private val severity = LOW
     private val readmePattern = "^readme(\\.md)?$".toRegex()
 
-    override fun filesICareAbout(allAvailableFiles: Set<String>) =
-        allAvailableFiles.filter { readmePattern.matches(it.lowercase()) }
+    override fun filesICareAbout(changedFiles: Set<String>) =
+        changedFiles.filter { readmePattern.matches(it.lowercase()) }
 
     override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
         val now = Clock.System.now()

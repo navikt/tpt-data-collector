@@ -42,10 +42,10 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         NewestCommitCheck(gitHub)
     )
 
-    suspend fun runAll(nameWithOwner: String, relevantFiles: Set<String>): List<CheckResult> {
+    suspend fun runAll(nameWithOwner: String, changedFiles: Set<String>): List<CheckResult> {
         requireQualifiedRepositoryName(nameWithOwner)
         val timedResults = mapOf(
-            "Files" to measureTimedValue { runFileBasedChecks(nameWithOwner, relevantFiles).awaitAll() },
+            "Files" to measureTimedValue { runFileBasedChecks(nameWithOwner, changedFiles).awaitAll() },
             "Datastore" to measureTimedValue { runDatastoreBasedChecks(nameWithOwner).awaitAll() },
             "GitHubApi" to measureTimedValue { runGitHubAPIBasedChecks(nameWithOwner).awaitAll() }
         )
@@ -72,11 +72,11 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
 
     private suspend fun runFileBasedChecks(
         nameWithOwner: String,
-        relevantFiles: Set<String>
+        changedFiles: Set<String>
     ): List<Deferred<Result<CheckResult>>> =
         coroutineScope {
             val filesNeededByChecks = fileBasedChecks
-                .associateWith { it.filesICareAbout(relevantFiles).toSet() }
+                .associateWith { it.filesICareAbout(changedFiles).toSet() }
                 .filterValues { it.isNotEmpty() }
             if (filesNeededByChecks.isEmpty()) {
                 logger.logEvent(Level.DEBUG, "No file-based checks to run", "repository" to nameWithOwner)
@@ -84,7 +84,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
             }
 
             val allFilesWeNeed = filesNeededByChecks.values.flatten().toSet()
-                .intersect(relevantFiles)
+                .intersect(changedFiles)
                 .associateWith { filePath ->
                     async {
                         runCatching { gitHub.readFileContents(nameWithOwner, filePath) }
