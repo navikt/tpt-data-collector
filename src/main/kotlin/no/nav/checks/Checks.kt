@@ -83,15 +83,14 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 return@coroutineScope emptyList()
             }
 
-            val allFilesWeNeed = filesNeededByChecks.values.flatten().toSet()
-                .intersect(changedFiles)
+            val contentsOfAllFilesWeNeed = filesNeededByChecks.values.flatten().toSet()
                 .associateWith { filePath ->
                     async {
                         runCatching { gitHub.readFileContents(nameWithOwner, filePath) }
                             .onFailure { ex ->
                                 if (ex is CancellationException) throw ex
                                 logger.logFailure(
-                                    "File read failed; dependent checks omitted", ex,
+                                    "File read failed ($filePath); dependent checks omitted", ex,
                                     "operation" to "file_contents", "repository" to nameWithOwner, "file" to filePath,
                                     "affected_checks" to filesNeededByChecks.filterValues { filePath in it }
                                         .keys.joinToString(",") { it.javaClass.simpleName }
@@ -101,20 +100,20 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 }
             logger.logEvent(
                 Level.DEBUG, "Repository file reads finished", "repository" to nameWithOwner,
-                "files_read" to allFilesWeNeed.values.count { it.isSuccess },
-                "files_failed" to allFilesWeNeed.values.count { it.isFailure }
+                "files_read" to contentsOfAllFilesWeNeed.values.count { it.isSuccess },
+                "files_failed" to contentsOfAllFilesWeNeed.values.count { it.isFailure }
             )
 
             filesNeededByChecks.map { (check, filesNeededForThisCheck) ->
                 async {
-                    val contents = allFilesWeNeed.filterKeys { it in filesNeededForThisCheck }
+                    val fileContentsThisCheckNeeds = contentsOfAllFilesWeNeed.filterKeys { it in filesNeededForThisCheck }
                     // A shared read failure is logged once above, with all affected checks.
-                    val readFailure = contents.values.firstNotNullOfOrNull { it.exceptionOrNull() }
-                    if (readFailure != null) return@async Result.failure<CheckResult>(readFailure)
+                    val readFailure = fileContentsThisCheckNeeds.values.firstNotNullOfOrNull { it.exceptionOrNull() }
+                    if (readFailure != null) return@async Result.failure(readFailure)
                     runCheck(nameWithOwner, check.javaClass.simpleName) {
                         check.run(
                             nameWithOwner,
-                            contents.mapValues { (_, content) -> content.getOrThrow() })
+                            fileContentsThisCheckNeeds.mapValues { (_, content) -> content.getOrThrow() })
                     }
                 }
             }

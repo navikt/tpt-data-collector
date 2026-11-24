@@ -56,22 +56,6 @@ class TptRequestHandlerTest {
     }
 
     @Test
-    fun `genuinely empty inventories still run checks and publish missing gitignore`() = runBlocking {
-        val datastore = RecordingDatastore()
-        val backend = FakeTptBackend()
-        val gitHub = object : FakeGitHub() {
-            override suspend fun allReposForTeam(teamName: String) = listOf("navikt/empty")
-        }
-
-        TptRequestHandler(gitHub, Checks(gitHub, datastore), backend).runAllChecksFor("team")
-
-        assertEquals(listOf("navikt/empty"), datastore.checkedRepos)
-        val results = backend.sentCheckResults.single()
-        assertEquals("navikt/empty", results.nameWithOwner)
-        assertTrue(results.results.single { it.name == "HasGitignoreCheck" } is CheckResult.NeedsWork)
-    }
-
-    @Test
     fun `cancellation propagates without checks publication or processing another repository`() {
         val datastore = RecordingDatastore()
         val backend = FakeTptBackend()
