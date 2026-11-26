@@ -83,6 +83,25 @@ class GitHubExpectedResponsesTest {
             "{}",
             "not-json"
         )
+
+        @JvmStatic
+        fun codeScanningDisabledResponses(): List<String> = listOf(
+            """{"message":"Code scanning is not enabled for this repository.","status":"403"}""",
+            """{"message":"Code Scanning is not enabled for this repository. Please enable code scanning in the repository settings."}""",
+            """{"message":"Code Security must be enabled for this repository to use code scanning"}""",
+            """{"message":"Advanced Security must be enabled for this repository to use code scanning"}""",
+            """{"message":"Advanced Security must be enabled for this repository to use code scanning.","documentation_url":"https://docs.github.com/rest/code-scanning/code-scanning#list-code-scanning-analyses-for-a-repository","status":"403"}"""
+        )
+
+        @JvmStatic
+        fun otherCodeScanningForbiddenResponses(): List<String> = listOf(
+            """{"message":"Resource not accessible by integration"}""",
+            """{"message":"Code scanning is not enabled for this repository. More details."}""",
+            """{"message":null}""",
+            """{"message":["Code scanning is not enabled for this repository."]}""",
+            "{}",
+            "not-json"
+        )
     }
 
     private data class Response(
@@ -141,6 +160,104 @@ class GitHubExpectedResponsesTest {
     private fun failedChecks() = TPTMetrics.registry.find("webhooks_failed").counter()?.count() ?: 0.0
     private fun alertRequests(paths: List<String>) = paths.count { it.endsWith("/dependabot/alerts") }
     private fun analysisRequests(paths: List<String>) = paths.count { it.endsWith("/code-scanning/analyses") }
+
+    @Test
+    fun `disabled code scanning forbidden response still publishes the tooling finding`() = runTest {
+        withCapturedLogs { events ->
+            withGitHub(listOf(Response(
+                """{"message":"Advanced Security must be enabled for this repository to use code scanning.","documentation_url":"https://docs.github.com/rest/code-scanning/code-scanning#list-code-scanning-analyses-for-a-repository","status":"403"}""",
+                HttpStatusCode.Forbidden
+            ))) { realGitHub, paths ->
+                val backend = FakeTptBackend()
+                val gitHub = object : FakeGitHub() {
+                    override suspend fun allReposForTeam(teamName: String) = listOf("navikt/repo")
+                    override suspend fun latestCodeScanningAnalysesFor(nameWithOwner: String) =
+                        realGitHub.latestCodeScanningAnalysesFor(nameWithOwner)
+                }
+                val before = failedChecks()
+
+                TptRequestHandler(gitHub, Checks(gitHub, FakeDatastore()), backend).runAllChecksFor("team")
+
+                assertEquals(before, failedChecks())
+                assertEquals(1, analysisRequests(paths))
+                assertEquals(0L, currentTime)
+                val published = backend.sentCheckResults.single()
+                val finding = assertIs<CheckResult.NeedsWork>(
+                    published.results.singleOrNull { it.name == "GitHubToolingStatus" }
+                )
+                assertEquals(listOf("navikt/repo has no code scanning analyses, possibly no tools configured"), finding.reasons)
+                assertTrue(published.results.any { it.name == "HasCriticalVulns" })
+                assertTrue(events.none { it.level.isMoreSpecificThan(Level.WARN) })
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("codeScanningDisabledResponses")
+    fun `recognized disabled code scanning responses return no analyses without retries`(body: String) = runTest {
+        withGitHub(listOf(Response(body, HttpStatusCode.Forbidden))) { gitHub, paths ->
+            assertTrue(gitHub.latestCodeScanningAnalysesFor("navikt/repo").isEmpty())
+            assertEquals(1, analysisRequests(paths))
+            assertEquals(0L, currentTime)
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("otherCodeScanningForbiddenResponses")
+    fun `other code scanning forbidden responses remain authorization failures`(body: String) = runTest {
+        withGitHub(listOf(Response(body, HttpStatusCode.Forbidden))) { gitHub, paths ->
+            val failure = assertThrows<GitHubTransportException> {
+                gitHub.latestCodeScanningAnalysesFor("navikt/repo")
+            }
+            assertEquals(GitHubFailure.AUTHORIZATION, failure.failure)
+            assertEquals(GitHubStopReason.PERMANENT, failure.stopReason)
+            assertEquals(1, analysisRequests(paths))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["Retry-After", "X-RateLimit-Remaining"])
+    fun `code scanning rate limit headers take precedence over a disabled message`(header: String) = runTest {
+        val value = if (header == "Retry-After") "1" else "0"
+        withGitHub(listOf(Response(
+            codeScanningDisabledResponses().first(), HttpStatusCode.Forbidden, mapOf(header to value)
+        ))) { gitHub, paths ->
+            val failure = assertThrows<GitHubTransportException> {
+                gitHub.latestCodeScanningAnalysesFor("navikt/repo")
+            }
+            assertEquals(
+                if (header == "Retry-After") GitHubFailure.SECONDARY_RATE_LIMIT else GitHubFailure.PRIMARY_RATE_LIMIT,
+                failure.failure
+            )
+            assertEquals(if (header == "Retry-After") 3 else 1, analysisRequests(paths))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [401, 429, 500])
+    fun `code scanning disabled messages on other statuses remain failures`(status: Int) = runTest {
+        withGitHub(listOf(Response(
+            codeScanningDisabledResponses().first(), HttpStatusCode.fromValue(status)
+        ))) { gitHub, paths ->
+            val failure = assertThrows<GitHubTransportException> {
+                gitHub.latestCodeScanningAnalysesFor("navikt/repo")
+            }
+            assertEquals(HttpStatusCode.fromValue(status), failure.response?.status)
+            assertEquals(if (status == 500) 3 else 1, analysisRequests(paths))
+        }
+    }
+
+    @Test
+    fun `disabled code scanning message during token exchange remains a failure`() = runTest {
+        withGitHub(
+            responses = emptyList(),
+            tokenResponse = Response(codeScanningDisabledResponses().first(), HttpStatusCode.Forbidden)
+        ) { gitHub, paths ->
+            assertThrows<GitHubTransportException> { gitHub.latestCodeScanningAnalysesFor("navikt/repo") }
+            assertEquals(0, analysisRequests(paths))
+            assertEquals(1, paths.size)
+        }
+    }
 
     @ParameterizedTest
     @MethodSource("codeScanningNotFoundResponses")

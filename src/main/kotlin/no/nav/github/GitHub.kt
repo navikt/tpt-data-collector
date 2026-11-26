@@ -134,10 +134,22 @@ class RealGitHub internal constructor(
                     .groupBy { it.category }
                     .map { (_, analyses) -> analyses.maxBy { it.createdAt } }
             } catch (e: ClientRequestException) {
-                if (e.response.status == HttpStatusCode.NotFound) emptyList() else throw e
+                if (e.response.status == HttpStatusCode.NotFound || e.isCodeScanningDisabled()) emptyList() else throw e
             }
         }
     }
+
+    private suspend fun ClientRequestException.isCodeScanningDisabled(): Boolean =
+        response.status == HttpStatusCode.Forbidden &&
+            response.headers["Retry-After"] == null &&
+            response.headers["X-RateLimit-Remaining"]?.trim()?.toLongOrNull() != 0L &&
+            response.gitHubErrorMessage() in setOf(
+                "Code scanning is not enabled for this repository.",
+                "Code Scanning is not enabled for this repository. Please enable code scanning in the repository settings.",
+                "Code Security must be enabled for this repository to use code scanning",
+                "Advanced Security must be enabled for this repository to use code scanning",
+                "Advanced Security must be enabled for this repository to use code scanning."
+            )
 
     override suspend fun allFilePathsIn(nameWithOwner: String): List<String> =
         allFilePathsIn(nameWithOwner, TreeInventoryLimits())
