@@ -32,18 +32,22 @@ class DistrolessCheck : FileBasedCheck {
         if (filesToCheck.isEmpty()) {
             return CheckResult.AllGood(name, desc, severity, Clock.System.now())
         }
-        val lastBaseImageUsed = filesToCheck.flatMap { (_, fileContents) ->
+        val lastBaseImages = filesToCheck.mapNotNull { (_, fileContents) ->
             fileContents.lines()
                 .map { it.lowercase() }
                 .filter { it.startsWith("from") }
                 .filterNot{ it.contains("{") } // templated image name, we can't verify these
-        }.last().substringAfter("from ").substringBeforeLast("as ")
-        val nonApprovedImageUsed = approvedImages.none { lastBaseImageUsed.startsWith(it) }
+                .lastOrNull()?.substringAfter("from ")?.substringBeforeLast("as ")
+        }
+        if (lastBaseImages.isEmpty()) {
+            throw NoSuchElementException("No non-templated FROM instructions found")
+        }
+        val nonApprovedImages = lastBaseImages.filter { image -> approvedImages.none { image.startsWith(it) } }
 
         val now = Clock.System.now()
-        return if (nonApprovedImageUsed) {
+        return if (nonApprovedImages.isNotEmpty()) {
             CheckResult.NeedsWork(name, desc,severity, now,
-                listOf("'$lastBaseImageUsed' is not a recommended base image. consider switching to distroless")
+                nonApprovedImages.map { "'$it' is not a recommended base image. consider switching to distroless" }
             )
         } else {
             CheckResult.AllGood(name, desc, severity, now)

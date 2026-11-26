@@ -27,6 +27,28 @@ class ChecksTest {
     private val lockfile = ".github/workflows/actions.lock"
     private val unpinnedWorkflow = "steps:\n  - uses: actions/checkout@v4"
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `an unchanged approved Dockerfile does not mask a changed non-recommended image`(reverseOrder: Boolean) =
+        runBlocking {
+            val files = mapOf(
+                "Dockerfile" to "FROM nginx:1.28",
+                "Dockerfile.prod" to "FROM cgr.dev/chainguard/go:latest"
+            )
+            val gitHub = FileGitHub(if (reverseOrder) files.toList().reversed().toMap() else files)
+
+            val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf("Dockerfile"))
+
+            val distroless = assertIs<CheckResult.NeedsWork>(results.single { it.name == "DistrolessCheck" })
+            assertEquals(
+                listOf("'nginx:1.28' is not a recommended base image. consider switching to distroless"),
+                distroless.reasons
+            )
+            assertEquals(files.keys, gitHub.requestedFiles.toSet())
+            assertEquals(gitHub.requestedFiles.size, gitHub.requestedFiles.toSet().size)
+            assertEquals(1, gitHub.inventoryRequests)
+        }
+
     @Test
     fun `removing the last readme reports needs work without fetching the deleted file`() = runBlocking {
         val gitHub = FileGitHub(emptyMap())
