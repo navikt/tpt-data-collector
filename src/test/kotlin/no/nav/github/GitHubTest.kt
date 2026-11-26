@@ -14,6 +14,10 @@ import org.junit.jupiter.api.assertThrows
 
 class GitHubTest {
 
+    private companion object {
+        val json = Json { ignoreUnknownKeys = true }
+    }
+
     @Test
     fun `token should be refreshed if expires in less than 10 mins`() {
         val now = Clock.System.now()
@@ -45,14 +49,13 @@ class GitHubTest {
 
     @Test
     fun `Is able to parse security alert response`() {
-        val json = Json{ignoreUnknownKeys = true}
         val parsed = json.decodeFromString<List<DependabotAlert>>(securityVulnerabilityJson)
         assertNotNull(parsed)
     }
 
     @Test
     fun `team repository response decodes full name rather than short name`() {
-        val parsed = Json { ignoreUnknownKeys = true }.decodeFromString<ReposForTeamResponse>(
+        val parsed = json.decodeFromString<ReposForTeamResponse>(
             """{"name":"repo","full_name":"another-owner/repo"}"""
         )
         assertEquals("another-owner/repo", parsed.nameWithOwner)
@@ -61,7 +64,7 @@ class GitHubTest {
     @Test
     fun `team repository response requires full name rather than synthesizing owner`() {
         assertThrows<kotlinx.serialization.SerializationException> {
-            Json { ignoreUnknownKeys = true }.decodeFromString<ReposForTeamResponse>(
+            json.decodeFromString<ReposForTeamResponse>(
                 """{"name":"repo"}"""
             )
         }
@@ -69,21 +72,18 @@ class GitHubTest {
 
     @Test
     fun `Is able to parse repo root response`() {
-        val json = Json{ignoreUnknownKeys = true}
         val parsed = json.decodeFromString<RepoRootResponse>(repoRootResponse)
         assertEquals("main", parsed.defaultBranch)
     }
 
     @Test
     fun `Is able to parse repo tree response`() {
-        val json = Json{ignoreUnknownKeys = true}
         val parsed = json.decodeFromString<TreeResponse>(treeResponse)
         assertEquals(42, parsed.tree.size)
     }
 
     @Test
     fun `Is able to parse code scanning analyses response`() {
-        val json = Json{ignoreUnknownKeys = true}
         val parsed = json.decodeFromString<List<GithubCodeScanningAnalysis>>(codeScanningAnalysesJson)
         assertEquals("CodeQL", parsed[0].tool.name)
         assertEquals("", parsed[0].error)

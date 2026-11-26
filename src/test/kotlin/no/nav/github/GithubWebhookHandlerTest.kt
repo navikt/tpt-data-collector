@@ -61,7 +61,7 @@ class GithubWebhookHandlerTest {
         withCapturedLogs { events ->
             val failure = IllegalStateException("Whodis lookup failed")
             val whodis = object : FakeWhodis() {
-                override suspend fun ownerTeamsFor(repo: String): List<String> = throw failure
+                override suspend fun ownerTeamsFor(nameWithOwner: String): List<String> = throw failure
             }
             val backend = FakeTptBackend()
             val handler = GithubWebhookHandler(
