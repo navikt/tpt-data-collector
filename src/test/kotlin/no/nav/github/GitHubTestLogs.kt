@@ -8,12 +8,18 @@ import org.apache.logging.log4j.core.LoggerContext
 import org.apache.logging.log4j.core.appender.AbstractAppender
 import org.apache.logging.log4j.core.config.Property
 
-internal suspend fun withCapturedLogs(vararg additionalLoggers: String, block: suspend (List<LogEvent>) -> Unit) {
+internal suspend fun withCapturedLogs(
+    vararg additionalLoggers: String,
+    onEvent: (LogEvent) -> Unit = {},
+    block: suspend (List<LogEvent>) -> Unit,
+) {
     val context = assertIs<LoggerContext>(LogManager.getContext(false))
     val events = CopyOnWriteArrayList<LogEvent>()
     val appender = object : AbstractAppender("github-test-capture", null, null, true, Property.EMPTY_ARRAY) {
         override fun append(event: LogEvent) {
-            events += event.toImmutable()
+            val captured = event.toImmutable()
+            events += captured
+            onEvent(captured)
         }
     }
     val loggers = listOf(

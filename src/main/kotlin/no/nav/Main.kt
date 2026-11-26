@@ -58,6 +58,7 @@ import no.nav.github.GitHubCollectHandler
 import no.nav.github.GitHubCollectRequest
 import no.nav.github.GithubWebhookHandler
 import no.nav.github.RealGitHub
+import no.nav.github.validateDeliveryId
 import no.nav.github.WebhookPayload
 import no.nav.metrics.TPTMetrics
 import no.nav.tpt.TexasTokenProvider
@@ -135,7 +136,8 @@ fun Application.businessModule(gitHub: GitHub,
         level = Level.INFO
         disableDefaultColors()
         filter { call ->
-            !call.request.path().startsWith("/internal")
+            !call.request.path().startsWith("/internal") &&
+                !(call.request.path() == "/webhook/github" && call.response.status() == HttpStatusCode.Accepted)
         }
     }
 
@@ -162,9 +164,15 @@ fun Application.businessModule(gitHub: GitHub,
                     call.respond(HttpStatusCode.BadRequest)
                     return@post
                 }
+                val deliveryId =
+                    validateDeliveryId(call.request.headers["X-GitHub-Delivery"])
 
-                runInBackground("github_webhook", "repository" to payload.repository.nameWithOwner) {
-                    githubWebhookHandler.handle(payload)
+                runInBackground(
+                    "github_webhook",
+                    "repository" to payload.repository.nameWithOwner,
+                    "delivery_id" to deliveryId
+                ) {
+                    githubWebhookHandler.handle(payload, deliveryId)
                 }
                 call.respond(HttpStatusCode.Accepted)
             }

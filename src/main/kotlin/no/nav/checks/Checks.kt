@@ -42,7 +42,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         NewestCommitCheck(gitHub)
     )
 
-    suspend fun runAll(nameWithOwner: String, changedFiles: Set<String>): List<CheckResult> {
+    suspend fun runAll(nameWithOwner: String, changedFiles: Set<String>, deliveryId: String? = null): List<CheckResult> {
         requireQualifiedRepositoryName(nameWithOwner)
         val timedResults = mapOf(
             "Files" to measureTimedValue { runFileBasedChecks(nameWithOwner, changedFiles).awaitAll() },
@@ -57,6 +57,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
         logger.logEvent(
             Level.INFO, "Repository checks finished",
             "repository" to nameWithOwner,
+            "delivery_id" to deliveryId,
             "outcome" to if (failedResults.isEmpty()) "success" else "partial",
             "checks_attempted" to allResults.size, "checks_completed" to successfulResults.size,
             "checks_failed" to failedResults.size,

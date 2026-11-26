@@ -14,19 +14,22 @@ import org.slf4j.event.Level
 class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whodis: Whodis, private val organization: String) {
     val logger = KtorSimpleLogger(this::class.java.name)
 
-    suspend fun handle(webhookPayload: WebhookPayload) {
+    suspend fun handle(webhookPayload: WebhookPayload, deliveryId: String? = null) {
         TPTMetrics.webhookReceived()
         val nameWithOwner = webhookPayload.repository.nameWithOwner
-        if (!isRelevant(webhookPayload)) {
+        val ignoreReason = ignoreReason(webhookPayload)
+        if (ignoreReason != null) {
             logger.logEvent(
-                Level.DEBUG, "Push ignored; not in the configured organization or default branch",
-                "repository" to nameWithOwner, "ref" to webhookPayload.ref
+                Level.INFO, "GitHub webhook ignored",
+                "operation" to "github_webhook", "outcome" to "ignored", "reason" to ignoreReason,
+                "repository" to nameWithOwner, "ref" to webhookPayload.ref, "delivery_id" to deliveryId
             )
             return
         }
         logger.logEvent(
-            Level.DEBUG, "Processing default-branch push",
-            "repository" to nameWithOwner, "ref" to webhookPayload.ref
+            Level.INFO, "GitHub webhook accepted",
+            "operation" to "github_webhook", "outcome" to "scheduled",
+            "repository" to nameWithOwner, "ref" to webhookPayload.ref, "delivery_id" to deliveryId
         )
         val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
         val repoOwners = try {
@@ -45,15 +48,18 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
             )
             emptyList()
         }
-        val results = checks.runAll(nameWithOwner, changedFiles)
+        val results = checks.runAll(nameWithOwner, changedFiles, deliveryId)
         val resultsForRepo = CheckResultsForRepo(nameWithOwner, repoOwners, results)
         if (backend.sendCheckResults(resultsForRepo)) {
             TPTMetrics.msgsSentToTpt(1)
         }
     }
 
-    private fun isRelevant(payload: WebhookPayload): Boolean {
+    private fun ignoreReason(payload: WebhookPayload): String? {
+        if (!payload.repository.nameWithOwner.startsWith("$organization/", ignoreCase = true)) {
+            return "other_organization"
+        }
         val pushBranch = payload.ref.split("/").last()
-        return payload.repository.nameWithOwner.startsWith("$organization/", ignoreCase = true) && pushBranch == payload.repository.masterBranch
+        return if (pushBranch != payload.repository.masterBranch) "non_default_branch" else null
     }
 }

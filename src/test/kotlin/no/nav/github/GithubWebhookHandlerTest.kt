@@ -120,15 +120,19 @@ class GithubWebhookHandlerTest {
 
     @ParameterizedTest
     @CsvSource(
-        "navikt/repo, main",
-        "other-org/repo, main",
-        "another-org-extra/repo, main",
-        "ANOTHER-ORG-EXTRA/repo, main",
-        "another-org, main",
-        "another-org/repo, feature",
-        "ANOTHER-ORG/repo, Main",
+        "navikt/repo, main, other_organization",
+        "other-org/repo, main, other_organization",
+        "another-org-extra/repo, main, other_organization",
+        "ANOTHER-ORG-EXTRA/repo, main, other_organization",
+        "another-org, main, other_organization",
+        "another-org/repo, feature, non_default_branch",
+        "ANOTHER-ORG/repo, Main, non_default_branch",
     )
-    fun `other organizations and non default branches do not trigger checks`(fullName: String, branch: String) = runTest {
+    fun `other organizations and non default branches do not trigger checks`(
+        fullName: String,
+        branch: String,
+        reason: String,
+    ) = runTest {
         val backend = FakeTptBackend()
         val ownerLookups = mutableListOf<String>()
         val whodis = object : FakeWhodis() {
@@ -141,10 +145,21 @@ class GithubWebhookHandlerTest {
             Checks(FakeGitHub(), FakeDatastore()), backend, whodis, "another-org",
         )
 
-        handler.handle(payload(fullName, branch))
+        withCapturedLogs { events ->
+            val deliveryId = "12345678-1234-1234-1234-123456789abc"
+            handler.handle(payload(fullName, branch), deliveryId)
 
-        assertTrue(ownerLookups.isEmpty())
-        assertTrue(backend.sentCheckResults.isEmpty())
+            assertTrue(ownerLookups.isEmpty())
+            assertTrue(backend.sentCheckResults.isEmpty())
+            val decision = events.single { it.message.formattedMessage == "GitHub webhook ignored" }
+            assertEquals(Level.INFO, decision.level)
+            assertEquals("github_webhook", decision.contextData.getValue<String>("operation"))
+            assertEquals("ignored", decision.contextData.getValue<String>("outcome"))
+            assertEquals(reason, decision.contextData.getValue<String>("reason"))
+            assertEquals(fullName, decision.contextData.getValue<String>("repository"))
+            assertEquals("refs/heads/$branch", decision.contextData.getValue<String>("ref"))
+            assertEquals(deliveryId, decision.contextData.getValue<String>("delivery_id"))
+        }
     }
 
     private fun payload(fullName: String, branch: String, defaultBranch: String = "main") =

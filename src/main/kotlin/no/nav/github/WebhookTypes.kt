@@ -5,6 +5,7 @@ package no.nav.github
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
+import kotlin.uuid.Uuid
 
 @Serializable
 class WebhookPayload (
@@ -27,3 +28,6 @@ class Repository (
 
 @Serializable
 class Commit(val id: String, val modified: List<String>, val added: List<String>, val removed: List<String>)
+
+internal fun validateDeliveryId(value: String?): String? =
+    value?.takeIf { Uuid.parseHexDashOrNull(it) != null }
