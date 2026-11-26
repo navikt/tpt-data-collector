@@ -34,18 +34,24 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
     private val fileBasedChecks = listOf(
         DistrolessCheck(), UnpinnedActionVersionsCheck(), CopyDotDotCheck(),
         PwnRequestCheck(), NpxUsageCheck(), CurlPipeShellCheck(), BaseImageIsNotPinnedCheck(),
-        HasGitignoreCheck(), ReadmeCheck()
+        ReadmeCheck()
     )
+    private val gitignoreCheck = HasGitignoreCheck()
     private val datastoreBasedChecks = listOf(OldDeploymentsCheck(datastore))
     private val gitHubAPIBasedChecks = listOf(
         CriticalVulnerabilitiesCheck(gitHub), GithubToolingStatusCheck(gitHub),
         NewestCommitCheck(gitHub)
     )
 
-    suspend fun runAll(nameWithOwner: String, changedFiles: Set<String>, deliveryId: String? = null): List<CheckResult> {
+    suspend fun runAll(
+        nameWithOwner: String,
+        changedFiles: Set<String>,
+        deliveryId: String? = null,
+        allFilesInRepo: Set<String>? = null
+    ): List<CheckResult> {
         requireQualifiedRepositoryName(nameWithOwner)
         val timedResults = mapOf(
-            "Files" to measureTimedValue { runFileBasedChecks(nameWithOwner, changedFiles).awaitAll() },
+            "Files" to measureTimedValue { runFileBasedChecks(nameWithOwner, changedFiles, allFilesInRepo).awaitAll() },
             "Datastore" to measureTimedValue { runDatastoreBasedChecks(nameWithOwner).awaitAll() },
             "GitHubApi" to measureTimedValue { runGitHubAPIBasedChecks(nameWithOwner).awaitAll() }
         )
@@ -73,15 +79,36 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
 
     private suspend fun runFileBasedChecks(
         nameWithOwner: String,
-        changedFiles: Set<String>
+        changedFiles: Set<String>,
+        allFilesInRepo: Set<String>?
     ): List<Deferred<Result<CheckResult>>> =
         coroutineScope {
-            val filesNeededByChecks = fileBasedChecks
-                .associateWith { it.filesICareAbout(changedFiles).toSet() }
-                .filterValues { it.isNotEmpty() }
+            val selectedChecks = fileBasedChecks.filter { it.filesICareAbout(changedFiles).isNotEmpty() }
+            val affectedChecks = listOf(gitignoreCheck.javaClass.simpleName) +
+                selectedChecks.map { it.javaClass.simpleName }
+            val inventory = try {
+                allFilesInRepo ?: gitHub.allFilePathsIn(nameWithOwner).toSet()
+            } catch (ex: CancellationException) {
+                throw ex
+            } catch (ex: Exception) {
+                logger.logFailure(
+                    "Complete file inventory unavailable; dependent checks omitted", ex,
+                    "operation" to "file_inventory", "repository" to nameWithOwner,
+                    "affected_checks" to affectedChecks.joinToString(",")
+                )
+                return@coroutineScope affectedChecks.map { async { Result.failure<CheckResult>(ex) } }
+            }
+            val gitignoreResult = async {
+                runCheck(nameWithOwner, gitignoreCheck.javaClass.simpleName) {
+                    gitignoreCheck.run(nameWithOwner, inventory)
+                }
+            }
+            // Changed paths select checks; only the current inventory establishes their inputs.
+            val filesNeededByChecks = selectedChecks
+                .associateWith { it.filesICareAbout(inventory).toSet() }
             if (filesNeededByChecks.isEmpty()) {
-                logger.logEvent(Level.DEBUG, "No file-based checks to run", "repository" to nameWithOwner)
-                return@coroutineScope emptyList()
+                logger.logEvent(Level.DEBUG, "No content-based checks to run", "repository" to nameWithOwner)
+                return@coroutineScope listOf(gitignoreResult)
             }
 
             val contentsOfAllFilesWeNeed = filesNeededByChecks.values.flatten().toSet()
@@ -105,7 +132,7 @@ class Checks(val gitHub: GitHub, datastore: Datastore) {
                 "files_failed" to contentsOfAllFilesWeNeed.values.count { it.isFailure }
             )
 
-            filesNeededByChecks.map { (check, filesNeededForThisCheck) ->
+            listOf(gitignoreResult) + filesNeededByChecks.map { (check, filesNeededForThisCheck) ->
                 async {
                     val fileContentsThisCheckNeeds = contentsOfAllFilesWeNeed.filterKeys { it in filesNeededForThisCheck }
                     // A shared read failure is logged once above, with all affected checks.

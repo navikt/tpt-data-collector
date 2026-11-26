@@ -37,6 +37,7 @@ import org.slf4j.event.Level
 interface GitHub {
     suspend fun readFileContents(nameWithOwner: String, filePath: String): String
     suspend fun hasOpenCriticalDependabotAlerts(nameWithOwner: String): DependabotAlertsResult
+    /** Complete blob-path inventory, including symlinks but excluding directories and submodules, or failure. */
     suspend fun allFilePathsIn(nameWithOwner: String): List<String>
     /** Complete non-archived repository list, or failure; collection has a 60-second overall deadline. */
     suspend fun allReposForTeam(teamName: String): List<String>

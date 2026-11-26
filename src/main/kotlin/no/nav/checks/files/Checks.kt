@@ -29,6 +29,9 @@ class DistrolessCheck : FileBasedCheck {
         changedFiles.filter { dockerfilePattern.find(it) != null }
 
     override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
+        if (filesToCheck.isEmpty()) {
+            return CheckResult.AllGood(name, desc, severity, Clock.System.now())
+        }
         val lastBaseImageUsed = filesToCheck.flatMap { (_, fileContents) ->
             fileContents.lines()
                 .map { it.lowercase() }
@@ -271,15 +274,13 @@ class BaseImageIsNotPinnedCheck : FileBasedCheck {
         chainguardImages.any { image.startsWith(it) }
 }
 
-class HasGitignoreCheck : FileBasedCheck {
+class HasGitignoreCheck {
     private val name = this.javaClass.simpleName
     private val desc = "Gitignore provides a safety net so that sensitive files are not committed."
     private val severity = MEDIUM
 
-    override fun filesICareAbout(changedFiles: Set<String>) = listOf(".gitignore")
-
-    override fun run(nameWithOwner: String, filesToCheck: Map<String, String>): CheckResult {
-        val hasGitignore = filesToCheck.keys.contains(".gitignore")
+    fun run(nameWithOwner: String, allFilesInRepo: Set<String>): CheckResult {
+        val hasGitignore = ".gitignore" in allFilesInRepo
         val now = Clock.System.now()
         return if (hasGitignore) {
             CheckResult.AllGood(name, desc, severity, now)

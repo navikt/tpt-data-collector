@@ -8,19 +8,8 @@ import org.junit.jupiter.api.Test
 class HasGitignoreCheckTest {
 
     @Test
-    fun `This check should only care about gitignore files`() {
-        val allAvailableFiles = setOf(".gitignore", "README.md", "Dockerfile")
-        val check = HasGitignoreCheck()
-        val expected = listOf(".gitignore")
-        val actual = check.filesICareAbout(allAvailableFiles)
-        assertEquals(expected, actual)
-    }
-
-    @Test
     fun `no gitignore present is bad`() {
-        val filesToCheck = mapOf(
-            ".github/workflows/yolo.yaml" to "whatever"
-        )
+        val filesToCheck = setOf(".github/workflows/yolo.yaml")
         val check = HasGitignoreCheck()
         val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.NeedsWork)
@@ -29,9 +18,7 @@ class HasGitignoreCheckTest {
 
     @Test
     fun `gitignore present is good`() {
-        val filesToCheck = mapOf(
-            ".gitignore" to "whatever"
-        )
+        val filesToCheck = setOf(".gitignore", "README.md", "Dockerfile")
         val check = HasGitignoreCheck()
         val results = check.run("navikt/bogusrepo", filesToCheck)
         assertTrue(results is CheckResult.AllGood)

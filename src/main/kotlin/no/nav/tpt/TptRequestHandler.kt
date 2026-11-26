@@ -24,7 +24,8 @@ class TptRequestHandler(private val gitHub: GitHub, private val checks: Checks, 
                 )
                 return@forEach
             }
-            val checkResults = checks.runAll(nameWithOwner, allFilesInRepo.toSet())
+            val inventory = allFilesInRepo.toSet()
+            val checkResults = checks.runAll(nameWithOwner, inventory, allFilesInRepo = inventory)
             if (backend.sendCheckResults(CheckResultsForRepo(nameWithOwner, listOf(teamSlug), checkResults))) {
                 TPTMetrics.msgsSentToTpt(1)
             }

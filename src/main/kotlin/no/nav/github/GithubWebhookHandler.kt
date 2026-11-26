@@ -31,7 +31,7 @@ class GithubWebhookHandler(val checks: Checks, val backend: TptBackend, val whod
             "operation" to "github_webhook", "outcome" to "scheduled",
             "repository" to nameWithOwner, "ref" to webhookPayload.ref, "delivery_id" to deliveryId
         )
-        val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified }.toSet()
+        val changedFiles: Set<String> = webhookPayload.commits.flatMap { it.added + it.modified + it.removed }.toSet()
         val repoOwners = try {
             TPTMetrics.whodisLookups(1)
             whodis.ownerTeamsFor(nameWithOwner).also { owners ->

@@ -24,6 +24,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
+import no.nav.checks.CheckResult
+import no.nav.checks.files.HasGitignoreCheck
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -127,7 +129,7 @@ class GitHubTreeInventoryTest {
     }
 
     @Test
-    fun `complete recursive trees preserve paths without extra requests`() = runBlocking {
+    fun `complete recursive trees return only blob paths without extra requests`() = runBlocking {
         val paths = listOf(".github", ".github/workflows/check.yml", "symlink", "submodule")
         withInventory(mapOf(initial to Response(tree(
             entry(paths[0], TreeEntryType.TREE, childSha),
@@ -135,8 +137,71 @@ class GitHubTreeInventoryTest {
             entry(paths[2]),
             entry(paths[3], TreeEntryType.COMMIT, nestedSha)
         )))) { fixture ->
-            assertEquals(paths, fixture.inventory.paths("main"))
+            assertEquals(listOf(".github/workflows/check.yml", "symlink"), fixture.inventory.paths("main"))
             assertEquals(listOf(initial), fixture.requests)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `a gitignore directory does not satisfy the presence check`(truncated: Boolean) = runBlocking {
+        val responses = if (truncated) {
+            mapOf(
+                initial to Response(tree(truncated = true)),
+                root to Response(tree(entry(".gitignore", TreeEntryType.TREE, childSha))),
+                child to Response(tree(entry("settings"), sha = childSha))
+            )
+        } else {
+            mapOf(initial to Response(tree(
+                entry(".gitignore", TreeEntryType.TREE, childSha),
+                entry(".gitignore/settings")
+            )))
+        }
+
+        withInventory(responses) { fixture ->
+            val paths = fixture.realGitHub().allFilePathsIn("navikt/repo")
+
+            assertEquals(listOf(".gitignore/settings"), paths)
+            assertTrue(HasGitignoreCheck().run("navikt/repo", paths.toSet()) is CheckResult.NeedsWork)
+            assertEquals(if (truncated) listOf(initial, root, child) else listOf(initial), fixture.requests)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `a gitignore submodule does not satisfy the presence check`(truncated: Boolean) = runBlocking {
+        val entries = tree(entry(".gitignore", TreeEntryType.COMMIT, childSha))
+        val responses = if (truncated) {
+            mapOf(initial to Response(tree(truncated = true)), root to Response(entries))
+        } else {
+            mapOf(initial to Response(entries))
+        }
+
+        withInventory(responses) { fixture ->
+            val paths = fixture.realGitHub().allFilePathsIn("navikt/repo")
+
+            assertTrue(paths.isEmpty())
+            assertTrue(HasGitignoreCheck().run("navikt/repo", paths.toSet()) is CheckResult.NeedsWork)
+            assertEquals(if (truncated) listOf(initial, root) else listOf(initial), fixture.requests)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `a gitignore blob satisfies the presence check without reading contents`(truncated: Boolean) = runBlocking {
+        val entries = tree(entry(".gitignore"))
+        val responses = if (truncated) {
+            mapOf(initial to Response(tree(truncated = true)), root to Response(entries))
+        } else {
+            mapOf(initial to Response(entries))
+        }
+
+        withInventory(responses) { fixture ->
+            val paths = fixture.realGitHub().allFilePathsIn("navikt/repo")
+
+            assertEquals(listOf(".gitignore"), paths)
+            assertTrue(HasGitignoreCheck().run("navikt/repo", paths.toSet()) is CheckResult.AllGood)
+            assertEquals(if (truncated) listOf(initial, root) else listOf(initial), fixture.requests)
         }
     }
 
@@ -157,8 +222,7 @@ class GitHubTreeInventoryTest {
             nested to Response(tree(entry("deep.txt"), sha = nestedSha))
         )) { fixture ->
             assertEquals(
-                listOf("left", "left/file.txt", "left/nested", "left/nested/deep.txt",
-                    "right", "right/file.txt", "right/nested", "right/nested/deep.txt", "submodule"),
+                listOf("left/file.txt", "left/nested/deep.txt", "right/file.txt", "right/nested/deep.txt"),
                 fixture.inventory.paths("main")
             )
             assertEquals(initial, fixture.requests.first())
@@ -176,7 +240,7 @@ class GitHubTreeInventoryTest {
             root to Response(tree(entry("dir", TreeEntryType.TREE, childSha), entry("dir", TreeEntryType.TREE, childSha))),
             child to Response(tree(entry("file"), entry("file"), sha = childSha))
         )) { fixture ->
-            assertEquals(listOf("dir", "dir/file"), fixture.inventory.paths("main"))
+            assertEquals(listOf("dir/file"), fixture.inventory.paths("main"))
             assertEquals(listOf(initial, root, child), fixture.requests)
         }
     }
@@ -280,7 +344,7 @@ class GitHubTreeInventoryTest {
             ),
             limits = TreeInventoryLimits(maxTreeFetches = 3, maxEntries = 2)
         ) { fixture ->
-            assertEquals(listOf("dir", "dir/file"), fixture.inventory.paths("main"))
+            assertEquals(listOf("dir/file"), fixture.inventory.paths("main"))
         }
     }
 
@@ -346,7 +410,7 @@ class GitHubTreeInventoryTest {
             root to Response(tree(entry("dir", TreeEntryType.TREE, childSha))),
             child to Response(tree(entry("file"), sha = childSha))
         )) { fixture ->
-            assertEquals(listOf("dir", "dir/file"), fixture.realGitHub().allFilePathsIn("navikt/repo"))
+            assertEquals(listOf("dir/file"), fixture.realGitHub().allFilePathsIn("navikt/repo"))
             assertEquals(listOf(initial, root, child), fixture.requests)
         }
     }

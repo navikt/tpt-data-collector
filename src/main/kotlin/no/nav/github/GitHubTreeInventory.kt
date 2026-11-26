@@ -37,7 +37,7 @@ internal class GitHubTreeInventory(
         }
         val initialEntries = validate(recursiveTree, recursive = true)
         if (!recursiveTree.truncated) {
-            return initialEntries.map { it.path }
+            return initialEntries.filter { it.type == TreeEntryType.BLOB }.map { it.path }
         }
 
         // A truncated response cannot seed the cache: even its returned subtrees may be incomplete.
@@ -63,7 +63,9 @@ internal class GitHubTreeInventory(
             val entry = current.entries.next()
             if (++expandedEntries > limits.maxEntries) fail("expanded entry budget exceeded")
             val path = if (current.prefix.isEmpty()) entry.path else "${current.prefix}/${entry.path}"
-            paths.add(path)
+            if (entry.type == TreeEntryType.BLOB) {
+                paths.add(path)
+            }
             if (entry.type == TreeEntryType.TREE) {
                 if (entry.sha in current.ancestors) fail("tree cycle detected")
                 pending.addLast(PendingTree(path, current.ancestors + entry.sha, entriesFor(entry.sha).iterator()))

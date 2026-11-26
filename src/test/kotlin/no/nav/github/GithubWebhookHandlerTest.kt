@@ -4,11 +4,14 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
+import no.nav.checks.CheckResult
 import no.nav.checks.Checks
 import no.nav.datastore.FakeDatastore
 import no.nav.tpt.FakeTptBackend
@@ -25,6 +28,82 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class GithubWebhookHandlerTest {
+    @ParameterizedTest
+    @ValueSource(ints = [1, 2])
+    fun `absent workflow from a stale or multi commit push is not fetched`(commitCount: Int) = runTest {
+        val removedWorkflow = ".github/workflows/deploy-backend.yaml"
+        val requestedFiles = mutableListOf<String>()
+        HttpClient(MockEngine { respond("Not Found", HttpStatusCode.NotFound) }) {
+            expectSuccess = true
+        }.use { client ->
+            val gitHub = object : FakeGitHub() {
+                override suspend fun allFilePathsIn(nameWithOwner: String) = listOf(".gitignore")
+
+                override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
+                    requestedFiles += filePath
+                    client.get("https://api.github.com/repos/$nameWithOwner/contents/$filePath")
+                    error("Expected the HTTP request to fail")
+                }
+            }
+            val backend = FakeTptBackend()
+            val handler = GithubWebhookHandler(
+                Checks(gitHub, FakeDatastore()), backend, FakeWhodis(), "navikt",
+            )
+            val push = WebhookPayload(
+                ref = "refs/heads/main",
+                after = "removed",
+                repository = Repository(1L, "team-ksg", "navikt/team-ksg", "main"),
+                commits = listOf(
+                    Commit("modified", listOf(removedWorkflow), emptyList(), emptyList()),
+                    Commit("removed", emptyList(), emptyList(), listOf(removedWorkflow)),
+                ).take(commitCount),
+            )
+
+            withCapturedLogs { events ->
+                handler.handle(push)
+
+                val failures = events.filter {
+                    it.message.formattedMessage.startsWith("File read failed")
+                }
+                assertTrue(requestedFiles.isEmpty(), "Nonexistent workflow was fetched: $requestedFiles; " +
+                    "logged failures: ${failures.map { it.message.formattedMessage }}")
+                assertTrue(failures.isEmpty())
+                assertTrue(backend.sentCheckResults.single().results.isNotEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `workflow removal triggers evaluation of remaining workflows`() = runTest {
+        val remainingWorkflow = ".github/workflows/build.yml"
+        val requestedFiles = mutableListOf<String>()
+        val gitHub = object : FakeGitHub() {
+            override suspend fun allFilePathsIn(nameWithOwner: String) = listOf(remainingWorkflow)
+
+            override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
+                requestedFiles += filePath
+                assertEquals(remainingWorkflow, filePath)
+                return "steps:\n  - uses: actions/checkout@v4"
+            }
+        }
+        val backend = FakeTptBackend()
+        val handler = GithubWebhookHandler(Checks(gitHub, FakeDatastore()), backend, FakeWhodis(), "navikt")
+        val push = WebhookPayload(
+            ref = "refs/heads/main",
+            after = "removed",
+            repository = Repository(1L, "repo", "navikt/repo", "main"),
+            commits = listOf(
+                Commit("removed", emptyList(), emptyList(), listOf(".github/workflows/deploy-backend.yaml")),
+            ),
+        )
+
+        handler.handle(push)
+
+        assertEquals(listOf(remainingWorkflow), requestedFiles)
+        assertTrue(backend.sentCheckResults.single().results
+            .single { it.name == "PinnedGitHubActionVersions" } is CheckResult.NeedsWork)
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["null", "[]"])
     fun `missing owners publish checks with an informational message and no error`(body: String) = runTest {

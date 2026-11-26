@@ -28,6 +28,140 @@ class ChecksTest {
     private val unpinnedWorkflow = "steps:\n  - uses: actions/checkout@v4"
 
     @Test
+    fun `removing the last readme reports needs work without fetching the deleted file`() = runBlocking {
+        val gitHub = FileGitHub(emptyMap())
+
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf("README.md"))
+
+        val readme = assertIs<CheckResult.NeedsWork>(results.single { it.name == "ReadmeCheck" })
+        assertEquals(listOf("navikt/repo does not appear to have a Readme"), readme.reasons)
+        assertTrue(gitHub.requestedFiles.isEmpty())
+        assertEquals(1, gitHub.inventoryRequests)
+    }
+
+    @Test
+    fun `removing the last workflow clears its findings without fetching the deleted file`() = runBlocking {
+        val gitHub = FileGitHub(emptyMap())
+
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf(workflow))
+
+        setOf("PinnedGitHubActionVersions", "PwnRequestCheck", "CurlPipeShell").forEach { name ->
+            assertIs<CheckResult.AllGood>(results.single { it.name == name })
+        }
+        assertTrue(gitHub.requestedFiles.isEmpty())
+        assertEquals(1, gitHub.inventoryRequests)
+    }
+
+    @Test
+    fun `removing the last dockerfile clears its findings without fetching the deleted file`() = runBlocking {
+        val gitHub = FileGitHub(emptyMap())
+
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf("Dockerfile"))
+
+        setOf("DistrolessCheck", "CopyDotDot", "CurlPipeShell", "BaseImageIsNotPinnedCheck").forEach { name ->
+            assertIs<CheckResult.AllGood>(results.single { it.name == name })
+        }
+        assertTrue(gitHub.requestedFiles.isEmpty())
+        assertEquals(1, gitHub.inventoryRequests)
+    }
+
+    @Test
+    fun `selected workflow checks include unchanged workflows and exclude absent changed paths`() = runBlocking<Unit> {
+        val unchangedWorkflow = ".github/workflows/unchanged.yml"
+        val gitHub = FileGitHub(mapOf(unchangedWorkflow to unpinnedWorkflow))
+
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf(workflow))
+
+        val pinning = assertIs<CheckResult.NeedsWork>(results.single { it.name == "PinnedGitHubActionVersions" })
+        assertEquals(listOf("Workflow '$unchangedWorkflow' uses non-pinned action versions"), pinning.reasons)
+        assertEquals(listOf(unchangedWorkflow), gitHub.requestedFiles)
+        assertEquals(1, gitHub.inventoryRequests)
+        assertIs<CheckResult.AllGood>(results.single { it.name == "PwnRequestCheck" })
+        assertIs<CheckResult.AllGood>(results.single { it.name == "CurlPipeShell" })
+    }
+
+    @Test
+    fun `unchanged lockfile satisfies a workflow triggered pinning check`() = runBlocking {
+        val gitHub = FileGitHub(mapOf(workflow to unpinnedWorkflow, lockfile to ""))
+
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf(workflow))
+
+        assertIs<CheckResult.AllGood>(results.single { it.name == "PinnedGitHubActionVersions" })
+        assertEquals(setOf(workflow, lockfile), gitHub.requestedFiles.toSet())
+        assertEquals(gitHub.requestedFiles.size, gitHub.requestedFiles.toSet().size)
+    }
+
+    @Test
+    fun `inventory does not select content checks without relevant changed paths`() = runBlocking<Unit> {
+        val gitHub = FileGitHub(mapOf(workflow to unpinnedWorkflow, "README.md" to "Project\nDescription"))
+
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf("README.md"))
+
+        assertEquals(listOf("README.md"), gitHub.requestedFiles)
+        assertTrue(results.none { it.name == "PinnedGitHubActionVersions" })
+        assertIs<CheckResult.AllGood>(results.single { it.name == "ReadmeCheck" })
+    }
+
+    @Test
+    fun `supplied complete inventory is reused by all file checks`() = runBlocking {
+        val gitHub = FileGitHub(mapOf(workflow to unpinnedWorkflow))
+
+        Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf(workflow), allFilesInRepo = gitHub.files.keys)
+
+        assertEquals(0, gitHub.inventoryRequests)
+        assertEquals(listOf(workflow), gitHub.requestedFiles)
+    }
+
+    @Test
+    fun `inventory failure omits all dependent checks without fetching changed paths`() = runBlocking {
+        val failure = IOException("Inventory unavailable")
+        var inventoryRequests = 0
+        val requestedFiles = mutableListOf<String>()
+        val gitHub = object : FakeGitHub() {
+            override suspend fun allFilePathsIn(nameWithOwner: String): List<String> {
+                inventoryRequests++
+                throw failure
+            }
+
+            override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
+                requestedFiles += filePath
+                return unpinnedWorkflow
+            }
+        }
+
+        withCapturedLogs { events ->
+            val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf(workflow))
+
+            assertEquals(1, inventoryRequests)
+            assertTrue(requestedFiles.isEmpty())
+            assertTrue(results.none {
+                it.name in setOf("HasGitignoreCheck", "PinnedGitHubActionVersions", "PwnRequestCheck", "CurlPipeShell")
+            })
+            assertTrue(results.any { it.name == "OldDeployments" })
+            assertTrue(results.any { it.name == "HasCriticalVulns" })
+            val warning = events.single { it.level == Level.WARN }
+            assertEquals("file_inventory", warning.contextData.getValue<String>("operation"))
+            assertEquals("navikt/repo", warning.contextData.getValue<String>("repository"))
+            assertEquals(
+                setOf("HasGitignoreCheck", "UnpinnedActionVersionsCheck", "PwnRequestCheck", "CurlPipeShellCheck"),
+                warning.contextData.getValue<String>("affected_checks").split(",").toSet()
+            )
+        }
+    }
+
+    @Test
+    fun `inventory cancellation propagates before content reads`() {
+        val gitHub = object : FakeGitHub() {
+            override suspend fun allFilePathsIn(nameWithOwner: String): List<String> =
+                throw CancellationException("Collection cancelled")
+        }
+
+        assertThrows<CancellationException> {
+            runBlocking { Checks(gitHub, FakeDatastore()).runAll("navikt/repo", setOf(workflow)) }
+        }
+    }
+
+    @Test
     fun `shared file read failures are logged once with repository, filenames and affected checks`() = runBlocking {
         withCapturedLogs { events ->
             val gitHub = FileGitHub(mapOf(workflow to unpinnedWorkflow), failedFiles = setOf(workflow))
@@ -100,7 +234,7 @@ class ChecksTest {
         val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", gitHub.files.keys)
 
         assertIs<CheckResult.AllGood>(results.single { it.name == "HasGitignoreCheck" })
-        assertEquals(listOf(".gitignore"), gitHub.requestedFiles)
+        assertTrue(gitHub.requestedFiles.isEmpty())
     }
 
     @ParameterizedTest
@@ -110,6 +244,8 @@ class ChecksTest {
             expectSuccess = true
         }.use { client ->
             val gitHub = object : FakeGitHub() {
+                override suspend fun allFilePathsIn(nameWithOwner: String) = listOf(workflow, "README.md")
+
                 override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
                     if (filePath == workflow) {
                         client.get("https://api.github.com/repos/$nameWithOwner/contents/$filePath")
@@ -145,17 +281,28 @@ class ChecksTest {
     }
 
     @Test
-    fun `unreadable gitignore does not pass the presence check`() = runBlocking {
+    fun `gitignore presence does not depend on readable contents`() = runBlocking {
         val gitHub = FileGitHub(mapOf(".gitignore" to "build/"), failedFiles = setOf(".gitignore"))
 
-        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", gitHub.files.keys)
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", emptySet())
 
-        assertTrue(results.none { it.name == "HasGitignoreCheck" })
+        assertIs<CheckResult.AllGood>(results.single { it.name == "HasGitignoreCheck" })
+        assertTrue(gitHub.requestedFiles.isEmpty())
         assertTrue(results.any { it.name == "OldDeployments" })
     }
 
     @Test
-    fun `successful empty workflow is not treated as a failed read`() = runBlocking {
+    fun `missing gitignore reports needs work without reading contents`() = runBlocking {
+        val gitHub = FileGitHub(emptyMap())
+
+        val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", emptySet())
+
+        assertIs<CheckResult.NeedsWork>(results.single { it.name == "HasGitignoreCheck" })
+        assertTrue(gitHub.requestedFiles.isEmpty())
+    }
+
+    @Test
+    fun `successful empty workflow is not treated as a failed read`() = runBlocking<Unit> {
         val gitHub = FileGitHub(mapOf(workflow to ""))
 
         val results = Checks(gitHub, FakeDatastore()).runAll("navikt/repo", gitHub.files.keys)
@@ -166,6 +313,8 @@ class ChecksTest {
     @Test
     fun `file read cancellation propagates`() {
         val gitHub = object : FakeGitHub() {
+            override suspend fun allFilePathsIn(nameWithOwner: String) = listOf(workflow)
+
             override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
                 throw CancellationException("Collection cancelled")
             }
@@ -183,6 +332,12 @@ class ChecksTest {
         private val failedFiles: Set<String> = emptySet()
     ) : FakeGitHub() {
         val requestedFiles = mutableListOf<String>()
+        var inventoryRequests = 0
+
+        override suspend fun allFilePathsIn(nameWithOwner: String): List<String> {
+            inventoryRequests++
+            return files.keys.toList()
+        }
 
         override suspend fun readFileContents(nameWithOwner: String, filePath: String): String {
             requestedFiles += filePath

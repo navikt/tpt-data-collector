@@ -43,7 +43,7 @@ Repository identities are qualified `owner/name` values throughout checks, GitHu
 
 | Endpoint | Auth | Does |
 |---|---|---|
-| `POST /webhook/github` | `X-Hub-Signature-256` | On a push to the default branch of a `navikt` repo: runs GitHub API and datastore checks, plus file checks whose paths were changed (each evaluates the whole repo) |
+| `POST /webhook/github` | `X-Hub-Signature-256` | On a push to the default branch of a `navikt` repo: runs GitHub API and datastore checks, plus file checks whose paths were added, modified or removed (each evaluates the whole repo) |
 | `POST /team/{slug}` | Azure AD | Runs all checks on every non-archived repo of the team |
 | `POST /collect/github` | Azure AD | Body `{"teams": [...], "repositories": ["owner/name"]}` (at least one). Fetches open vulnerability alerts per repo |
 | `GET /internal/isAlive`, `/isReady`, `/metrics` | — | Nais probes and Prometheus metrics |
@@ -62,6 +62,10 @@ Work runs in the background: `202 Accepted` means the job started, not that it s
 The checks callback body has `nameWithOwner` (for example, `"navikt/my-repo"`), `repoOwners` (team slugs), and `results` (check results). The previous `repoName` field is no longer sent.
 
 Failed callbacks (network errors, `5xx`, `408`, `429`) are retried with exponential backoff. Callbacks that still fail are logged and counted in the `tpt_backend_callbacks_failed` metric, tagged with `callback`. If file checks cannot read the repository tree or a file, the affected checks are left out of the callback instead of being reported.
+
+Changed paths select content-based checks, but their read targets come from the complete current default-branch inventory, including unchanged matching files. Deleted or stale changed paths are not fetched. Inventory is shared with the gitignore presence check and reused for team runs. A file deleted after inventory collection can still produce a read failure; dependent checks remain omitted in that case.
+
+The file inventory contains blob paths (including symlinks), not directories or submodules. A directory or submodule named `.gitignore` does not satisfy the gitignore presence check.
 
 ## Deployment and operations
 

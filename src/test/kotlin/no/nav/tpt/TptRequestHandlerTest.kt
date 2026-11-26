@@ -104,7 +104,7 @@ class TptRequestHandlerTest {
         TptRequestHandler(gitHub, Checks(gitHub, datastore), backend).runAllChecksFor("team")
 
         assertEquals(repositories, inventoryRequests)
-        assertEquals(repositories, fileRequests)
+        assertTrue(fileRequests.isEmpty())
         assertEquals(repositories, apiRequests)
         assertEquals(repositories, datastore.checkedRepos)
         assertEquals(repositories, backend.sentCheckResults.map { it.nameWithOwner })

@@ -8,6 +8,13 @@ import org.junit.jupiter.api.Test
 class DistrolessCheckTest {
 
     @Test
+    fun `No Dockerfiles means no non-recommended images`() {
+        val result = DistrolessCheck().run("navikt/bogusrepo", emptyMap())
+
+        assertTrue(result is CheckResult.AllGood)
+    }
+
+    @Test
     fun `This check should only care about Dockerfiles`() {
         val allAvailableFiles = setOf("Dockerfile", "Dockerfile.test", "prod.dockerfile", "whatever")
         val check = DistrolessCheck()
